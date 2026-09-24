@@ -37,6 +37,7 @@ import { MetaModule } from './meta/meta.module.js';
 import { MessagesModule } from './messages/messages.module.js';
 import { ApplicationsModule } from './applications/applications.module.js';
 import { PortalModule } from './portal/portal.module.js';
+import { AdminApplicationsModule } from './admin-applications/admin-applications.module.js';
 
 // Phase 2 (done): the full schema (001_schema.sql) and entities for every
 // table the project plan's "Data model" section lists, plus the infra
@@ -56,8 +57,12 @@ import { PortalModule } from './portal/portal.module.js';
 // and PortalModule (autosave/submit, OTP sign-in, private document
 // upload/download via StorageModule's PrivateFileStore, interview-slot
 // booking, notifications) — the plan's "Apply flow and portal" section.
-// TODO(phase 7): admin applications module (list/counts/CSV/review/bulk/
-// interview-slots) and the admin overview aggregate.
+// Phase 7 (done): AdminApplicationsModule — the staff half of the
+// scholarship pipeline (list/counts/CSV export, single-application review,
+// the status-transition map, document accept/reject, request-documents,
+// internal notes, bulk actions, interview-slot management via
+// CrudController) plus the role-filtered admin/overview aggregate. This was
+// the last feature phase; phase 8 is docs/openapi/smoke only.
 @Module({
   imports: [
     ConfigModule,
@@ -99,6 +104,7 @@ import { PortalModule } from './portal/portal.module.js';
     MessagesModule,
     ApplicationsModule,
     PortalModule,
+    AdminApplicationsModule,
   ],
   providers: [
     // Guards run before interceptors regardless of relative registration

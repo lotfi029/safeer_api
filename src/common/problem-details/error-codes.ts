@@ -30,6 +30,16 @@ export const ErrorCode = {
   SLOT_ALREADY_BOOKED: 'SLOT_ALREADY_BOOKED',
   /** Phase 6: `portal/interview-slots` and `portal/interview` — the application's `status` is not `interview`. */
   INTERVIEW_NOT_AVAILABLE: 'INTERVIEW_NOT_AVAILABLE',
+  /**
+   * Phase 7 (admin applications): `PATCH admin/applications/:id`, the
+   * `status` bulk action, and `POST .../request-documents` all validate
+   * against `admin-applications/transitions.ts`'s allowed-transition map
+   * before writing anything. Thrown for any disallowed `from`→`to` pair,
+   * including every attempt to move into or out of `draft` from this admin
+   * surface (`draft`→`new` only ever happens through the applicant's own
+   * submit) — `extra.from`/`extra.to` name the rejected pair.
+   */
+  INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
