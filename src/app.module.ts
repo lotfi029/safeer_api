@@ -34,6 +34,7 @@ import { HomeModule } from './home/home.module.js';
 import { SiteModule } from './site/site.module.js';
 import { ContactModule } from './contact/contact.module.js';
 import { MetaModule } from './meta/meta.module.js';
+import { MessagesModule } from './messages/messages.module.js';
 
 // Phase 2 (done): the full schema (001_schema.sql) and entities for every
 // table the project plan's "Data model" section lists, plus the infra
@@ -46,7 +47,8 @@ import { MetaModule } from './meta/meta.module.js';
 // partners, doc-categories/documents, contact/newsletter, meta, plus the
 // home and site (chrome) public aggregates. PreviewModule now covers
 // `posts` (see auth/preview-token.util.ts's PreviewCollection).
-// TODO(phase 5): import MessagesModule (contact inbox).
+// Phase 5 (done): MessagesModule (contact inbox — reply, status, convert to
+// testimonial, delete), hand-written and admin/support-gated per the plan.
 // TODO(phase 6): import ApplicationsModule (apply flow) and PortalModule
 // (OTP student portal + private documents — wires StorageModule's
 // PrivateFileStore into real upload/download endpoints for the first time).
@@ -90,6 +92,7 @@ import { MetaModule } from './meta/meta.module.js';
     SiteModule,
     ContactModule,
     MetaModule,
+    MessagesModule,
   ],
   providers: [
     // Guards run before interceptors regardless of relative registration
