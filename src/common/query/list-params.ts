@@ -80,3 +80,16 @@ export function readPageLimit(query: Record<string, unknown>, opts: PageLimitOpt
   const beyondMaxOffset = rawOffset > MAX_OFFSET;
   return { page, limit, offset: Math.min(rawOffset, MAX_OFFSET), beyondMaxOffset };
 }
+
+/**
+ * `%`, `_` and `\` are LIKE metacharacters — unescaped, a `?q=` value could
+ * alter the match pattern rather than just its value (an unbounded `%`, or
+ * `\` breaking the `ESCAPE '\\'` clause every caller pairs this with).
+ * Previously duplicated identically in `crud.factory.ts` (the CRUD kernel's
+ * own `?q=` search) and `admin-applications.service.ts` (its hand-written
+ * reference/name/email search) — extracted here so both share one
+ * definition, the same way `asString`/`readPageLimit` already are.
+ */
+export function escapeLikeValue(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
+}

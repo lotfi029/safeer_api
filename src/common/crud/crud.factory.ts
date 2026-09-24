@@ -6,7 +6,7 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { CacheService } from '../../cache/cache.service.js';
 import { declarePurger } from '../../cache/cache-tag-registry.js';
-import { readPageLimit, readString } from '../query/list-params.js';
+import { escapeLikeValue, readPageLimit, readString } from '../query/list-params.js';
 import { ProblemException } from '../problem-details/problem.exception.js';
 import { ErrorCode } from '../problem-details/error-codes.js';
 import type { RequestContext } from '../request-context.js';
@@ -51,11 +51,6 @@ const MAX_PAGE_SIZE = 100;
  * the whole name with no prefix — `/AssetId$/` alone would silently miss it.
  */
 const ASSET_ID_FIELD_RE = /AssetId$/i;
-
-/** I-10: `%`, `_` and `\` are LIKE metacharacters — unescaped, `?q=` lets a caller alter the match pattern, not just its value. */
-function escapeLikeValue(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
 
 /** mysql2 error shape surfaced through TypeORM's QueryFailedError.driverError — same check as http-exception.filter.ts. */
 function isRowReferencedError(err: unknown): boolean {

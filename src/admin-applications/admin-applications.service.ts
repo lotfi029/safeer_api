@@ -13,7 +13,7 @@ import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
 import type { RequestContext } from '../common/request-context.js';
 import type { PagedResult } from '../common/crud/crud.factory.js';
-import { readPageLimit, readString } from '../common/query/list-params.js';
+import { escapeLikeValue, readPageLimit, readString } from '../common/query/list-params.js';
 import { toCsvWithBom } from '../common/csv.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
@@ -49,11 +49,6 @@ export interface BulkActionResult {
   id: string;
   ok: boolean;
   error?: string;
-}
-
-/** I-10 (crud.factory.ts): `%`, `_` and `\` are LIKE metacharacters — unescaped, `?q=` would let a caller alter the match pattern, not just its value. */
-function escapeLikeValue(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
 }
 
 function errorMessageFrom(err: unknown): string {

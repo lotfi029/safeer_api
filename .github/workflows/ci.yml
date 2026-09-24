@@ -38,10 +38,9 @@ jobs:
 
     env:
       # NODE_ENV=development (not test/staging) so migrate.mjs includes
-      # migrations/dev/003_dev_sample.sql — several smoke cases (the
-      # editor-role gates, the lockout/reset flow) need that seeded data
-      # and skip themselves cleanly when it's absent, but running with it
-      # is what actually exercises them.
+      # migrations/dev/003_dev_sample.sql — the legacy-news bulk-delete
+      # smoke case needs that seeded data (the 3 "legacy template" posts)
+      # to have anything to act on.
       NODE_ENV: development
       PORT: 3900
       DB_HOST: 127.0.0.1
@@ -66,8 +65,12 @@ jobs:
       CACHE_TTL_SECONDS: '60'
       CACHE_MAX_ENTRIES: '500'
       # B0-5: refused outright if NODE_ENV=production — safe here since
-      # NODE_ENV is development, and it's what lets the seeded editor
-      # actually sign in for the role-gate smoke cases.
+      # NODE_ENV is development. Not load-bearing for the smoke suite's own
+      # role-gate cases (scripts/smoke.mjs creates its own temporary
+      # editor/reviewer/support accounts by direct row insert, since
+      # 002_seed.sql/dev/003_dev_sample.sql seed zero users on purpose — the
+      # only account either ever produces is the bootstrap admin below), but
+      # left on for parity with a real dev environment.
       ALLOW_DEV_PASSWORD_FIXUP: 'true'
 
     steps:
