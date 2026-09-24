@@ -1,0 +1,2087 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>جمعية سفير الدعوية — نموذج تفاعلي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --primary:#0B4343; --primary-dark:#063333; --secondary:#1C8184; --sl:#DDF2F1;
+  --bg:#FFFFFF; --surface:#F6FAF9; --card:#FFFFFF; --text:#183333; --muted:#4F6B6B;
+  --border:#DCE8E7; --decor:#668080; --on-primary:#FFFFFF;
+  --alert:#B4532A; --alert-bg:#FFF0E8; --alert-br:#E8D5CB; --alert-tx:#8A3D1E;
+  --ok:#1E6B3C; --ok-bg:#E4F3E9;
+  --logo1:#0B4343; --logo2:#1C8184; --hero:#F6FAF9; --band:#0B4343; --band-tx:#FFFFFF;
+  --band-soft:#C9E6E4; --band-dim:#8FC9C7; --band-card:#063333;
+  --raise:#EEF6F5; --app-bg:#F6FAF9; --thead:#F6FAF9; --sidebar:#063333;
+  --badge-tx:#FFFFFF; --onband-bg:#FFFFFF; --onband-tx:#0B4343;
+  --shadow-sm:0 2px 16px rgba(11,67,67,.07); --shadow-md:0 14px 34px rgba(11,67,67,.10);
+  --r-card:20px; --r-btn:10px; --pad:60px; --maxw:1280px;
+}
+[data-theme="dark"]{
+  /* elevation ladder: bg < surface < card < raise */
+  --bg:#06191B; --surface:#0C2326; --card:#102A2D; --raise:#16373A; --border:#1F4649;
+  --text:#E9F4F3; --muted:#9DB7B6; --decor:#6E9190;
+  --primary:#3FB8B4; --primary-dark:#57C9C5; --secondary:#6ED3CE; --on-primary:#052021;
+  --sl:#173538;
+  --alert:#E08B63; --alert-bg:#3A2017; --alert-br:#5C3524; --alert-tx:#F3BFA5;
+  --ok:#74CE95; --ok-bg:#12331F;
+  --logo1:#E9F4F3; --logo2:#6ED3CE; --hero:#0A2326;
+  --band:#0A2E31; --band-tx:#EAF6F5; --band-soft:#A9C9C7; --band-dim:#6ED3CE; --band-card:#0F3A3D;
+  --app-bg:#0A1F21; --thead:#16373A; --sidebar:#041214;
+  --badge-tx:#052021; --onband-bg:#3FB8B4; --onband-tx:#052021;
+  --shadow-sm:0 2px 16px rgba(0,0,0,.45); --shadow-md:0 16px 40px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'IBM Plex Sans Arabic','IBM Plex Sans',system-ui,sans-serif;
+  background:var(--bg); color:var(--text);
+  font-size:17px; line-height:1.85; -webkit-font-smoothing:antialiased;
+}
+html[dir="ltr"] body{font-family:'IBM Plex Sans','IBM Plex Sans Arabic',system-ui,sans-serif}
+a{color:var(--secondary); text-decoration:none}
+a:hover{color:var(--primary)}
+button,input,select,textarea{font-family:inherit; font-size:inherit; color:inherit}
+h1,h2,h3,h4{margin:0; line-height:1.35; font-weight:600; color:var(--primary)}
+[data-theme="dark"] h1,[data-theme="dark"] h2,[data-theme="dark"] h3,[data-theme="dark"] h4{color:var(--text)}
+p{margin:0}
+.ltr{direction:ltr; text-align:right; font-family:'IBM Plex Sans',sans-serif}
+html[dir="ltr"] .ltr{text-align:left}
+
+/* ---------- layout ---------- */
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 var(--pad)}
+.sec{padding:96px 0}
+.sec.tight{padding:64px 0}
+.sec.surface{background:var(--surface)}
+.sec.band{background:var(--band); color:var(--band-tx)}
+.sec.band h1,.sec.band h2,.sec.band h3{color:var(--band-tx)}
+.row{display:flex; gap:24px}
+.row.mid{align-items:center}
+.row.end{align-items:flex-end}
+.col{display:flex; flex-direction:column}
+.g8{gap:8px}.g12{gap:12px}.g16{gap:16px}.g20{gap:20px}.g24{gap:24px}.g32{gap:32px}.g40{gap:40px}
+.grow{flex-grow:1}
+.spread{display:flex; align-items:center; justify-content:space-between; gap:24px}
+.grid{display:grid; gap:24px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g5{grid-template-columns:repeat(5,minmax(0,1fr))}
+
+/* ---------- type ---------- */
+.display{font-size:clamp(34px,4.2vw,60px); font-weight:700; line-height:1.3}
+.h1{font-size:clamp(30px,3.4vw,48px); font-weight:700}
+.h2{font-size:clamp(26px,2.9vw,40px)}
+.h3{font-size:clamp(20px,1.6vw,24px)}
+.lead{font-size:19px; line-height:1.85; color:var(--muted)}
+.sec.band .lead,.band-soft{color:var(--band-soft)}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.cap{font-size:13px; color:var(--muted)}
+.eyebrow{font-size:14px; font-weight:600; letter-spacing:.08em; color:var(--secondary)}
+.sec.band .eyebrow{color:var(--band-dim)}
+
+/* ---------- components ---------- */
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:10px; white-space:nowrap;
+  min-height:52px; padding:0 28px; border-radius:var(--r-btn); border:none;
+  background:var(--primary); color:var(--on-primary); font-size:16px; font-weight:600;
+  cursor:pointer; transition:background .2s, transform .2s}
+.btn:hover{background:var(--primary-dark); color:var(--on-primary); transform:translateY(-1px)}
+.btn.sm{min-height:44px; padding:0 20px; font-size:15px}
+.btn.xs{min-height:38px; padding:0 16px; font-size:14px; border-radius:8px}
+.btn.ghost{background:transparent; color:var(--primary); border:1.5px solid var(--primary)}
+.btn.ghost:hover{background:var(--sl); color:var(--primary)}
+.btn.soft{background:var(--sl); color:var(--primary)}
+.btn.soft:hover{background:var(--sl); filter:brightness(.96); color:var(--primary)}
+.btn.line{background:var(--card); color:var(--text); border:1px solid var(--border); font-weight:600}
+.btn.line:hover{background:var(--raise); color:var(--text)}
+.btn.danger{background:var(--alert); color:var(--badge-tx)}
+.btn.danger:hover{background:var(--alert); filter:brightness(.92)}
+.btn.onband{background:var(--onband-bg); color:var(--onband-tx)}
+.btn.onband:hover{background:var(--onband-bg); color:var(--onband-tx); filter:brightness(.95)}
+.btn.onband-ghost{background:transparent; color:var(--band-tx); border:1.5px solid var(--band-dim)}
+.btn.onband-ghost:hover{background:rgba(255,255,255,.08); color:var(--band-tx)}
+
+.card{background:var(--card); border:1px solid var(--border); border-radius:var(--r-card); padding:32px}
+.card.pad0{padding:0; overflow:hidden}
+.card.hover{transition:transform .28s, border-color .28s, box-shadow .28s}
+.card.hover:hover{transform:translateY(-4px); border-color:var(--secondary); box-shadow:var(--shadow-md)}
+.tile{background:var(--raise); border-radius:14px; padding:18px 22px}
+
+.pill{display:inline-flex; align-items:center; padding:6px 13px; border-radius:999px; font-size:13px; font-weight:600; white-space:nowrap}
+.pill.teal{background:var(--sl); color:var(--primary)}
+[data-theme="dark"] .pill.teal{color:var(--text)}
+.pill.ok{background:var(--ok-bg); color:var(--ok)}
+.pill.warn{background:var(--alert-bg); color:var(--alert-tx)}
+.pill.plain{background:var(--raise); border:1px solid var(--border); color:var(--muted)}
+.pill.solid{background:var(--secondary); color:var(--on-primary)}
+
+.chip{display:inline-flex; align-items:center; min-height:42px; padding:0 20px; border-radius:999px;
+  background:var(--card); border:1px solid var(--border); color:var(--text);
+  font-size:15px; font-weight:500; cursor:pointer}
+.chip.on{background:var(--primary); color:var(--on-primary); border-color:var(--primary); font-weight:600}
+
+.ico{width:54px; height:54px; border-radius:16px; background:var(--sl);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--secondary)}
+.ico.sm{width:44px; height:44px; border-radius:12px}
+.ico.lg{width:60px; height:60px; border-radius:18px}
+
+.ph{background:var(--sl); border-radius:var(--r-card); display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px; color:var(--primary);
+  font-size:15px; font-weight:600; text-align:center; padding:20px}
+.ph.dim{background:var(--surface); border:1px solid var(--border); color:var(--muted)}
+
+label{font-size:15px; font-weight:600; color:var(--text)}
+.field{display:flex; flex-direction:column; gap:8px}
+input[type=text],input[type=email],input[type=tel],input[type=url],input[type=date],
+input[type=search],input[type=password],select,textarea{
+  min-height:52px; padding:0 16px; border:1px solid var(--border); border-radius:var(--r-btn);
+  background:var(--card); color:var(--text); font-size:16px; width:100%}
+textarea{padding:14px 16px; line-height:1.8; min-height:120px; resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--secondary); outline-offset:1px}
+input::placeholder,textarea::placeholder{color:var(--decor); opacity:1}
+.req{color:var(--alert)}
+.check{display:flex; gap:14px; align-items:center; min-height:56px; padding:0 22px;
+  border:1px solid var(--border); border-radius:12px; background:var(--card); cursor:pointer; font-weight:500}
+.check.on{border:1.5px solid var(--secondary); background:var(--sl); font-weight:600; color:var(--primary)}
+[data-theme="dark"] .check.on{color:var(--text)}
+input[type=radio],input[type=checkbox]{width:20px; height:20px; accent-color:var(--primary); min-height:0}
+
+.note{display:flex; gap:16px; align-items:flex-start; padding:22px 26px; border-radius:14px;
+  background:var(--sl); color:var(--primary); font-size:15px; line-height:1.8}
+[data-theme="dark"] .note{color:var(--text)}
+.note.warn{background:var(--alert-bg); border:1px solid var(--alert-br); color:var(--alert-tx)}
+
+.tbl{background:var(--card); border:1px solid var(--border); border-radius:18px; overflow:hidden}
+.tbl .th,.tbl .tr{display:flex; gap:18px; align-items:center; padding:16px 24px}
+.tbl .th{background:var(--thead); border-bottom:1px solid var(--border); font-size:14px; font-weight:600; color:var(--muted)}
+.tbl .tr{padding:18px 24px; border-bottom:1px solid var(--border); font-size:15px}
+.tbl .tr:last-child{border-bottom:none}
+.tbl .tr:hover{background:var(--raise)}
+.divider{height:1px; background:var(--border)}
+
+/* ---------- site chrome ---------- */
+.nav{position:sticky; top:0; z-index:50; background:var(--bg); border-bottom:1px solid var(--border);
+  transition:box-shadow .25s}
+.nav.stuck{box-shadow:var(--shadow-sm)}
+.nav-in{max-width:1400px; margin:0 auto; padding:0 var(--pad); height:88px;
+  display:flex; align-items:center; gap:24px}
+.navlink{font-size:15px; font-weight:600; color:var(--primary); white-space:nowrap}
+[data-theme="dark"] .navlink{color:var(--text)}
+.brand{display:flex; align-items:center; gap:12px; color:var(--primary)}
+.brand:hover{color:var(--primary)}
+.logochip{display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+  background:#FFFFFF; border-radius:10px; padding:5px}
+.logo{display:block; height:100%; width:auto}
+.side .logochip,.foot .logochip{box-shadow:0 1px 6px rgba(0,0,0,.18)}
+.brand b{font-size:19px; font-weight:700; display:block; line-height:1.3; white-space:nowrap}
+.brand .tag{font-size:12px; color:var(--muted); display:block}
+.menu{flex-grow:1; display:flex; align-items:center; justify-content:center; gap:22px}
+.menu a{font-size:16px; font-weight:500; color:var(--text); padding:8px 2px; border-bottom:2px solid transparent; white-space:nowrap}
+.menu a:hover{color:var(--secondary)}
+.menu a.on{font-weight:600; color:var(--primary); border-bottom-color:var(--secondary)}
+[data-theme="dark"] .menu a.on{color:var(--text)}
+.navtools{display:flex; align-items:center; gap:12px}
+.iconbtn{width:44px; height:44px; border-radius:10px; border:1px solid var(--border);
+  background:var(--card); color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer}
+.iconbtn:hover{background:var(--raise)}
+.langbtn{height:44px; padding:0 14px; border-radius:8px; border:1px solid var(--border);
+  background:transparent; color:var(--muted); font-weight:600; font-size:14px; cursor:pointer;
+  font-family:'IBM Plex Sans',sans-serif}
+.burger{display:none}
+
+.foot{background:var(--primary-dark); color:#fff; padding:64px 0 28px}
+[data-theme="dark"] .foot{background:var(--surface); border-top:1px solid var(--border); color:var(--text)}
+.foot a{color:#C9E6E4}
+[data-theme="dark"] .foot a{color:var(--muted)}
+.foot a:hover{color:#fff}
+.foot h4{color:#fff; font-size:18px; margin-bottom:6px}
+[data-theme="dark"] .foot h4{color:var(--text)}
+.foot .fcol{display:flex; flex-direction:column; gap:12px; font-size:15px}
+.foot .bot{display:flex; align-items:center; justify-content:space-between; gap:24px;
+  border-top:1px solid rgba(255,255,255,.12); margin-top:40px; padding-top:24px; font-size:14px; color:#A2C9C7}
+[data-theme="dark"] .foot .bot{border-top-color:var(--border); color:var(--muted)}
+.soc{display:flex; gap:12px}
+.soc a{width:40px; height:40px; border-radius:10px; border:1px solid rgba(255,255,255,.18);
+  display:flex; align-items:center; justify-content:center; color:#C9E6E4}
+[data-theme="dark"] .soc a{border-color:var(--border)}
+
+/* ---------- hero ---------- */
+.hero{position:relative; overflow:hidden; background:var(--hero); padding:84px 0}
+.hero .wrap{position:relative; z-index:1; display:flex; gap:56px; align-items:center}
+.hero .lines{position:absolute; inset-inline-start:0; top:0; opacity:.18; pointer-events:none}
+[data-theme="dark"] .hero .lines{opacity:.34}
+html[dir="ltr"] .hero .lines{transform:scaleX(-1)}
+.badge{display:inline-flex; align-items:center; padding:8px 18px; border-radius:999px;
+  background:var(--sl); color:var(--primary); font-size:14px; font-weight:600; align-self:flex-start}
+[data-theme="dark"] .badge{color:var(--text)}
+
+/* ---------- admin shell ---------- */
+.app{display:flex; min-height:100vh; overflow-x:clip}
+.side{width:272px; flex-shrink:0; background:var(--sidebar); color:#fff; padding:26px 18px;
+  display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto}
+[data-theme="dark"] .side{border-inline-end:1px solid var(--border)}
+.side .sbrand{display:flex; align-items:center; gap:12px; padding:0 10px 14px; color:#fff}
+.side .sbrand b{font-size:16px; font-weight:700; display:block}
+.side .sbrand span{font-size:12px; color:#A2C9C7}
+.sbh{font-size:11px; font-weight:600; letter-spacing:.1em; color:#6E9B99; padding:18px 12px 8px}
+.sbl{display:flex; align-items:center; gap:12px; padding:13px 14px; border-radius:10px;
+  color:#C9E6E4; font-size:15px; font-weight:500}
+.sbl:hover{background:rgba(255,255,255,.06); color:#fff}
+.sbl.on{background:var(--secondary); color:var(--on-primary); font-weight:600}
+[data-theme="dark"] .sbl{color:var(--muted)}
+[data-theme="dark"] .sbl.on{color:var(--on-primary)}
+.sbl .badge-n{margin-inline-start:auto; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:700}
+.main{flex-grow:1; min-width:0; background:var(--app-bg); display:flex; flex-direction:column}
+.topbar{height:78px; flex-shrink:0; padding:0 36px; background:var(--card);
+  border-bottom:1px solid var(--border); display:flex; align-items:center; gap:22px; position:sticky; top:0; z-index:20}
+.topbar .t{font-size:20px; font-weight:600; color:var(--primary); white-space:nowrap}
+[data-theme="dark"] .topbar .t{color:var(--text)}
+.content{padding:28px 36px; display:flex; flex-direction:column; gap:22px}
+.avatar{width:34px; height:34px; border-radius:50%; background:var(--primary); color:var(--on-primary);
+  display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; flex-shrink:0}
+.who{display:flex; align-items:center; gap:10px; padding:6px 14px 6px 6px; background:var(--raise);
+  border:1px solid var(--border); border-radius:999px; font-size:15px; font-weight:600}
+.stat .n{font-size:38px; font-weight:700; color:var(--primary); line-height:1.1}
+[data-theme="dark"] .stat .n{color:var(--secondary)}
+.bars{height:210px; display:flex; align-items:flex-end; gap:26px}
+.bars .b{flex-grow:1; display:flex; flex-direction:column; align-items:center; gap:10px}
+.bars .bb{width:100%; display:flex; gap:6px; align-items:flex-end; height:180px}
+.bars .bb i{flex-grow:1; border-radius:6px 6px 0 0; display:block}
+.toggle{width:52px; height:30px; border-radius:999px; background:var(--border); padding:3px;
+  display:flex; align-items:center; cursor:pointer; flex-shrink:0}
+.toggle i{width:24px; height:24px; border-radius:50%; background:var(--card); box-shadow:0 1px 3px rgba(0,0,0,.35); display:block; transition:margin .2s}
+.toggle.on{background:var(--secondary); justify-content:flex-end}
+.step{display:flex; gap:20px}
+.step .rail{width:40px; flex-shrink:0; display:flex; flex-direction:column; align-items:center}
+.step .dot{width:40px; height:40px; border-radius:50%; background:var(--card); border:2px solid var(--border);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0}
+.step .dot.done{background:var(--primary); border-color:var(--primary); color:var(--on-primary)}
+.step .dot.now{background:var(--secondary); border:3px solid var(--sl)}
+.step .dot.now i{width:10px; height:10px; border-radius:50%; background:var(--on-primary); display:block}
+.step .line{width:2px; flex-grow:1; min-height:36px; background:var(--border)}
+.step .line.done{background:var(--primary)}
+.bar{height:12px; background:var(--raise); border-radius:999px; overflow:hidden}
+.bar i{display:block; height:100%; background:var(--secondary)}
+.drop{border:1.5px dashed var(--secondary); border-radius:16px; padding:30px; text-align:center;
+  display:flex; flex-direction:column; align-items:center; gap:10px; color:var(--primary); background:var(--card)}
+[data-theme="dark"] .drop{color:var(--text)}
+
+/* ---------- motion ---------- */
+.rv{opacity:0; transform:translateY(30px); transition:opacity .6s ease, transform .6s ease}
+.rv.in{opacity:1; transform:none}
+.page{animation:pg .3s ease both}
+@keyframes pg{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+#loader{position:fixed; inset:0; z-index:200; background:var(--bg);
+  display:flex; align-items:center; justify-content:center; transition:opacity .4s}
+#loader.gone{opacity:0; pointer-events:none}
+#loader img{height:132px; width:auto; display:block; opacity:0; transform:scale(.88);
+  animation:mark .7s cubic-bezier(.2,.8,.3,1) forwards}
+#loader .word{opacity:0; animation:fade .5s ease .55s forwards; font-weight:700; font-size:22px; color:var(--primary)}
+#loader .rule{width:0; height:2px; background:var(--secondary); border-radius:2px;
+  animation:rule .6s ease .35s forwards}
+@keyframes mark{to{opacity:1; transform:none}}
+@keyframes rule{to{width:120px}}
+@keyframes fade{to{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001s !important; transition-duration:.001s !important}
+  .rv{opacity:1; transform:none}
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:1320px){
+  .menu{gap:16px}
+  .menu a{font-size:15px}
+  .navtools .navlink{display:none}
+}
+@media (max-width:1100px){
+  :root{--pad:28px}
+  .g4,.g5{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero .wrap{flex-direction:column; align-items:stretch}
+  .side{display:none; position:fixed; inset-inline-start:0; top:0; z-index:80; box-shadow:0 0 40px rgba(0,0,0,.25)}
+  .side.open{display:flex}
+  .content,.topbar{padding-inline:20px}
+}
+@media (max-width:1100px){
+  .menu{display:none}
+  .burger{display:flex}
+  .navtools .who{display:none}
+  .row:not(.keep){flex-direction:column}
+  .row:not(.keep)>*{flex:1 1 auto !important; width:100% !important; max-width:none !important}
+}
+@media (max-width:900px){
+  .tbl .th{display:none}
+  .tbl .tr{flex-direction:column; align-items:flex-start; gap:8px}
+  .tbl .tr>*{width:auto !important}
+}
+@media (max-width:760px){
+  body{font-size:16px}
+  :root{--pad:20px}
+  .nav-in{height:68px; gap:8px}
+  .navtools{gap:8px}
+  .iconbtn,.langbtn{width:40px; height:40px; padding:0}
+  .langbtn{width:auto; padding:0 10px}
+  .brand .tag{display:none}
+  .brand b{font-size:16px}
+  .hero .btn,.sec.band .btn{width:100%}
+  .grid,.g2,.g3,.g4,.g5{grid-template-columns:minmax(0,1fr)}
+  .row.keep{flex-wrap:wrap}
+  .sec{padding:56px 0}
+  .hero{padding:44px 0}
+  .spread{flex-direction:column; align-items:flex-start}
+  .foot .bot{flex-direction:column; align-items:flex-start}
+  .navtools .btn{display:none}
+  .topbar{height:auto; padding-block:14px; flex-wrap:wrap}
+  .drawer{display:flex}
+}
+@media (max-width:400px){ .brand b{display:none} }
+.drawer{display:none; position:fixed; inset:0; z-index:90; background:rgba(0,0,0,.4)}
+.drawer.show{display:block}
+.drawer .panel{position:absolute; inset-inline-end:0; top:0; bottom:0; width:280px; background:var(--bg);
+  padding:24px; display:flex; flex-direction:column; gap:6px}
+.drawer .panel .spread{flex-direction:row !important; align-items:center}
+.drawer .panel a{padding:14px 12px; border-radius:10px; color:var(--text); font-weight:600}
+.drawer .panel a:hover{background:var(--raise)}
+</style>
+</head>
+<body>
+<div id="loader">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:16px">
+    <img id="loaderLogo" alt="جمعية سفير الدعوية">
+    <div class="rule"></div>
+    <div class="word">جمعية سفير الدعوية</div>
+  </div>
+</div>
+<div id="app"></div>
+<div class="drawer" id="drawer" onclick="if(event.target.id==='drawer')closeDrawer()"><div class="panel" id="drawerPanel"></div></div>
+<script>
+/* ============================ core ============================ */
+let LANG = 'ar';
+const T = o => (o == null ? '' : (typeof o === 'string' ? o : (o[LANG] || o.ar || '')));
+const AR = n => LANG === 'ar' ? String(n).replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[d]) : String(n);
+
+const ICONS = {
+  book:'<path d="M4 19V6a2 2 0 012-2h6v15H6a2 2 0 00-2 2z"/><path d="M20 19V6a2 2 0 00-2-2h-6v15h6a2 2 0 012 2z"/>',
+  heart:'<path d="M12 20s-7-4.4-7-9.2A4.2 4.2 0 0112 8.4a4.2 4.2 0 017 2.4C19 15.6 12 20 12 20z"/>',
+  mosque:'<path d="M5 20V9l7-5 7 5v11"/><path d="M9.5 20v-6h5v6"/>',
+  people:'<circle cx="9" cy="8" r="3"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 5.5a3 3 0 010 5.6M18 19c0-2.4-1-4.2-2.6-5.2"/>',
+  mic:'<path d="M4 11a8 8 0 1116 0v5a3 3 0 01-3 3h-3"/><rect x="3" y="11" width="3.5" height="6" rx="1.5"/><rect x="17.5" y="11" width="3.5" height="6" rx="1.5"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z"/>',
+  cap:'<path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M7 10v5c0 1.5 2.2 3 5 3s5-1.5 5-3v-5"/>',
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.5-4.5"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  arrow:'<path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/>',
+  arrowL:'<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
+  image:'<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="8.5" cy="10" r="1.8"/><path d="M21 16l-5-5-7 8"/>',
+  file:'<path d="M14 3v5h5"/><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/>',
+  mail:'<rect x="4" y="6" width="16" height="12" rx="2"/><path d="M4 7.5l8 5.5 8-5.5"/>',
+  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a1 1 0 01-1.1 1A16 16 0 014 5.1 1 1 0 015 4z"/>',
+  pin:'<path d="M12 21c4-3.5 7-6.8 7-10.4A7 7 0 005 10.6C5 14.2 8 17.5 12 21z"/><circle cx="12" cy="10.5" r="2.5"/>',
+  user:'<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/>',
+  quote:'<path d="M9 8H5.5A1.5 1.5 0 004 9.5V13h5V8zM20 8h-3.5A1.5 1.5 0 0015 9.5V13h5V8z"/><path d="M9 13c0 2.5-1.5 4-4 4M20 13c0 2.5-1.5 4-4 4"/>',
+  eye:'<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.8"/>',
+  msg:'<path d="M4 5h16v11H8l-4 4z"/>',
+  target:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
+  grid:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
+  pages:'<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 9h16M9 9v11"/>',
+  news:'<path d="M4 6h12v13H6a2 2 0 01-2-2z"/><path d="M16 9h4v8a2 2 0 01-2 2M7 9h6M7 13h6"/>',
+  partners:'<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19c0-2.8 2.2-5 5-5M21 19c0-2.8-2.2-5-5-5"/>',
+  folder:'<path d="M5 4h9l5 5v11H5z"/><path d="M14 4v5h5"/>',
+  gear:'<circle cx="12" cy="12" r="3.2"/><path d="M5 12a7 7 0 0114 0 7 7 0 01-14 0z"/>',
+  bell:'<path d="M6 10a6 6 0 1112 0c0 4 1.5 5 1.5 5h-15S6 14 6 10z"/><path d="M10.5 19a2 2 0 003 0"/>',
+  upload:'<path d="M12 16V5M8 9l4-4 4 4"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/>',
+  download:'<path d="M12 4v11M8 11l4 4 4-4"/><path d="M5 19h14"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  drag:'<path d="M8 7h8M8 12h8M8 17h8"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.4l2.8 1.8"/>',
+  warn:'<path d="M12 8v5M12 16.4v.2"/><path d="M10.3 4l-7 12A2 2 0 005 19h14a2 2 0 001.7-3l-7-12a2 2 0 00-3.4 0z"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.4"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+  moon:'<path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/>',
+  menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  cal:'<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/>',
+  chart:'<path d="M6 20V10M12 20V5M18 20v-7"/>',
+  building:'<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 8h2M13 8h2M9 12h2M13 12h2M9 16h6"/>',
+  map:'<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>'
+};
+const ic = (n, s = 20, w = 1.75) =>
+  `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+
+/* The official association logo, exactly as published on safeer-sa.org.
+   Deep-teal ink, so on dark surfaces it sits on a white tile (.logochip). */
+const LOGO_SRC = 'data:image/png;base64,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';
+const LOGO = (s = 48) =>
+  `<span class="logochip" style="height:${s}px"><img class="logo" src="${LOGO_SRC}" alt="${T({ar:'جمعية سفير الدعوية', en:'Safeer Association'})}"></span>`;
+
+const LINES = (w = 600, h = 660) => `
+<svg class="lines" viewBox="0 0 600 660" width="${w}" height="${h}" fill="none" aria-hidden="true">
+  <path d="M40 660C40 470 180 420 270 320C380 200 410 110 430 40" stroke="var(--secondary)" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M120 660C120 500 250 450 340 355C450 240 480 150 500 80" stroke="var(--secondary)" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M200 660C200 530 320 485 405 395C510 285 540 200 560 130" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round"/>
+</svg>`;
+
+const ph = (label, h = 300, dim = false) =>
+  `<div class="ph ${dim ? 'dim' : ''}" style="height:${h}px">${ic('image', 36, 1.5)}<div>${T(label)}</div></div>`;
+
+const link = (route, label, cls = '', extra = '') =>
+  `<a href="#/${route}" class="${cls}" ${extra}>${T(label)}</a>`;
+
+const more = label => `<a href="#/${label.r}" class="row keep g8" style="align-items:center;font-weight:600">${T(label.t)} ${ic('arrow', 18, 2)}</a>`;
+
+/* ============================ shared copy ============================ */
+const ORG = {ar:'جمعية سفير الدعوية', en:'Safeer Da\'wah Association'};
+const TAG = {ar:'لطلاب المنح', en:'For scholarship students'};
+const BLURB = {ar:'جمعية أهلية غير ربحية متخصصة في رعاية طلاب وطالبات المنح الدوليين الدارسين في الجامعات السعودية.',
+               en:'A Saudi non-profit association dedicated to supporting international scholarship students at Saudi universities.'};
+const PHONE = '+966 53 464 6648';
+const EMAIL = 'info@safeer-sa.org';
+const ADDR = {ar:'الرياض — حي السويدي، شارع سدير، المملكة العربية السعودية',
+              en:'Riyadh — Al Suwaidi, Sudair St., Kingdom of Saudi Arabia'};
+const RIGHTS = {ar:'جميع الحقوق محفوظة لجمعية سفير بالمملكة العربية السعودية', en:'All rights reserved — Safeer Association, Saudi Arabia'};
+const PLACEHOLDER = {ar:'[يُدار من لوحة التحكم]', en:'[Managed from the dashboard]'};
+
+const GOALS = [
+  {ar:'استخدام التقنية الحديثة في الدعوة إلى الله ونشر العلم الشرعي', en:'Using modern technology in outreach and in spreading religious knowledge'},
+  {ar:'تصحيح المفاهيم المغلوطة عن الإسلام ورد الشبهات المثارة عليه', en:'Correcting misconceptions about Islam and answering claims raised against it'},
+  {ar:'تعليم المسلمين أصول دينهم وتعميق روابط الأخوة فيما بينهم', en:'Teaching Muslims the fundamentals of their faith and deepening bonds between them'},
+  {ar:'الدعوة المتخصصة للفئات الاجتماعية', en:'Specialised outreach for specific social groups'},
+  {ar:'الاهتمام الدعوي بالجاليات والتواصل معهم', en:'Engaging with and supporting expatriate communities'}
+];
+
+const AREAS = [
+  {icon:'mic', t:{ar:'الدعوة العامة', en:'General outreach'}, items:[
+    {ar:'الدعوة الشبابية والنسائية والجاليات', en:'Youth, women and expatriate community outreach'},
+    {ar:'معرض الوسائل الدعوية', en:'Outreach media exhibition'},
+    {ar:'المشاركات المجتمعية والمصليات المتنقلة', en:'Community participation and mobile prayer spaces'},
+    {ar:'الحج والعمرة', en:'Hajj and Umrah'}]},
+  {icon:'globe', t:{ar:'الدعوة الإلكترونية', en:'Digital outreach'}, items:[
+    {ar:'دعوة غير المسلمين', en:'Outreach to non-Muslims'},
+    {ar:'استخدام الوسائل الحديثة في الدعوة', en:'Using modern channels for outreach'}]},
+  {icon:'cap', t:{ar:'التدريب والتأهيل', en:'Training and qualification'}, items:[
+    {ar:'تأهيل الكوادر الإدارية', en:'Qualifying administrative staff'},
+    {ar:'تأهيل الدعاة — علمياً ومهارياً', en:'Qualifying outreach workers — academically and practically'}]},
+  {icon:'search', t:{ar:'الأبحاث والدراسات الدعوية', en:'Research and studies'}, items:[
+    {ar:'إعداد البحوث الشرعية', en:'Producing religious research'},
+    {ar:'المسابقات العامة', en:'Public competitions'},
+    {ar:'تطوير وصناعة المحتوى الدعوي', en:'Developing outreach content'}]}
+];
+
+const PILLARS = [
+  {icon:'book', t:{ar:'الدعم الأكاديمي والتعليمي', en:'Academic and educational support'},
+   d:{ar:'دورات تعليم اللغة العربية لغير الناطقين بها، ودروس تقوية في المواد الأكاديمية، ومرشدون أكاديميون للمناهج والبحوث والمشاريع.',
+      en:'Arabic courses for non-native speakers, tutoring in academic subjects, and academic mentors for curricula, research and projects.'}},
+  {icon:'heart', t:{ar:'الدعم النفسي والإرشادي', en:'Psychological and counselling support'},
+   d:{ar:'مستشارون متخصصون، وجلسات توعية وورش عمل حول مهارات التكيّف وإدارة الضغوط بعيداً عن الأهل والوطن.',
+      en:'Specialist counsellors, awareness sessions and workshops on adapting and managing pressure far from home.'}},
+  {icon:'mosque', t:{ar:'الإرشاد الديني والدعوي', en:'Religious guidance'},
+   d:{ar:'دروس في الفقه والشريعة، ولقاءات دعوية، وتيسير أداء الفرائض وتنظيم رحلات العمرة والزيارة.',
+      en:'Classes in jurisprudence and Shari\'ah, outreach gatherings, prayer facilities and organised Umrah trips.'}},
+  {icon:'people', t:{ar:'التمكين والمشاركة المجتمعية', en:'Empowerment and community participation'},
+   d:{ar:'تشجيع الطلاب على الأنشطة التطوعية وخدمة المجتمع السعودي، بما يعزّز شعور الانتماء والاندماج.',
+      en:'Encouraging students into volunteering and service to Saudi society, strengthening belonging and integration.'}}
+];
+
+const BOARD = [
+  {n:'د. عبد الله بن دجين بن علي السهلي', ne:'Dr. Abdullah bin Dujain Al-Suhali', r:{ar:'رئيس المجلس', en:'Chairman'}, lead:true},
+  {n:'د. فهد بن سعيد بن ناصر بن سعيد', ne:'Dr. Fahd bin Saeed bin Nasser', r:{ar:'نائب الرئيس', en:'Vice Chairman'}},
+  {n:'د. سالم بن عبد الله بن عامر العجمي', ne:'Dr. Salem bin Abdullah Al-Ajmi', r:{ar:'مشرف مالي', en:'Financial supervisor'}},
+  {n:'د. عبد الرحمن عبد الكريم البراهيم اليزيد', ne:'Dr. Abdulrahman Al-Ibrahim Al-Yazid', r:{ar:'عضو', en:'Member'}},
+  {n:'د. عثمان بن سليمان بن حمد العراجه', ne:'Dr. Othman bin Sulaiman Al-Arajah', r:{ar:'عضو', en:'Member'}}
+];
+const EXEC = {n:'أ. شعلان عبدالله الشمراني', ne:'Mr. Shalan Abdullah Al-Shamrani', r:{ar:'المدير التنفيذي', en:'Executive Director'}};
+
+const THEMES = [
+  {t:{ar:'تجربة تعليمية ممتازة', en:'An excellent learning experience'},
+   d:{ar:'امتنان للدروس والمحاضرات التي تقدّمها الجمعية، وإشادة بأسلوب التعليم الشامل والميسّر.',
+      en:'Gratitude for the association\'s classes and lectures, and praise for its clear, accessible teaching.'}},
+  {t:{ar:'دعم شخصي', en:'Personal support'},
+   d:{ar:'دعم فردي في فهم الإسلام أو في تبنّيه كدين جديد.', en:'One-to-one support in understanding Islam or in embracing it as a new faith.'}},
+  {t:{ar:'بيئة مرحبة', en:'A welcoming environment'},
+   d:{ar:'بيئة دافئة تُشعر المستفيد بالراحة والانتماء.', en:'A warm environment where people feel comfortable and that they belong.'}},
+  {t:{ar:'تنظيم الفعاليات', en:'Event organisation'}, flag:true,
+   d:{ar:'تقدير للأنشطة مع اقتراحات بتحسين التنظيم والتواصل.', en:'Appreciation for the activities, with suggestions to improve organisation and communication.'}},
+  {t:{ar:'موارد إضافية', en:'More resources'}, flag:true,
+   d:{ar:'اقتراحات بزيادة الموارد التعليمية من كتب ومقالات.', en:'Suggestions to expand educational resources such as books and articles.'}}
+];
+
+const NEWS1 = {
+  t:{ar:'توزيع ٥٠٠ كرتونة تمور مقدمة من جمعية سفير', en:'Distributing 500 boxes of dates donated by Safeer Association'},
+  cat:{ar:'أنشطة مجتمعية', en:'Community activities'},
+  date:{ar:'٣٠ يوليو ٢٠٢٠', en:'30 July 2020'},
+  x:{ar:'ضمن المشاركات المجتمعية للجمعية، وُزّعت الكراتين على المستفيدين بالتعاون مع الجهات الشريكة.',
+     en:'As part of the association\'s community work, the boxes were distributed to beneficiaries with partner organisations.'}
+};
+
+const NAV = [
+  ['home', {ar:'الرئيسية', en:'Home'}],
+  ['about', {ar:'من نحن', en:'About'}],
+  ['work', {ar:'مجالات عملنا', en:'Our work'}],
+  ['scholarships', {ar:'منح الوافدين', en:'Scholarships'}],
+  ['news', {ar:'الأخبار', en:'News'}],
+  ['partners', {ar:'شركاؤنا', en:'Partners'}],
+  ['contact', {ar:'تواصل معنا', en:'Contact'}]
+];
+
+/* ============================ site chrome ============================ */
+function siteNav(active) {
+  const items = NAV.map(([r, l]) => `<a href="#/${r}" class="${r === active ? 'on' : ''}">${T(l)}</a>`).join('');
+  return `
+  <header class="nav" id="nav">
+    <div class="nav-in">
+      <a href="#/home" class="brand">${LOGO(54)}<span><b>${T(ORG)}</b><span class="tag">${T(TAG)}</span></span></a>
+      <nav class="menu">${items}</nav>
+      <div class="navtools">
+        <button class="langbtn" onclick="toggleLang()" aria-label="Language">${LANG === 'ar' ? 'EN' : 'ع'}</button>
+        <button class="iconbtn" onclick="toggleTheme()" aria-label="${T({ar:'تبديل الوضع',en:'Toggle theme'})}">${ic(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon')}</button>
+        <a href="#/portal-login" class="navlink">${T({ar:'بوابة الطالب', en:'Student portal'})}</a>
+        <a href="#/apply" class="btn sm">${T({ar:'قدّم طلب منحة', en:'Apply'})}</a>
+        <button class="iconbtn burger" onclick="openDrawer()" aria-label="${T({ar:'القائمة',en:'Menu'})}">${ic('menu')}</button>
+      </div>
+    </div>
+  </header>`;
+}
+
+function siteFoot() {
+  const q = (r, l) => `<a href="#/${r}">${T(l)}</a>`;
+  return `
+  <footer class="foot">
+    <div class="wrap">
+      <div class="row g40" style="flex-wrap:wrap">
+        <div class="col g16" style="flex:1 1 320px;max-width:400px">
+          ${LOGO(64)}
+          <p style="color:#C9E6E4;line-height:1.9">${T(BLURB)}</p>
+        </div>
+        <div class="fcol" style="min-width:180px"><h4>${T({ar:'روابط مهمة', en:'Key links'})}</h4>
+          ${q('about', {ar:'من نحن', en:'About'})}${q('board', {ar:'مجلس الإدارة', en:'Board'})}
+          ${q('documents', {ar:'التراخيص والسياسات', en:'Licences & policies'})}${q('work', {ar:'مجالات عملنا', en:'Our work'})}
+        </div>
+        <div class="fcol" style="min-width:180px"><h4>${T({ar:'الخدمات', en:'Services'})}</h4>
+          ${q('scholarships', {ar:'منح الوافدين', en:'Scholarships'})}${q('apply', {ar:'تسجيل طلب منحة', en:'Apply for a scholarship'})}
+          ${q('portal-login', {ar:'بوابة الطالب', en:'Student portal'})}${q('news', {ar:'الأخبار', en:'News'})}
+        </div>
+        <div class="fcol" style="flex:1 1 240px"><h4>${T({ar:'للتواصل السريع', en:'Get in touch'})}</h4>
+          <a class="ltr" href="tel:+966534646648">${PHONE}</a>
+          <a class="ltr" href="mailto:${EMAIL}">${EMAIL}</a>
+          <span style="color:#C9E6E4">${T(ADDR)}</span>
+          <div class="soc">
+            <a href="#/home" aria-label="Facebook">${ic('msg', 18)}</a>
+            <a href="#/home" aria-label="Instagram">${ic('image', 18)}</a>
+            <a href="#/home" aria-label="X">${ic('x', 18)}</a>
+          </div>
+        </div>
+      </div>
+      <div class="bot"><span>${T(RIGHTS)}</span><span>${T({ar:'نموذج تفاعلي — ليس الموقع المنشور', en:'Interactive prototype — not the live site'})}</span></div>
+    </div>
+  </footer>`;
+}
+
+const pageHead = (crumbs, title, lead) => `
+  <section class="sec band tight" style="position:relative;overflow:hidden">
+    ${LINES(420, 300)}
+    <div class="wrap col g12" style="position:relative;z-index:1">
+      <div class="small" style="color:var(--band-dim)">${crumbs.map(c => c.r ? `<a href="#/${c.r}" style="color:var(--band-dim)">${T(c.t)}</a>` : T(c.t)).join(' · ')}</div>
+      <h1 class="h1">${T(title)}</h1>
+      ${lead ? `<p class="lead" style="max-width:740px">${T(lead)}</p>` : ''}
+    </div>
+  </section>`;
+
+const secHead = (eyebrow, title, lead) => `
+  <div class="col g12" style="max-width:760px">
+    ${eyebrow ? `<div class="eyebrow">${T(eyebrow)}</div>` : ''}
+    <h2 class="h2">${T(title)}</h2>
+    ${lead ? `<p class="lead">${T(lead)}</p>` : ''}
+  </div>`;
+
+/* ============================ public pages ============================ */
+function pHome() {
+  const stats = [
+    ['2', {ar:'أعوام من الخبرة', en:'Years of experience'}],
+    ['—', {ar:'طالب وطالبة مستفيد', en:'Students supported'}],
+    ['—', {ar:'برنامج وفعالية', en:'Programmes and events'}],
+    ['—', {ar:'جهة شريكة', en:'Partner organisations'}]
+  ];
+  return `
+  ${siteNav('home')}
+  <section class="hero">
+    ${LINES()}
+    <div class="wrap">
+      <div class="col g24" style="flex:1 1 520px">
+        <span class="badge">${T({ar:'جمعية أهلية غير ربحية · المملكة العربية السعودية', en:'Saudi non-profit association'})}</span>
+        <h1 class="display">${T({ar:'نرعى طلاب المنح<br>ونبني جسور المعرفة', en:'We care for scholarship<br>students and build bridges'})}</h1>
+        <p class="lead" style="max-width:540px">${T({ar:'دعم أكاديمي ونفسي وإرشاد ديني وتمكين مجتمعي لطلاب وطالبات المنح الدوليين الدارسين في الجامعات السعودية.',
+          en:'Academic and psychological support, religious guidance and community empowerment for international scholarship students at Saudi universities.'})}</p>
+        <div class="row keep g16" style="flex-wrap:wrap">
+          <a href="#/apply" class="btn">${T({ar:'قدّم طلب منحة', en:'Apply for a scholarship'})} ${ic('arrow', 19, 2)}</a>
+          <a href="#/about" class="btn ghost">${T({ar:'تعرّف على الجمعية', en:'About the association'})}</a>
+        </div>
+      </div>
+      <div style="flex:1 1 420px">${ph({ar:'[صورة الواجهة: طلاب المنح في فعالية الجمعية]', en:'[Hero image: scholarship students at an association event]'}, 420)}</div>
+    </div>
+  </section>
+
+  <section class="sec"><div class="wrap row g40 rv">
+    <div style="flex:1 1 420px">${ph({ar:'[صورة: لقاء توجيهي للطلاب الوافدين]', en:'[Photo: orientation session for incoming students]'}, 400, true)}</div>
+    <div class="col g20" style="flex:1 1 460px">
+      ${secHead({ar:'من نحن', en:'About us'}, {ar:'الرؤية والرسالة والأهداف', en:'Vision, mission and goals'})}
+      <div class="col g12">${GOALS.map(g => `<div class="row keep g12" style="align-items:flex-start">
+        <span style="color:var(--secondary);flex-shrink:0;margin-top:5px">${ic('check', 22, 2)}</span>
+        <span>${T(g)}</span></div>`).join('')}</div>
+      <a href="#/about" class="row keep g8" style="font-weight:600;align-items:center">${T({ar:'اقرأ المزيد عن الجمعية', en:'Read more about us'})} ${ic('arrow', 18, 2)}</a>
+    </div>
+  </div></section>
+
+  <section class="sec tight band"><div class="wrap row g40 mid">
+    <div class="col g8" style="flex:0 0 280px">
+      <div class="eyebrow">${T({ar:'أثرنا', en:'Our impact'})}</div>
+      <h2 class="h3" style="color:var(--band-tx)">${T({ar:'بالأرقام', en:'In numbers'})}</h2>
+      <p class="small" style="color:var(--band-soft)">${T({ar:'تُحرَّر هذه الأرقام من لوحة التحكم — ولا تُنشر إلا بأرقام موثقة.', en:'Edited from the dashboard — published only once verified.'})}</p>
+    </div>
+    <div class="grid g4 grow">${stats.map(([n, l]) => `
+      <div class="card rv" style="background:var(--band-card);border:none">
+        <div class="n counter" data-n="${n}" style="font-size:44px;font-weight:700;color:var(--band-dim);line-height:1.1">${n === '—' ? '[—]' : AR(n)}</div>
+        <div style="color:var(--band-soft);font-size:16px">${T(l)}</div>
+      </div>`).join('')}</div>
+  </div></section>
+
+  <section class="sec"><div class="wrap col g40">
+    <div class="spread">${secHead({ar:'مجالات عملنا', en:'Our work'}, {ar:'أربعة مجالات، هدف واحد', en:'Four areas, one purpose'})}
+      <a href="#/work" class="row keep g8" style="font-weight:600;align-items:center">${T({ar:'كل المجالات', en:'All areas'})} ${ic('arrow', 18, 2)}</a></div>
+    <div class="grid g4">${AREAS.map((a, i) => `
+      <div class="card hover rv" style="transition-delay:${i * 90}ms">
+        <div class="ico">${ic(a.icon, 26)}</div>
+        <h3 class="h3" style="margin-top:16px">${T(a.t)}</h3>
+        <p class="muted" style="margin-top:10px">${a.items.map(x => T(x)).join(' · ')}</p>
+      </div>`).join('')}</div>
+  </div></section>
+
+  <section class="sec surface"><div class="wrap col g40">
+    ${secHead({ar:'منح الوافدين', en:'Scholarships'}, {ar:'رعاية متكاملة لطالب المنحة', en:'Complete care for a scholarship student'},
+      {ar:'من لحظة الوصول إلى التخرج: دعم يسهّل التكيّف مع البيئة الجديدة ويعزّز التجربة الأكاديمية والثقافية.',
+       en:'From arrival to graduation: support that eases adaptation and strengthens the academic and cultural experience.'})}
+    <div class="grid g2">${PILLARS.map((p, i) => `
+      <div class="card hover rv" style="transition-delay:${i * 90}ms">
+        <div class="row keep g20" style="align-items:flex-start">
+          <div class="ico">${ic(p.icon, 26)}</div>
+          <div class="col g10"><h3 class="h3">${T(p.t)}</h3><p class="muted">${T(p.d)}</p></div>
+        </div>
+      </div>`).join('')}</div>
+    <a href="#/scholarships" class="btn soft" style="align-self:flex-start">${T({ar:'تفاصيل برنامج المنح', en:'Scholarship programme details'})}</a>
+  </div></section>
+
+  <section class="sec"><div class="wrap col g40">
+    <div class="spread">${secHead({ar:'أخبارنا', en:'News'}, {ar:'آخر الأنشطة', en:'Latest activity'})}
+      <a href="#/news" class="row keep g8" style="font-weight:600;align-items:center">${T({ar:'كل الأخبار', en:'All news'})} ${ic('arrow', 18, 2)}</a></div>
+    <div class="grid g3">
+      <a href="#/article" class="card pad0 hover rv" style="color:inherit">
+        ${ph(NEWS1.cat, 200)}
+        <div class="col g12" style="padding:26px">
+          <div class="row keep g12 mid"><span class="pill teal">${T(NEWS1.cat)}</span><span class="cap">${T(NEWS1.date)}</span></div>
+          <h3 class="h3">${T(NEWS1.t)}</h3><p class="muted small">${T(NEWS1.x)}</p>
+        </div>
+      </a>
+      ${[1, 2].map(i => `<div class="card pad0 rv" style="transition-delay:${i * 90}ms">
+        ${ph({ar:'[صورة الخبر]', en:'[Article image]'}, 200, true)}
+        <div class="col g12" style="padding:26px">
+          <div class="row keep g12 mid"><span class="pill plain">${T({ar:'[التصنيف]', en:'[Category]'})}</span><span class="cap">${T({ar:'[التاريخ]', en:'[Date]'})}</span></div>
+          <h3 class="h3 muted">${T({ar:'[عنوان الخبر]', en:'[Article title]'})}</h3>
+          <p class="muted small">${T({ar:'يُضاف من لوحة التحكم — قسم الأخبار.', en:'Added from the dashboard — News section.'})}</p>
+        </div></div>`).join('')}
+    </div>
+  </div></section>
+
+  <section class="sec surface"><div class="wrap row g40">
+    <div class="col g24 grow">
+      ${secHead({ar:'قالوا عنا', en:'Testimonials'}, {ar:'ما يقوله المستفيدون', en:'What beneficiaries say'})}
+      <div class="row g20">
+        ${[0, 1].map(i => `<div class="card grow rv" style="transition-delay:${i * 90}ms">
+          <span style="color:var(--secondary)">${ic('quote', 28)}</span>
+          <p style="margin:14px 0 14px;line-height:1.95">${T(THEMES[i].d)}</p>
+          <div class="cap" style="border-top:1px solid var(--border);padding-top:14px;font-weight:600">${i === 0 ? 'ع. ج' : T({ar:'[اسم المستفيد]', en:'[Beneficiary name]'})}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="col g24" style="flex:0 0 360px">
+      ${secHead({ar:'شركاء النجاح', en:'Partners'}, {ar:'من نعمل معهم', en:'Who we work with'})}
+      <div class="grid g2" style="gap:16px">${[1, 2, 3, 4].map(() =>
+        `<div class="card rv" style="height:92px;display:flex;align-items:center;justify-content:center;padding:0"><span class="cap">${T({ar:'[شعار شريك]', en:'[Partner logo]'})}</span></div>`).join('')}</div>
+      <a href="#/partners" style="font-weight:600">${T({ar:'مشاهدة كل الشركاء', en:'See all partners'})}</a>
+    </div>
+  </div></section>
+
+  <section class="sec tight band"><div class="wrap spread">
+    <div class="col g12"><h2 class="h2" style="color:var(--band-tx)">${T({ar:'للتسجيل في جمعية سفير الدعوية', en:'Register with Safeer Association'})}</h2>
+      <p class="lead" style="max-width:620px">${T({ar:'قدّم طلبك إلكترونياً وتابع حالته من بوابة الطالب دون مراجعة المقر.', en:'Apply online and follow your application in the student portal — no office visit needed.'})}</p></div>
+    <div class="row keep g16" style="flex-wrap:wrap">
+      <a href="#/apply" class="btn onband">${T({ar:'تسجيل طلب منحة', en:'Apply now'})}</a>
+      <a href="#/contact" class="btn onband-ghost">${T({ar:'تواصل معنا', en:'Contact us'})}</a>
+    </div>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pAbout() {
+  return `${siteNav('about')}
+  ${pageHead([{r:'home', t:{ar:'الرئيسية', en:'Home'}}, {t:{ar:'من نحن', en:'About'}}], {ar:'من نحن', en:'About us'}, BLURB)}
+  <section class="sec"><div class="wrap row g40 rv">
+    <div class="col g20 grow">
+      ${secHead({ar:'عن الجمعية', en:'About the association'}, {ar:'نشر تعاليم الإسلام السمحة ورعاية طلابه', en:'Sharing Islam\'s teachings and caring for its students'})}
+      <p class="muted">${T({ar:'جمعية سفير الدعوية جمعية تهدف إلى نشر الإسلام وتعاليمه السمحة بين الناس من خلال العديد من الخدمات والأنشطة. تقدم الجمعية برامج توعوية وتعليمية تستهدف مختلف الفئات العمرية، وتعقد دورات تدريبية لتعزيز فهم الإسلام وتعاليمه.',
+        en:'Safeer Association works to share Islam and its teachings through a range of services and activities. It runs awareness and education programmes for all age groups and holds training courses that deepen understanding of Islam.'})}</p>
+      <p class="muted">${T({ar:'كما تنظّم الجمعية محاضرات وندوات دينية، وتهتم بتوزيع الكتب والنشرات التثقيفية التي تشرح المبادئ الإسلامية بشكل مبسّط وواضح.',
+        en:'It also organises lectures and seminars, and distributes books and educational material explaining Islamic principles clearly and simply.'})}</p>
+      <div class="row keep g16" style="flex-wrap:wrap">
+        <a href="#/documents" class="btn soft">${T({ar:'التراخيص والسياسات', en:'Licences & policies'})}</a>
+        <a href="#/board" class="btn ghost">${T({ar:'مجلس الإدارة', en:'Board of directors'})}</a>
+      </div>
+    </div>
+    <div style="flex:1 1 420px">${ph({ar:'[صورة: مقر الجمعية أو فعالية توعوية]', en:'[Photo: the association or an awareness event]'}, 400, true)}</div>
+  </div></section>
+
+  <section class="sec surface"><div class="wrap col g40">
+    ${secHead({ar:'مهمتنا', en:'Our mission'}, {ar:'الرؤية والرسالة والأهداف', en:'Vision, mission and goals'})}
+    <div class="grid g3">
+      ${[['eye', {ar:'الرؤية', en:'Vision'}, {ar:'الريادة في الدعوة المتخصصة باستخدام التقنية الحديثة، ورعاية طلاب المنح في الجامعات السعودية.', en:'Leadership in specialised outreach using modern technology, and care for scholarship students at Saudi universities.'}],
+         ['msg', {ar:'الرسالة', en:'Mission'}, {ar:'تقديم خدمات دعوية وتعليمية وإرشادية نوعية تُعرّف بالإسلام، وتدعم الطالب الوافد أكاديمياً ونفسياً ومجتمعياً.', en:'Delivering quality outreach, education and guidance that introduce Islam and support incoming students academically, psychologically and socially.'}],
+         ['target', {ar:'الأهداف', en:'Goals'}, {ar:'خمسة أهداف معلنة تحكم كل برامج الجمعية وتُقاس عليها.', en:'Five stated goals that govern and measure every programme.'}]]
+        .map(([i, t, d]) => `<div class="card hover rv"><div class="ico">${ic(i, 25)}</div>
+          <h3 class="h3" style="margin-top:14px">${T(t)}</h3><p class="muted" style="margin-top:10px">${T(d)}</p></div>`).join('')}
+    </div>
+    <div class="card rv"><div class="grid g2" style="gap:20px 48px">${GOALS.map((g, i) => `
+      <div class="row keep g16" style="align-items:flex-start">
+        <span style="width:34px;height:34px;flex-shrink:0;border-radius:10px;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px">${AR(i + 1)}</span>
+        <span>${T(g)}</span></div>`).join('')}</div></div>
+  </div></section>
+
+  <section class="sec"><div class="wrap row g40">
+    <div class="col g16" style="flex:0 0 360px">
+      ${secHead({ar:'الحوكمة', en:'Governance'}, {ar:'الاجتماعات والمحاضر', en:'Meetings and minutes'},
+        {ar:'تُنشر محاضر الاجتماعات كملفات PDF قابلة للتحميل، وتُدار من قسم «المستندات» في لوحة التحكم.', en:'Minutes are published as downloadable PDFs, managed from the Documents section of the dashboard.'})}
+    </div>
+    <div class="col g16 grow">
+      ${[[{ar:'محاضر اجتماعات مجلس الإدارة', en:'Board meeting minutes'}, {ar:'[عدد المحاضر المنشورة]', en:'[Number published]'}],
+         [{ar:'محاضر اجتماعات الجمعية العمومية', en:'General assembly minutes'}, {ar:'[عدد المحاضر المنشورة]', en:'[Number published]'}],
+         [{ar:'تقارير الأنشطة', en:'Activity reports'}, {ar:'تقرير الأنشطة المنشور · PDF', en:'Published activity report · PDF'}]]
+        .map(([t, m]) => `<a href="#/documents" class="card hover rv row keep g20 mid" style="color:inherit;padding:24px 28px">
+          <div class="ico sm">${ic('file', 23)}</div>
+          <div class="col grow"><strong style="font-size:19px;color:var(--primary)">${T(t)}</strong><span class="cap">${T(m)}</span></div>
+          <span style="color:var(--secondary)">${ic('arrow', 20, 2)}</span></a>`).join('')}
+    </div>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pBoard() {
+  return `${siteNav('about')}
+  ${pageHead([{r:'home', t:{ar:'الرئيسية', en:'Home'}}, {r:'about', t:{ar:'من نحن', en:'About'}}, {t:{ar:'مجلس الإدارة', en:'Board'}}],
+    {ar:'مجلس الإدارة', en:'Board of directors'},
+    {ar:'المجلس المسؤول عن حوكمة الجمعية واعتماد خططها وبرامجها.', en:'The body responsible for governance and for approving the association\'s plans and programmes.'})}
+  <section class="sec"><div class="wrap col g32">
+    ${secHead({ar:'الأعضاء', en:'Members'}, {ar:'أعضاء المجلس', en:'Board members'})}
+    <div class="grid g3">${BOARD.map((m, i) => `
+      <div class="card hover rv ${m.lead ? '' : ''}" style="${m.lead ? 'background:var(--band);border-color:var(--band);color:var(--band-tx);grid-column:span 2' : ''};transition-delay:${i * 80}ms">
+        <div class="row keep g20 mid">
+          <div class="ico ${m.lead ? '' : ''}" style="${m.lead ? 'background:rgba(255,255,255,.12);color:var(--band-tx);' : ''}width:84px;height:84px;border-radius:20px">${ic('user', 34, 1.5)}</div>
+          <div class="col g10">
+            <span class="pill ${m.lead ? 'solid' : 'teal'}" style="align-self:flex-start">${T(m.r)}</span>
+            <strong style="font-size:${m.lead ? '26px' : '20px'};line-height:1.5;${m.lead ? 'color:var(--band-tx)' : 'color:var(--primary)'}">${LANG === 'ar' ? m.n : m.ne}</strong>
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div></section>
+  <section class="sec surface"><div class="wrap row g40">
+    <div class="col g16" style="flex:0 0 340px">${secHead({ar:'التشغيل', en:'Operations'}, {ar:'الإدارة التنفيذية', en:'Executive management'},
+      {ar:'الفريق المسؤول عن تنفيذ خطط المجلس وإدارة البرامج اليومية.', en:'The team executing the board\'s plans and running day-to-day programmes.'})}</div>
+    <div class="grid g3 grow">
+      <div class="card rv"><div class="ico">${ic('user', 28, 1.6)}</div>
+        <div class="eyebrow" style="margin-top:14px">${T(EXEC.r)}</div>
+        <strong style="font-size:20px;color:var(--primary);display:block;margin-top:6px">${LANG === 'ar' ? EXEC.n : EXEC.ne}</strong></div>
+      ${[1, 2].map(() => `<div class="card rv" style="border-style:dashed">
+        <div class="ico" style="background:var(--surface);color:var(--muted)">${ic('plus', 28)}</div>
+        <div class="cap" style="margin-top:14px;font-weight:600">${T({ar:'[المنصب]', en:'[Role]'})}</div>
+        <strong class="muted" style="font-size:20px;display:block;margin-top:6px">${T({ar:'[الاسم]', en:'[Name]'})}</strong></div>`).join('')}
+    </div>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pWork() {
+  return `${siteNav('work')}
+  ${pageHead([{r:'home', t:{ar:'الرئيسية', en:'Home'}}, {t:{ar:'مجالات عملنا', en:'Our work'}}],
+    {ar:'مجالات عمل الجمعية', en:'Our areas of work'},
+    {ar:'تهدف الجمعية إلى نشر التعاليم الإسلامية وتعزيز القيم الدينية، وتعمل في أربعة مجالات رئيسية.', en:'The association works to share Islamic teachings and strengthen religious values across four main areas.'})}
+  <section class="sec"><div class="wrap col g24">
+    ${AREAS.map((a, i) => `
+      <div class="card rv ${i % 2 ? 'surface-card' : ''}" style="${i % 2 ? 'background:var(--surface)' : ''};padding:40px 44px;transition-delay:${i * 80}ms">
+        <div class="row g40">
+          <div class="col g16" style="flex:0 0 280px">
+            <div class="ico lg" style="${i % 2 ? 'background:var(--card)' : ''}">${ic(a.icon, 28)}</div>
+            <h3 class="h2" style="font-size:30px">${T(a.t)}</h3>
+            <div class="eyebrow">${AR('0' + (i + 1))}</div>
+          </div>
+          <div class="grid g2 grow" style="gap:16px 40px;align-content:start">
+            ${a.items.map(x => `<div class="tile row keep g12" style="align-items:flex-start;${i % 2 ? 'background:var(--card)' : ''}">
+              <span style="color:var(--secondary);flex-shrink:0;margin-top:4px">${ic('check', 20, 2)}</span><span>${T(x)}</span></div>`).join('')}
+          </div>
+        </div>
+      </div>`).join('')}
+  </div></section>
+  <section class="sec band"><div class="wrap col g32">
+    <div class="spread">${secHead({ar:'ما يقوله المستفيدون', en:'What beneficiaries say'}, {ar:'خمسة محاور متكررة في الآراء', en:'Five recurring themes'})}
+      <a href="#/testimonials" class="btn onband-ghost sm">${T({ar:'كل الآراء', en:'All testimonials'})}</a></div>
+    <div class="grid g3">${THEMES.map((t, i) => `
+      <div class="card rv" style="background:var(--band-card);border:${t.flag ? '1px solid rgba(255,255,255,.14)' : 'none'};transition-delay:${i * 80}ms">
+        <h3 class="h3" style="color:var(--band-tx)">${T(t.t)}</h3>
+        <p style="color:var(--band-soft);margin-top:10px">${T(t.d)}</p>
+      </div>`).join('')}
+      <div class="card rv" style="background:var(--secondary);border:none;display:flex;align-items:center">
+        <p style="color:var(--band-tx);font-weight:600;font-size:18px;line-height:1.6">${T({ar:'الملاحظتان الأخيرتان تُعرضان بوضوح — لأن الشفافية تبني الثقة.', en:'The last two are shown plainly — transparency builds trust.'})}</p></div>
+    </div>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pScholar() {
+  const steps = [
+    [{ar:'تعبئة الطلب', en:'Fill the form'}, {ar:'بيانات شخصية وأكاديمية عبر نموذج من ثلاث خطوات.', en:'Personal and academic details in a three-step form.'}],
+    [{ar:'رفع المستندات', en:'Upload documents'}, {ar:'صورة الهوية والشهادات الدراسية بصيغة PDF أو صورة.', en:'ID copy and certificates as PDF or image.'}],
+    [{ar:'المراجعة الأولية', en:'Initial review'}, {ar:'تدقيق اكتمال البيانات والمستندات من فريق الجمعية.', en:'The team checks the data and documents are complete.'}],
+    [{ar:'المقابلة', en:'Interview'}, {ar:'موعد يُحجز من البوابة عند اجتياز المراجعة.', en:'Booked from the portal once review is passed.'}],
+    [{ar:'القرار والرعاية', en:'Decision and care'}, {ar:'إشعار بالقرار، ثم بدء برنامج الرعاية والمتابعة.', en:'Decision notice, then the care programme begins.'}]
+  ];
+  const reqs = [
+    {ar:'صورة الهوية أو جواز السفر', en:'ID or passport copy'},
+    {ar:'الشهادات الدراسية', en:'Academic certificates'},
+    {ar:'اسم الجامعة والمرحلة الدراسية', en:'University name and degree level'},
+    {ar:'بريد إلكتروني ورقم هاتف فعّالان', en:'A working email and phone number'}
+  ];
+  return `${siteNav('scholarships')}
+  <section class="sec band" style="position:relative;overflow:hidden">${LINES(420, 320)}
+    <div class="wrap row g40 mid" style="position:relative;z-index:1">
+      <div class="col g16 grow">
+        <div class="small" style="color:var(--band-dim)"><a href="#/home" style="color:var(--band-dim)">${T({ar:'الرئيسية', en:'Home'})}</a> · ${T({ar:'منح الوافدين', en:'Scholarships'})}</div>
+        <h1 class="h1">${T({ar:'منح الوافدين للدراسة<br>بالجامعات السعودية', en:'Scholarships for international<br>students in Saudi universities'})}</h1>
+        <p class="lead" style="max-width:640px">${T({ar:'تلعب الجمعية دوراً محورياً في رعاية طلاب المنح الدوليين، عبر دعم شامل يسهّل تكيّفهم ويعزّز تجربتهم الأكاديمية والثقافية.',
+          en:'The association plays a central role in caring for international scholarship students, with support that eases adaptation and enriches their academic and cultural experience.'})}</p>
+        <div class="row keep g16" style="flex-wrap:wrap">
+          <a href="#/apply" class="btn onband">${T({ar:'ابدأ الطلب الآن', en:'Start your application'})}</a>
+          <a href="#/portal-login" class="btn onband-ghost">${T({ar:'تتبّع طلبي', en:'Track my application'})}</a>
+        </div>
+      </div>
+      <div style="flex:0 0 400px">${ph({ar:'[صورة: طلاب منح في الحرم الجامعي]', en:'[Photo: scholarship students on campus]'}, 300)}</div>
+    </div></section>
+
+  <section class="sec"><div class="wrap col g40">
+    ${secHead({ar:'أوجه الرعاية', en:'How we help'}, {ar:'أربعة أوجه للدعم', en:'Four kinds of support'})}
+    <div class="grid g2">${PILLARS.map((p, i) => `<div class="card hover rv" style="transition-delay:${i * 80}ms">
+      <div class="row keep g16 mid"><div class="ico">${ic(p.icon, 26)}</div><h3 class="h3">${T(p.t)}</h3></div>
+      <p class="muted" style="margin-top:14px">${T(p.d)}</p></div>`).join('')}</div>
+  </div></section>
+
+  <section class="sec surface"><div class="wrap col g40">
+    ${secHead({ar:'الخطوات', en:'Steps'}, {ar:'من الطلب إلى القبول', en:'From application to acceptance'},
+      {ar:'كل خطوة لها حالة ظاهرة للطالب في بوابته، وحالة مقابلة في لوحة تحكم الجمعية.', en:'Each step has a status visible in the student portal and a matching one in the dashboard.'})}
+    <div class="grid g5">${steps.map(([t, d], i) => `
+      <div class="card rv" style="${i === 4 ? 'background:var(--sl);border-color:var(--secondary)' : ''};transition-delay:${i * 80}ms">
+        <span style="width:38px;height:38px;border-radius:12px;background:${i === 4 ? 'var(--secondary)' : 'var(--primary)'};color:var(--on-primary);display:flex;align-items:center;justify-content:center;font-weight:700">${AR(i + 1)}</span>
+        <h3 class="h3" style="font-size:19px;margin-top:14px">${T(t)}</h3>
+        <p class="muted small" style="margin-top:10px">${T(d)}</p></div>`).join('')}</div>
+  </div></section>
+
+  <section class="sec"><div class="wrap row g40">
+    <div class="col g20 grow">
+      ${secHead({ar:'المتطلبات', en:'Requirements'}, {ar:'ما تحتاجه قبل التقديم', en:'What to prepare'})}
+      <div class="col g12">${reqs.map(r => `<div class="tile row keep g12 mid">
+        <span style="color:var(--secondary)">${ic('check', 20, 2)}</span><span>${T(r)}</span></div>`).join('')}</div>
+    </div>
+    <div class="card rv" style="flex:0 0 440px;background:var(--band);border:none;color:var(--band-tx);display:flex;flex-direction:column;gap:18px;justify-content:center">
+      <h3 class="h2" style="color:var(--band-tx);font-size:28px">${T({ar:'جاهز للتقديم؟', en:'Ready to apply?'})}</h3>
+      <p style="color:#C9E6E4;line-height:1.85">${T({ar:'النموذج يحفظ تقدّمك تلقائياً، ويمكنك العودة لإكماله لاحقاً من بوابة الطالب.', en:'The form saves your progress automatically — come back and finish it from the student portal.'})}</p>
+      <a href="#/apply" class="btn onband">${T({ar:'تسجيل طلب منحة', en:'Apply for a scholarship'})}</a>
+      <a href="#/contact" style="color:#8FC9C7;text-align:center;font-weight:600">${T({ar:'لديك سؤال؟ تواصل معنا', en:'Questions? Contact us'})}</a>
+    </div>
+  </div></section>
+  ${siteFoot()}`;
+}
+function pNews() {
+  const cats = [{ar:'كل الأخبار', en:'All news'}, {ar:'أنشطة مجتمعية', en:'Community'}, {ar:'برامج تدريبية', en:'Training'}, {ar:'الاجتماعات', en:'Meetings'}, {ar:'رعاية الطلاب', en:'Student care'}];
+  return `${siteNav('news')}
+  ${pageHead([{r:'home', t:{ar:'الرئيسية', en:'Home'}}, {t:{ar:'الأخبار', en:'News'}}], {ar:'أخبار الجمعية', en:'Association news'},
+    {ar:'أنشطة وفعاليات ومحاضر اجتماعات — بتصنيفات عربية تخص عمل الجمعية.', en:'Activities, events and meeting minutes — with categories that match the association\'s actual work.'})}
+  <section class="sec tight"><div class="wrap col g32">
+    <div class="spread">
+      <div class="row keep g12" style="flex-wrap:wrap">${cats.map((c, i) => `<button class="chip ${i === 0 ? 'on' : ''}">${T(c)}</button>`).join('')}</div>
+      <div class="field" style="max-width:300px"><label for="ns" class="cap">${T({ar:'بحث', en:'Search'})}</label>
+        <input id="ns" type="search" placeholder="${T({ar:'ابحث في الأخبار', en:'Search the news'})}"></div>
+    </div>
+    <a href="#/article" class="card rv row g40 mid" style="color:inherit;background:var(--surface);padding:32px">
+      <div style="flex:0 0 480px">${ph(NEWS1.cat, 300)}</div>
+      <div class="col g16 grow">
+        <div class="row keep g12 mid" style="flex-wrap:wrap"><span class="pill solid">${T({ar:'مميّز', en:'Featured'})}</span>
+          <span class="pill teal">${T(NEWS1.cat)}</span><span class="cap">${T(NEWS1.date)}</span></div>
+        <h2 class="h2" style="font-size:32px">${T(NEWS1.t)}</h2>
+        <p class="muted">${T(NEWS1.x)}</p>
+        <span class="row keep g8 mid" style="font-weight:600;color:var(--secondary)">${T({ar:'اقرأ الخبر كاملاً', en:'Read the full story'})} ${ic('arrow', 18, 2)}</span>
+      </div>
+    </a>
+    <div class="grid g3">${[1, 2, 3, 4, 5, 6].map(i => `
+      <div class="card pad0 rv" style="transition-delay:${(i % 3) * 80}ms">
+        ${ph({ar:'[صورة الخبر]', en:'[Article image]'}, 190, true)}
+        <div class="col g10" style="padding:24px">
+          <div class="row keep g10 mid"><span class="pill plain">${T({ar:'[التصنيف]', en:'[Category]'})}</span><span class="cap">${T({ar:'[التاريخ]', en:'[Date]'})}</span></div>
+          <h3 class="h3 muted" style="font-size:19px">${T({ar:'[عنوان الخبر]', en:'[Article title]'})}</h3>
+          <p class="muted small">${T({ar:'[مقتطف قصير من الخبر]', en:'[Short excerpt]'})}</p>
+        </div></div>`).join('')}</div>
+    <div class="row keep g8" style="justify-content:center">
+      <button class="iconbtn" aria-label="${T({ar:'السابق', en:'Previous'})}">${ic('arrowL', 18, 2)}</button>
+      ${[1, 2, 3].map(n => `<button class="iconbtn" style="${n === 1 ? 'background:var(--primary);color:var(--on-primary);border-color:var(--primary)' : ''}">${AR(n)}</button>`).join('')}
+      <button class="iconbtn" aria-label="${T({ar:'التالي', en:'Next'})}">${ic('arrow', 18, 2)}</button>
+    </div>
+  </div></section>
+  <section class="sec tight surface"><div class="wrap spread">
+    <div class="col g8"><h2 class="h3" style="font-size:28px">${T({ar:'اشترك في نشرة الأخبار', en:'Subscribe to the newsletter'})}</h2>
+      <p class="muted">${T({ar:'رسالة شهرية بأبرز أنشطة الجمعية وبرامجها.', en:'A monthly note on the association\'s activities and programmes.'})}</p></div>
+    <div class="row keep g12" style="align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="min-width:280px"><label for="nl">${T({ar:'البريد الإلكتروني', en:'Email'})}</label><input id="nl" type="email" class="ltr" placeholder="name@example.com"></div>
+      <button class="btn">${T({ar:'اشترك', en:'Subscribe'})}</button>
+    </div>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pArticle() {
+  return `${siteNav('news')}
+  <section class="sec tight"><div class="wrap row g40">
+    <article class="col g24" style="flex:1 1 640px">
+      <div class="cap"><a href="#/home">${T({ar:'الرئيسية', en:'Home'})}</a> · <a href="#/news">${T({ar:'الأخبار', en:'News'})}</a> · ${T(NEWS1.cat)}</div>
+      <div class="row keep g12 mid" style="flex-wrap:wrap"><span class="pill teal">${T(NEWS1.cat)}</span>
+        <span class="cap">${T(NEWS1.date)}</span><span class="cap">·</span><span class="cap">${T({ar:'دقيقتان قراءة', en:'2 min read'})}</span></div>
+      <h1 class="h1">${T(NEWS1.t)}</h1>
+      ${ph({ar:'[صورة الخبر الرئيسية]', en:'[Main article image]'}, 380)}
+      <p style="font-size:19px;line-height:2">${T(NEWS1.x)}</p>
+      <p class="muted" style="line-height:2">${T({ar:'[نص الخبر الكامل — يُحرّر من لوحة التحكم بمحرر نصوص يدعم العناوين الفرعية والقوائم والصور والاقتباسات.]',
+        en:'[Full article body — edited from the dashboard with a rich text editor supporting subheadings, lists, images and quotes.]'})}</p>
+      <blockquote style="margin:0;padding:26px 30px;background:var(--surface);border-inline-start:3px solid var(--secondary);border-radius:0 14px 14px 0;font-size:20px;line-height:1.95;font-weight:500;color:var(--primary)">
+        ${T({ar:'[اقتباس من الخبر أو تصريح لأحد المسؤولين]', en:'[A quote from the story or a statement from an official]'})}</blockquote>
+      <div class="row keep g12 mid" style="border-top:1px solid var(--border);padding-top:22px">
+        <strong>${T({ar:'مشاركة:', en:'Share:'})}</strong>
+        ${['x', 'msg', 'mail'].map(i => `<a href="#/article" class="iconbtn" aria-label="share">${ic(i, 18)}</a>`).join('')}
+      </div>
+    </article>
+    <aside class="col g24" style="flex:0 0 340px">
+      <div class="card" style="background:var(--band);border:none;color:var(--band-tx)">
+        <h3 class="h3" style="color:var(--band-tx)">${T({ar:'هل أنت طالب منحة؟', en:'Are you a scholarship student?'})}</h3>
+        <p style="color:#C9E6E4;margin:12px 0 18px">${T({ar:'قدّم طلبك وتابع حالته إلكترونياً.', en:'Apply and follow your application online.'})}</p>
+        <a href="#/apply" class="btn onband" style="width:100%">${T({ar:'ابدأ الآن', en:'Start now'})}</a>
+      </div>
+      <div class="card col g16"><h3 class="h3" style="font-size:19px">${T({ar:'أخبار ذات صلة', en:'Related news'})}</h3>
+        ${[1, 2, 3].map(() => `<a href="#/article" class="row keep g14 mid" style="gap:14px;color:inherit">
+          <span style="width:74px;height:62px;flex-shrink:0;border-radius:12px;background:var(--surface);border:1px solid var(--border)"></span>
+          <span class="col"><strong class="muted small">${T({ar:'[عنوان خبر ذي صلة]', en:'[Related article title]'})}</strong><span class="cap">${T({ar:'[التاريخ]', en:'[Date]'})}</span></span></a>`).join('')}
+      </div>
+      <div class="card" style="background:var(--surface)"><h3 class="h3" style="font-size:19px">${T({ar:'التصنيفات', en:'Categories'})}</h3>
+        <div class="row keep g10" style="flex-wrap:wrap;margin-top:14px">
+          ${[{ar:'أنشطة مجتمعية', en:'Community'}, {ar:'برامج تدريبية', en:'Training'}, {ar:'الاجتماعات', en:'Meetings'}, {ar:'رعاية الطلاب', en:'Student care'}]
+            .map(c => `<a href="#/news" class="chip">${T(c)}</a>`).join('')}</div>
+      </div>
+    </aside>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pTestimonials() {
+  return `${siteNav('about')}
+  ${pageHead([{r:'home', t:{ar:'الرئيسية', en:'Home'}}, {t:{ar:'قالوا عنا', en:'Testimonials'}}], {ar:'قالوا عنا', en:'What people say'},
+    {ar:'آراء المستفيدين كما وصلتنا — الإيجابي منها والمقترحات على حد سواء.', en:'Beneficiary feedback as we received it — the praise and the suggestions alike.'})}
+  <section class="sec tight"><div class="wrap col g32">
+    <div class="card rv row g40" style="background:var(--surface);padding:48px 52px;align-items:flex-start">
+      <span style="color:var(--secondary);flex-shrink:0">${ic('quote', 44, 1.6)}</span>
+      <div class="col g20 grow">
+        <p style="font-size:26px;line-height:1.95;font-weight:500;color:var(--primary)">${T({ar:'كنت في زيارة لأحد الأصدقاء وحضرت معهم محاضرة من محاضرات الجمعية — [يُستكمل النص الكامل للشهادة من لوحة التحكم].',
+          en:'I was visiting a friend and attended one of the association\'s lectures with them — [full testimonial completed from the dashboard].'})}</p>
+        <div class="row keep g14 mid" style="border-top:1px solid var(--border);padding-top:20px">
+          <span class="avatar" style="width:48px;height:48px;border-radius:14px;background:var(--sl);color:var(--primary)">ع</span>
+          <span class="col"><strong>ع. ج</strong><span class="cap">${T({ar:'مستفيد من برامج الجمعية', en:'Programme beneficiary'})}</span></span>
+        </div>
+      </div>
+    </div>
+    ${secHead({ar:'المحاور', en:'Themes'}, {ar:'ما يتكرر في آراء المستفيدين', en:'What comes up most'})}
+    <div class="grid g3">${THEMES.map((t, i) => `
+      <div class="card hover rv" style="${t.flag ? 'background:var(--surface)' : ''};transition-delay:${i * 80}ms">
+        <div class="row keep g12 mid">
+          <div class="ico sm" style="${t.flag ? 'background:var(--card);color:var(--alert)' : ''}">${ic(t.flag ? 'cal' : 'book', 24)}</div>
+          ${t.flag ? `<span class="pill warn">${T({ar:'فرصة تحسين', en:'Improvement'})}</span>` : ''}
+        </div>
+        <h3 class="h3" style="margin-top:14px">${T(t.t)}</h3>
+        <p class="muted" style="margin-top:10px">${T(t.d)}</p>
+      </div>`).join('')}
+      <div class="card rv" style="background:var(--band);border:none;color:var(--band-tx);display:flex;flex-direction:column;gap:16px;justify-content:center">
+        <h3 class="h3" style="color:var(--band-tx)">${T({ar:'شاركنا رأيك', en:'Share your feedback'})}</h3>
+        <p style="color:#C9E6E4">${T({ar:'تصل الآراء إلى صندوق الرسائل في لوحة التحكم، وتُنشر بعد مراجعتها.', en:'Feedback lands in the dashboard inbox and is published after review.'})}</p>
+        <a href="#/contact" class="btn onband">${T({ar:'أرسل رأيك', en:'Send feedback'})}</a>
+      </div>
+    </div>
+    <div class="grid g3">${[1, 2, 3].map(() => `<div class="card rv">
+      <p style="line-height:1.95">${T({ar:'[نص الشهادة — يُدار من قسم «قالوا عنا» في لوحة التحكم.]', en:'[Testimonial text — managed from the Testimonials section.]'})}</p>
+      <div class="row keep g12 mid" style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
+        <span style="width:40px;height:40px;border-radius:12px;background:var(--surface);border:1px solid var(--border)"></span>
+        <strong class="muted small">${T({ar:'[الاسم أو الأحرف الأولى]', en:'[Name or initials]'})}</strong></div></div>`).join('')}</div>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pPartners() {
+  const cats = [{ar:'الكل', en:'All'}, {ar:'جهات حكومية', en:'Government'}, {ar:'جامعات', en:'Universities'}, {ar:'جمعيات ومؤسسات', en:'Associations'}, {ar:'داعمون', en:'Supporters'}];
+  return `${siteNav('partners')}
+  ${pageHead([{r:'home', t:{ar:'الرئيسية', en:'Home'}}, {t:{ar:'شركاؤنا', en:'Partners'}}], {ar:'شركاء النجاح', en:'Our partners'},
+    {ar:'الجهات التي نعمل معها في رعاية طلاب المنح وتنفيذ البرامج الدعوية والتدريبية.', en:'The organisations we work with on student care, outreach and training.'})}
+  <section class="sec"><div class="wrap col g32">
+    <div class="row keep g10" style="flex-wrap:wrap">${cats.map((c, i) => `<button class="chip ${i === 0 ? 'on' : ''}">${T(c)}</button>`).join('')}</div>
+    <div class="grid g4">${[1, 2, 3, 4, 5, 6, 7, 8].map(i => `
+      <div class="card hover rv" style="height:168px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition-delay:${(i % 4) * 70}ms">
+        <span style="width:92px;height:56px;border-radius:10px;background:var(--surface)"></span>
+        <span class="cap" style="font-weight:600">${T({ar:'[اسم الشريك]', en:'[Partner name]'})}</span></div>`).join('')}</div>
+    <div class="note">${ic('info', 24)}<span>${T({ar:'صفحة الشركاء على الموقع الحالي فارغة من المحتوى. تُرفع الشعارات وأسماء الجهات من قسم «الشركاء» في لوحة التحكم، وتُرتَّب بالسحب.',
+      en:'The current site\'s partners page has no content. Logos and names are uploaded from the Partners section of the dashboard and reordered by dragging.'})}</span></div>
+    <div class="card rv spread" style="background:var(--surface);padding:44px 48px">
+      <div class="col g12"><h2 class="h2" style="font-size:30px">${T({ar:'هل ترغب في الشراكة معنا؟', en:'Want to partner with us?'})}</h2>
+        <p class="muted" style="max-width:640px">${T({ar:'نرحّب بالجهات الراغبة في دعم برامج رعاية طلاب المنح أو المشاركة في البرامج التدريبية والدعوية.',
+          en:'We welcome organisations wishing to support student care programmes or take part in training and outreach.'})}</p></div>
+      <a href="#/contact" class="btn">${T({ar:'تواصل معنا', en:'Contact us'})}</a>
+    </div>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pDocuments() {
+  const secs = [
+    [{ar:'التراخيص', en:'Licences'}, [[{ar:'[ترخيص الجمعية]', en:'[Association licence]'}, 'file'], [{ar:'[شهادة التسجيل]', en:'[Registration certificate]'}, 'file']]],
+    [{ar:'السياسات واللوائح', en:'Policies & regulations'}, [[{ar:'[اللائحة الأساسية]', en:'[Articles of association]'}, 'file'], [{ar:'[سياسة الخصوصية وحماية البيانات]', en:'[Privacy & data protection policy]'}, 'file']]],
+    [{ar:'محاضر الاجتماعات', en:'Meeting minutes'}, [[{ar:'[محضر اجتماع مجلس الإدارة رقم ١]', en:'[Board meeting minutes no. 1]'}, 'file'], [{ar:'[محضر اجتماع الجمعية العمومية]', en:'[General assembly minutes]'}, 'file']]]
+  ];
+  return `${siteNav('about')}
+  ${pageHead([{r:'home', t:{ar:'الرئيسية', en:'Home'}}, {r:'about', t:{ar:'من نحن', en:'About'}}, {t:{ar:'التراخيص والسياسات', en:'Licences & policies'}}],
+    {ar:'التراخيص والسياسات واللوائح', en:'Licences, policies and regulations'},
+    {ar:'مستندات الجمعية الرسمية في مكان واحد — بمعاينة مباشرة وتحميل، بدل مشغّل PDF مضمّن بلا عناوين.',
+     en:'Official documents in one place — with previews and downloads, instead of an unlabelled embedded PDF viewer.'})}
+  <section class="sec"><div class="wrap row g32">
+    <aside class="col g10" style="flex:0 0 300px">
+      <div class="eyebrow" style="margin-bottom:6px">${T({ar:'الأقسام', en:'Sections'})}</div>
+      ${[...secs.map(s => s[0]), {ar:'التقارير السنوية', en:'Annual reports'}].map((s, i) =>
+        `<a href="#/documents" class="tile" style="${i === 0 ? 'background:var(--primary);color:var(--on-primary)' : 'background:var(--card);border:1px solid var(--border);color:var(--text)'};font-weight:${i === 0 ? 600 : 500}">${T(s)}</a>`).join('')}
+      <div class="tile cap" style="margin-top:12px;line-height:1.85">${T({ar:'كل ملف هنا يُرفع ويُصنَّف ويُؤرَّخ من قسم «المستندات» في لوحة التحكم.', en:'Every file here is uploaded, categorised and dated from the Documents section of the dashboard.'})}</div>
+    </aside>
+    <div class="col g32 grow">
+      ${secs.map(([title, files]) => `
+        <div class="col g16">
+          <h2 class="h3" style="font-size:28px">${T(title)}</h2>
+          <div class="grid g2">${files.map(([f]) => `
+            <div class="card hover rv row keep g16 mid" style="padding:24px 26px">
+              <div class="ico sm">${ic('file', 23)}</div>
+              <div class="col grow"><strong>${T(f)}</strong><span class="cap">PDF · ${T({ar:'[الحجم]', en:'[Size]'})} · ${T({ar:'[التاريخ]', en:'[Date]'})}</span></div>
+              <button class="btn line xs">${T({ar:'تحميل', en:'Download'})}</button>
+            </div>`).join('')}</div>
+        </div>`).join('')}
+      <div class="col g16">
+        <h2 class="h3" style="font-size:28px">${T({ar:'التقارير السنوية', en:'Annual reports'})}</h2>
+        <div class="card rv row keep g16 mid" style="background:var(--sl);border:none;padding:24px 26px">
+          <div class="ico sm" style="background:var(--card)">${ic('chart', 23)}</div>
+          <div class="col grow"><strong style="color:var(--primary)">${T({ar:'تقارير الأنشطة', en:'Activity reports'})}</strong>
+            <span class="cap" style="color:var(--primary)">${T({ar:'PDF منشور على الموقع الحالي · مايو ٢٠٢٤', en:'PDF published on the current site · May 2024'})}</span></div>
+          <button class="btn xs">${T({ar:'تحميل', en:'Download'})}</button>
+        </div>
+      </div>
+    </div>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pContact() {
+  const cards = [
+    ['phone', {ar:'الهاتف', en:'Phone'}, `<a class="ltr" href="tel:+966534646648" style="font-size:20px;font-weight:600">${PHONE}</a>`, {ar:'أوقات العمل: [من — إلى]', en:'Hours: [from — to]'}],
+    ['mail', {ar:'البريد الإلكتروني', en:'Email'}, `<a class="ltr" href="mailto:${EMAIL}" style="font-size:20px;font-weight:600">${EMAIL}</a>`, {ar:'نرد خلال [مدة الرد]', en:'We reply within [time]'}],
+    ['pin', {ar:'العنوان', en:'Address'}, `<span style="line-height:1.8">${T(ADDR)}</span>`, {ar:'الحصول على الاتجاهات', en:'Get directions'}]
+  ];
+  return `${siteNav('contact')}
+  ${pageHead([{r:'home', t:{ar:'الرئيسية', en:'Home'}}, {t:{ar:'تواصل معنا', en:'Contact'}}], {ar:'تواصل معنا', en:'Contact us'},
+    {ar:'إذا كانت لديك أي أسئلة أو كنت بحاجة إلى مساعدة، فلا تتردد في الاتصال بنا.', en:'If you have a question or need help, get in touch.'})}
+  <section class="sec tight"><div class="wrap col g32">
+    <div class="grid g3">${cards.map(([i, t, v, m]) => `<div class="card hover rv">
+      <div class="ico">${ic(i, 24)}</div><h3 class="h3" style="font-size:19px;margin-top:14px">${T(t)}</h3>
+      <div style="margin-top:10px">${v}</div><div class="cap" style="margin-top:8px">${T(m)}</div></div>`).join('')}</div>
+    <div class="row g32">
+      <form class="card col g24 grow" style="background:var(--surface);padding:44px 48px" onsubmit="event.preventDefault();alert('${T({ar:'نموذج تجريبي — لن تُرسل الرسالة', en:'Prototype only — nothing is sent'})}')">
+        <div class="col g8"><h2 class="h2" style="font-size:30px">${T({ar:'اتصل بنا', en:'Send a message'})}</h2>
+          <p class="muted">${T({ar:'تصل رسالتك مباشرة إلى صندوق الرسائل في لوحة التحكم.', en:'Your message goes straight to the dashboard inbox.'})}</p></div>
+        <div class="grid g2" style="gap:20px">
+          <div class="field"><label for="cn">${T({ar:'الاسم', en:'Name'})} <span class="req">*</span></label><input id="cn" type="text" required></div>
+          <div class="field"><label for="cp">${T({ar:'الهاتف', en:'Phone'})} <span class="req">*</span></label><input id="cp" type="tel" class="ltr" required></div>
+          <div class="field"><label for="ce">${T({ar:'البريد الإلكتروني', en:'Email'})} <span class="req">*</span></label><input id="ce" type="email" class="ltr" required></div>
+          <div class="field"><label for="cs">${T({ar:'الموضوع', en:'Subject'})}</label><select id="cs">
+            <option>${T({ar:'استفسار عن المنح', en:'Scholarship enquiry'})}</option><option>${T({ar:'طلب شراكة', en:'Partnership request'})}</option>
+            <option>${T({ar:'ملاحظة أو اقتراح', en:'Feedback or suggestion'})}</option><option>${T({ar:'موضوع آخر', en:'Something else'})}</option></select></div>
+        </div>
+        <div class="field"><label for="cm">${T({ar:'الرسالة', en:'Message'})} <span class="req">*</span></label><textarea id="cm" required></textarea></div>
+        <div class="spread"><span class="cap" style="max-width:420px">${T({ar:'بإرسالك الرسالة فأنت توافق على سياسة الخصوصية الخاصة بالجمعية.', en:'By sending you agree to the association\'s privacy policy.'})}</span>
+          <button class="btn" type="submit">${T({ar:'إرسال', en:'Send'})}</button></div>
+      </form>
+      <aside class="col g24" style="flex:0 0 420px">
+        ${ph({ar:'[خريطة موقع المقر] — حي السويدي، الرياض', en:'[Map of the office] — Al Suwaidi, Riyadh'}, 320)}
+        <div class="card" style="background:var(--band);border:none;color:var(--band-tx)">
+          <h3 class="h3" style="color:var(--band-tx)">${T({ar:'للتسجيل في الجمعية', en:'Register with us'})}</h3>
+          <p style="color:#C9E6E4;margin:12px 0 18px">${T({ar:'إن كنت طالب منحة، فالطلب الإلكتروني أسرع من الرسالة.', en:'If you are a scholarship student, the online form is faster than a message.'})}</p>
+          <a href="#/apply" class="btn onband" style="width:100%">${T({ar:'تسجيل طلب منحة', en:'Apply now'})}</a>
+        </div>
+      </aside>
+    </div>
+  </div></section>
+  ${siteFoot()}`;
+}
+
+function pApply() {
+  const steps = [[{ar:'البيانات الشخصية', en:'Personal details'}, {ar:'الخطوة الحالية', en:'Current step'}],
+                 [{ar:'البيانات الأكاديمية', en:'Academic details'}, {ar:'الجامعة والمرحلة', en:'University and degree'}],
+                 [{ar:'المستندات والإقرار', en:'Documents and consent'}, {ar:'الهوية والشهادات', en:'ID and certificates'}]];
+  return `${siteNav('')}
+  <section class="sec tight surface" style="border-bottom:1px solid var(--border)"><div class="wrap col g32">
+    <div class="col g12"><h1 class="h1">${T({ar:'لتسجيل طلب منحة', en:'Scholarship application'})}</h1>
+      <p class="lead">${T({ar:'يُرجى استكمال البيانات التالية. يُحفَظ تقدّمك تلقائياً ويمكنك العودة لإكماله لاحقاً.', en:'Please complete the details below. Your progress is saved automatically.'})}</p></div>
+    <div class="row keep g16 mid" style="flex-wrap:wrap">${steps.map(([t, s], i) => `
+      <div class="row keep g14 mid" style="flex:1 1 240px">
+        <span style="width:44px;height:44px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;
+          ${i === 0 ? 'background:var(--primary);color:var(--on-primary)' : 'background:var(--card);border:1.5px solid var(--border);color:var(--muted)'}">${AR(i + 1)}</span>
+        <span class="col"><strong style="${i === 0 ? 'color:var(--primary)' : 'color:var(--muted)'}">${T(t)}</strong><span class="cap">${T(s)}</span></span>
+      </div>`).join('')}</div>
+  </div></section>
+
+  <section class="sec tight"><div class="wrap row g32">
+    <div class="col g24 grow">
+      <form class="card col g24" style="padding:40px 44px" onsubmit="event.preventDefault();location.hash='#/portal-status'">
+        <div class="row keep g14 mid"><h2 class="h2" style="font-size:26px">${T({ar:'الخطوة ١ — البيانات الشخصية', en:'Step 1 — Personal details'})}</h2>
+          <span class="pill teal">${T({ar:'نشطة', en:'Active'})}</span></div>
+        <div class="col g10"><label>${T({ar:'الاسم', en:'Full name'})} <span class="req">*</span></label>
+          <div class="grid g3" style="gap:16px">
+            ${[[{ar:'الاسم الأول', en:'First'}, 'af'], [{ar:'الاسم الأوسط', en:'Middle'}, 'am'], [{ar:'اسم العائلة', en:'Last'}, 'al']]
+              .map(([p, id]) => `<div class="field"><input id="${id}" type="text" placeholder="${T(p)}"><label for="${id}" class="cap" style="font-weight:400">${T(p)}</label></div>`).join('')}
+          </div></div>
+        <div class="grid g2" style="gap:20px">
+          <div class="field"><label for="ad">${T({ar:'تاريخ الميلاد', en:'Date of birth'})} <span class="req">*</span></label><input id="ad" type="date" class="ltr"></div>
+          <div class="field"><label for="ap">${T({ar:'الهاتف', en:'Phone'})} <span class="req">*</span></label><input id="ap" type="tel" class="ltr" placeholder="+966 5x xxx xxxx"></div>
+          <div class="field"><label for="an">${T({ar:'الجنسية', en:'Nationality'})} <span class="req">*</span></label><select id="an">
+            <option>${T({ar:'اختر دولتك', en:'Select your country'})}</option><option>${T({ar:'المملكة العربية السعودية', en:'Saudi Arabia'})}</option>
+            <option>${T({ar:'مصر', en:'Egypt'})}</option><option>${T({ar:'نيجيريا', en:'Nigeria'})}</option>
+            <option>${T({ar:'إندونيسيا', en:'Indonesia'})}</option><option>${T({ar:'الهند', en:'India'})}</option></select></div>
+          <div class="field"><label for="ai">${T({ar:'رقم الهوية / الإقامة', en:'ID / residency number'})}</label><input id="ai" type="text" class="ltr"></div>
+          <div class="field"><label for="ae">${T({ar:'البريد الإلكتروني', en:'Email'})} <span class="req">*</span></label><input id="ae" type="email" class="ltr" placeholder="name@example.com"></div>
+          <div class="field"><label for="aj">${T({ar:'العمل الحالي', en:'Current job'})}</label><input id="aj" type="text"></div>
+        </div>
+        <div class="col g12"><label>${T({ar:'الجنس', en:'Gender'})} <span class="req">*</span></label>
+          <div class="row keep g14">
+            <label class="check on grow"><input type="radio" name="g" checked>${T({ar:'ذكر', en:'Male'})}</label>
+            <label class="check grow"><input type="radio" name="g">${T({ar:'أنثى', en:'Female'})}</label>
+          </div></div>
+        <div class="spread" style="border-top:1px solid var(--border);padding-top:24px">
+          <button type="button" class="btn line">${T({ar:'حفظ كمسودة', en:'Save draft'})}</button>
+          <button type="submit" class="btn">${T({ar:'التالي — البيانات الأكاديمية', en:'Next — academic details'})}</button>
+        </div>
+      </form>
+
+      <div class="card col g24" style="background:var(--surface);padding:40px 44px">
+        <div class="row keep g14 mid"><h2 class="h2" style="font-size:26px">${T({ar:'الخطوة ٣ — المستندات والإقرار', en:'Step 3 — Documents and consent'})}</h2>
+          <span class="pill plain">${T({ar:'معاينة التصميم', en:'Design preview'})}</span></div>
+        <div class="grid g2" style="gap:20px">
+          ${[[{ar:'صورة الهوية', en:'ID copy'}, {ar:'اسحب الملف هنا أو اختره · PDF أو JPG · حتى ٥ ميجابايت', en:'Drop a file or choose one · PDF or JPG · up to 5 MB'}],
+             [{ar:'الشهادات الدراسية', en:'Academic certificates'}, {ar:'يمكن رفع أكثر من ملف · PDF أو JPG', en:'Multiple files allowed · PDF or JPG'}]]
+            .map(([t, d]) => `<div class="drop"><span style="color:var(--secondary)">${ic('upload', 30)}</span>
+              <strong>${T(t)}</strong><span class="cap">${T(d)}</span>
+              <button type="button" class="btn soft xs">${T({ar:'اختيار ملف', en:'Choose file'})}</button></div>`).join('')}
+        </div>
+        <div class="col g12"><label>${T({ar:'المرحلة الدراسية', en:'Degree level'})} <span class="req">*</span></label>
+          <div class="row keep g14">
+            <label class="check on grow"><input type="radio" name="d" checked>${T({ar:'بكالوريوس', en:'Bachelor'})}</label>
+            <label class="check grow"><input type="radio" name="d">${T({ar:'ماجستير', en:'Master'})}</label>
+            <label class="check grow"><input type="radio" name="d">${T({ar:'دكتوراه', en:'PhD'})}</label>
+          </div></div>
+        <div class="field"><label for="ab">${T({ar:'نبذة مختصرة عن المنحة', en:'Brief note about your scholarship'})}</label><textarea id="ab"></textarea></div>
+        <label class="check" style="min-height:auto;padding:20px 24px;align-items:flex-start;font-weight:400">
+          <input type="checkbox" style="margin-top:4px">
+          <span>${T({ar:'أقرّ بصحة البيانات المدخلة وأوافق على سياسة الخصوصية ومعالجة بياناتي لأغراض دراسة الطلب.',
+            en:'I confirm the details are accurate and consent to my data being processed to assess this application.'})}</span></label>
+        <div class="spread" style="border-top:1px solid var(--border);padding-top:24px">
+          <button type="button" class="btn line">${T({ar:'السابق', en:'Back'})}</button>
+          <a href="#/portal-status" class="btn">${T({ar:'إرسال الطلب', en:'Submit application'})}</a>
+        </div>
+      </div>
+    </div>
+
+    <aside class="col g20" style="flex:0 0 360px">
+      <div class="card" style="background:var(--band);border:none;color:var(--band-tx)">
+        <h3 class="h3" style="color:var(--band-tx)">${T({ar:'تقدّم الطلب', en:'Progress'})}</h3>
+        <div class="bar" style="background:rgba(255,255,255,.15);margin:14px 0 10px"><i style="width:33%;background:var(--band-dim)"></i></div>
+        <div style="color:var(--band-soft)">${T({ar:'اكتملت ١ من ٣ خطوات', en:'1 of 3 steps complete'})}</div>
+        <div class="cap" style="color:var(--band-soft);border-top:1px solid rgba(255,255,255,.15);padding-top:14px;margin-top:14px">${T({ar:'آخر حفظ تلقائي: [الوقت]', en:'Last autosave: [time]'})}</div>
+      </div>
+      <div class="card col g14"><h3 class="h3" style="font-size:19px">${T({ar:'جهّز قبل البدء', en:'Have these ready'})}</h3>
+        ${[{ar:'صورة الهوية أو الجواز', en:'ID or passport copy'}, {ar:'الشهادات الدراسية', en:'Academic certificates'}, {ar:'اسم الجامعة والمرحلة', en:'University and degree level'}]
+          .map(x => `<div class="row keep g12" style="align-items:flex-start"><span style="color:var(--secondary);flex-shrink:0;margin-top:4px">${ic('check', 20, 2)}</span><span>${T(x)}</span></div>`).join('')}
+      </div>
+      <div class="note">${ic('lock', 22)}<span>${T({ar:'بياناتك محفوظة ولا تُعرض إلا لفريق مراجعة الطلبات في الجمعية.', en:'Your data is stored securely and seen only by the review team.'})}</span></div>
+    </aside>
+  </div></section>
+  ${siteFoot()}`;
+}
+/* ============================ portal ============================ */
+function portalNav(active) {
+  const items = [['portal-status', {ar:'حالة الطلب', en:'Application status'}], ['portal-docs', {ar:'مستنداتي', en:'My documents'}], ['contact', {ar:'الدعم', en:'Support'}]];
+  return `<header class="nav"><div class="nav-in">
+    <a href="#/home" class="brand">${LOGO(46)}<span><b>${T({ar:'بوابة الطالب', en:'Student portal'})}</b></span></a>
+    <nav class="menu">${items.map(([r, l]) => `<a href="#/${r}" class="${r === active ? 'on' : ''}">${T(l)}</a>`).join('')}</nav>
+    <div class="navtools">
+      <button class="langbtn" onclick="toggleLang()">${LANG === 'ar' ? 'EN' : 'ع'}</button>
+      <button class="iconbtn" onclick="toggleTheme()" aria-label="theme">${ic(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon')}</button>
+      <button class="iconbtn" aria-label="${T({ar:'الإشعارات', en:'Notifications'})}">${ic('bell')}</button>
+      <span class="who"><span class="avatar">م</span>${T({ar:'[اسم الطالب]', en:'[Student name]'})}</span>
+    </div></div></header>`;
+}
+
+function pPortalLogin() {
+  return `<div class="row" style="min-height:100vh;gap:0">
+    <div class="col g40" style="flex:0 0 46%;background:var(--band);color:var(--band-tx);padding:64px 60px;justify-content:space-between;position:relative;overflow:hidden">
+      ${LINES(600, 500)}
+      <a href="#/home" class="row keep g14 mid" style="position:relative;color:var(--band-tx)">${LOGO(64)}<strong style="font-size:20px">${T(ORG)}</strong></a>
+      <div class="col g20" style="position:relative">
+        <h1 class="h1" style="color:var(--band-tx)">${T({ar:'بوابة الطالب', en:'Student portal'})}</h1>
+        <p style="color:var(--band-soft);font-size:18px;line-height:1.9;max-width:420px">${T({ar:'تابع حالة طلب المنحة، وارفع المستندات الناقصة، واحجز موعد المقابلة — دون مراجعة المقر.',
+          en:'Track your application, upload missing documents and book an interview — without visiting the office.'})}</p>
+        <div class="col g12" style="margin-top:8px">${[{ar:'متابعة حالة الطلب لحظة بلحظة', en:'Live application status'}, {ar:'رفع المستندات وتعديلها', en:'Upload and replace documents'}, {ar:'إشعارات بالبريد والرسائل النصية', en:'Email and SMS notifications'}]
+          .map(x => `<div class="row keep g12 mid"><span style="color:var(--band-dim)">${ic('check', 20, 2)}</span><span style="color:var(--band-soft)">${T(x)}</span></div>`).join('')}</div>
+      </div>
+      <div class="cap" style="color:var(--band-soft);position:relative">${T(ADDR)}</div>
+    </div>
+    <div class="col g24" style="flex:1 1 auto;padding:64px;justify-content:center;max-width:620px;margin:0 auto">
+      <div class="col g8"><h2 class="h2" style="font-size:32px">${T({ar:'تسجيل الدخول', en:'Sign in'})}</h2>
+        <p class="muted">${T({ar:'أدخل رقم الطلب أو البريد الإلكتروني المسجّل.', en:'Enter your application reference or registered email.'})}</p></div>
+      <form class="col g20" onsubmit="event.preventDefault();location.hash='#/portal-status'">
+        <div class="field"><label for="pid">${T({ar:'رقم الطلب أو البريد الإلكتروني', en:'Reference or email'})}</label>
+          <input id="pid" type="text" class="ltr" placeholder="SA-2026-00184"></div>
+        <div class="field"><label for="potp">${T({ar:'رمز التحقق', en:'Verification code'})}</label>
+          <input id="potp" type="text" class="ltr" placeholder="${T({ar:'الرمز المرسل إلى هاتفك', en:'Code sent to your phone'})}">
+          <span class="cap">${T({ar:'لا نستخدم كلمات مرور — يُرسَل رمز لمرة واحدة إلى هاتفك أو بريدك.', en:'No passwords — a one-time code is sent to your phone or email.'})}</span></div>
+        <button class="btn" type="submit" style="min-height:56px">${T({ar:'دخول', en:'Sign in'})}</button>
+        <button class="btn soft" type="button">${T({ar:'إعادة إرسال الرمز', en:'Resend code'})}</button>
+      </form>
+      <div class="divider"></div>
+      <div class="card spread" style="background:var(--surface)">
+        <div class="col g6"><strong style="font-size:18px;color:var(--primary)">${T({ar:'لم تقدّم بعد؟', en:'Not applied yet?'})}</strong>
+          <span class="cap">${T({ar:'ابدأ طلب منحة جديداً في ثلاث خطوات.', en:'Start a new application in three steps.'})}</span></div>
+        <a href="#/apply" class="btn ghost sm">${T({ar:'تقديم طلب', en:'Apply'})}</a>
+      </div>
+      <a href="#/contact" style="font-weight:600">${T({ar:'تواجه مشكلة في الدخول؟ تواصل معنا', en:'Trouble signing in? Contact us'})}</a>
+    </div>
+  </div>`;
+}
+
+function pPortalStatus() {
+  const steps = [
+    [{ar:'استلام الطلب', en:'Application received'}, {ar:'اكتملت البيانات الشخصية والأكاديمية · [التاريخ]', en:'Personal and academic details complete · [date]'}, 'done'],
+    [{ar:'استلام المستندات', en:'Documents received'}, {ar:'صورة الهوية والشهادات · [التاريخ]', en:'ID copy and certificates · [date]'}, 'done'],
+    [{ar:'المراجعة من فريق الجمعية', en:'Review by the team'}, {ar:'جارية الآن · المدة المتوقعة [عدد الأيام]', en:'In progress · expected [days]'}, 'now'],
+    [{ar:'المقابلة', en:'Interview'}, {ar:'يُتاح حجز الموعد بعد اجتياز المراجعة', en:'Booking opens once review passes'}, ''],
+    [{ar:'القرار النهائي', en:'Final decision'}, {ar:'يصلك إشعار بالبريد والرسائل النصية', en:'You will be notified by email and SMS'}, '']
+  ];
+  return `${portalNav('portal-status')}
+  <section class="sec tight" style="background:var(--surface);min-height:80vh"><div class="wrap row g28" style="gap:28px">
+    <div class="col g24 grow">
+      <div class="card spread" style="background:var(--band);border:none;color:var(--band-tx);padding:36px 40px">
+        <div class="col g8"><span class="cap" style="color:#8FC9C7">${T({ar:'رقم الطلب', en:'Reference'})}</span>
+          <strong class="ltr" style="font-size:30px;font-weight:700">SA-2026-00184</strong>
+          <span class="cap" style="color:#C9E6E4">${T({ar:'قُدّم في [التاريخ] · آخر تحديث [التاريخ]', en:'Submitted [date] · updated [date]'})}</span></div>
+        <span class="pill" style="background:var(--secondary);color:var(--on-primary);font-size:17px;padding:14px 26px">${T({ar:'قيد المراجعة', en:'Under review'})}</span>
+      </div>
+      <div class="card col g24" style="padding:36px 40px">
+        <h2 class="h3" style="font-size:26px">${T({ar:'مسار الطلب', en:'Application timeline'})}</h2>
+        <div class="col">${steps.map(([t, d, st], i) => `
+          <div class="step">
+            <div class="rail">
+              <div class="dot ${st}">${st === 'done' ? ic('check', 20, 2.5) : st === 'now' ? '<i></i>' : ''}</div>
+              ${i < steps.length - 1 ? `<div class="line ${i < 2 ? 'done' : ''}"></div>` : ''}
+            </div>
+            <div class="col g6" style="padding-bottom:${i < steps.length - 1 ? '26px' : '0'}">
+              <strong style="font-size:19px;${st ? 'color:var(--primary)' : 'color:var(--muted)'}">${T(t)}</strong>
+              <span class="cap">${T(d)}</span></div>
+          </div>`).join('')}</div>
+      </div>
+      <div class="note warn row keep mid" style="padding:28px 32px">
+        <span>${ic('warn', 26)}</span>
+        <div class="col g6 grow"><strong style="font-size:18px">${T({ar:'مطلوب إجراء: صورة الهوية غير واضحة', en:'Action needed: ID copy is not legible'})}</strong>
+          <span>${T({ar:'يُرجى إعادة رفع صورة الهوية بجودة أعلى لاستكمال المراجعة.', en:'Please re-upload a clearer copy so the review can continue.'})}</span></div>
+        <a href="#/portal-docs" class="btn danger sm">${T({ar:'رفع بديل', en:'Replace file'})}</a>
+      </div>
+    </div>
+    <aside class="col g24" style="flex:0 0 380px">
+      <div class="card col g16"><h3 class="h3" style="font-size:20px">${T({ar:'ملخص الطلب', en:'Summary'})}</h3>
+        ${[[{ar:'الاسم', en:'Name'}, {ar:'[اسم الطالب]', en:'[Student name]'}], [{ar:'الجنسية', en:'Nationality'}, {ar:'[الجنسية]', en:'[Nationality]'}],
+           [{ar:'الجامعة', en:'University'}, {ar:'[اسم الجامعة]', en:'[University]'}], [{ar:'المرحلة', en:'Degree'}, {ar:'بكالوريوس', en:'Bachelor'}]]
+          .map(([k, v]) => `<div class="spread" style="gap:16px"><span class="muted">${T(k)}</span><strong>${T(v)}</strong></div>`).join('')}
+        <a href="#/apply" style="font-weight:600;border-top:1px solid var(--border);padding-top:14px">${T({ar:'تعديل بيانات الطلب', en:'Edit application'})}</a></div>
+      <div class="card col g16"><h3 class="h3" style="font-size:20px">${T({ar:'آخر التحديثات', en:'Latest updates'})}</h3>
+        ${[[{ar:'بدأت مراجعة الطلب', en:'Review started'}, 1], [{ar:'استُلمت المستندات', en:'Documents received'}, 0], [{ar:'أُرسل الطلب', en:'Application submitted'}, 0]]
+          .map(([t, on]) => `<div class="row keep g14" style="align-items:flex-start">
+            <span style="width:10px;height:10px;border-radius:50%;margin-top:8px;flex-shrink:0;background:${on ? 'var(--secondary)' : 'var(--border)'}"></span>
+            <span class="col"><strong class="small">${T(t)}</strong><span class="cap">${T({ar:'[التاريخ والوقت]', en:'[Date and time]'})}</span></span></div>`).join('')}</div>
+      <div class="card" style="background:var(--sl);border:none">
+        <h3 class="h3" style="font-size:19px">${T({ar:'تحتاج مساعدة؟', en:'Need help?'})}</h3>
+        <p style="margin:10px 0 12px;color:var(--primary)">${T({ar:'فريق رعاية الطلاب متاح للرد على استفساراتك.', en:'The student care team is available to help.'})}</p>
+        <a class="ltr" href="tel:+966534646648" style="font-weight:600;font-size:17px">${PHONE}</a></div>
+    </aside>
+  </div></section>`;
+}
+
+function pPortalDocs() {
+  const rows = [
+    [{ar:'صورة الهوية', en:'ID copy'}, 'id-card.jpg · 1.2 MB', {ar:'مرفوض — غير واضح', en:'Rejected — not legible'}, 'warn', true],
+    [{ar:'الشهادة الثانوية', en:'High school certificate'}, 'certificate.pdf · 840 KB', {ar:'مقبول', en:'Accepted'}, 'ok', false],
+    [{ar:'خطاب القبول الجامعي', en:'University admission letter'}, 'admission.pdf · 620 KB', {ar:'قيد المراجعة', en:'Under review'}, 'plain', false],
+    [{ar:'[مستند اختياري]', en:'[Optional document]'}, {ar:'لم يُرفع بعد', en:'Not uploaded'}, {ar:'مطلوب', en:'Required'}, 'plain', 'up']
+  ];
+  return `${portalNav('portal-docs')}
+  <section class="sec tight" style="background:var(--surface);min-height:80vh"><div class="wrap row g28" style="gap:28px">
+    <div class="col g24 grow">
+      <div class="spread"><div class="col g8"><h1 class="h2" style="font-size:32px">${T({ar:'مستنداتي', en:'My documents'})}</h1>
+        <span class="muted">${T({ar:'الملفات المرفوعة مع طلب المنحة رقم', en:'Files attached to application'})} <span class="ltr">SA-2026-00184</span></span></div>
+        <button class="btn sm">${ic('plus', 19, 2)} ${T({ar:'رفع مستند', en:'Upload'})}</button></div>
+      <div class="drop">${ic('upload', 34)}<strong style="font-size:18px">${T({ar:'اسحب الملفات إلى هنا', en:'Drop files here'})}</strong>
+        <span class="cap">${T({ar:'PDF أو JPG أو PNG · حتى ٥ ميجابايت للملف', en:'PDF, JPG or PNG · up to 5 MB each'})}</span></div>
+      <div class="tbl">
+        <div class="th"><span class="grow">${T({ar:'المستند', en:'Document'})}</span><span style="width:150px">${T({ar:'تاريخ الرفع', en:'Uploaded'})}</span>
+          <span style="width:170px">${T({ar:'الحالة', en:'Status'})}</span><span style="width:120px"></span></div>
+        ${rows.map(([t, meta, st, kind, act]) => `<div class="tr">
+          <span class="row keep g16 mid grow"><span class="ico sm" style="${kind === 'warn' ? 'background:var(--alert-bg);color:var(--alert)' : ''}">${ic('file', 21)}</span>
+            <span class="col"><strong>${T(t)}</strong><span class="cap ltr">${typeof meta === 'string' ? meta : T(meta)}</span></span></span>
+          <span style="width:150px" class="muted">${act === 'up' ? '—' : T({ar:'[التاريخ]', en:'[Date]'})}</span>
+          <span style="width:170px"><span class="pill ${kind}">${T(st)}</span></span>
+          <span style="width:120px">${act === true ? `<button class="btn danger xs">${T({ar:'إعادة رفع', en:'Re-upload'})}</button>`
+            : act === 'up' ? `<button class="btn soft xs">${T({ar:'رفع', en:'Upload'})}</button>`
+            : `<a href="#/portal-docs" style="font-weight:600">${T({ar:'معاينة', en:'Preview'})}</a>`}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+    <aside class="col g24" style="flex:0 0 360px">
+      <div class="card col g14"><h3 class="h3" style="font-size:20px">${T({ar:'اكتمال الملف', en:'Completeness'})}</h3>
+        <div class="bar"><i style="width:66%"></i></div>
+        <span class="muted">${T({ar:'٢ من ٣ مستندات مطلوبة مكتملة', en:'2 of 3 required documents complete'})}</span></div>
+      <div class="card col g12"><h3 class="h3" style="font-size:19px">${T({ar:'نصائح للرفع', en:'Upload tips'})}</h3>
+        <p class="muted">${T({ar:'صوّر المستند في إضاءة جيدة وبزوايا مستقيمة، وتأكد من وضوح الأرقام والأسماء قبل الرفع.', en:'Photograph in good light, square to the page, and check that numbers and names are readable.'})}</p></div>
+      <div class="note">${ic('lock', 22)}<span>${T({ar:'مستنداتك مشفّرة ولا يطّلع عليها إلا فريق مراجعة الطلبات.', en:'Your documents are encrypted and seen only by the review team.'})}</span></div>
+    </aside>
+  </div></section>`;
+}
+
+/* ============================ admin shell ============================ */
+const ANAV = [
+  ['g1', {ar:'الرئيسية', en:'Main'}],
+  ['admin', {ar:'نظرة عامة', en:'Overview'}, 'grid'],
+  ['admin-apps', {ar:'طلبات المنح', en:'Applications'}, 'file', '12', 'var(--alert)'],
+  ['admin-messages', {ar:'الرسائل', en:'Messages'}, 'mail', '5', 'var(--secondary)'],
+  ['g2', {ar:'محتوى الموقع', en:'Site content'}],
+  ['admin-pages', {ar:'صفحات الموقع', en:'Pages'}, 'pages'],
+  ['admin-news', {ar:'الأخبار', en:'News'}, 'news'],
+  ['admin-work', {ar:'مجالات العمل', en:'Work areas'}, 'target'],
+  ['admin-board', {ar:'مجلس الإدارة', en:'Board'}, 'user'],
+  ['admin-testimonials', {ar:'قالوا عنا', en:'Testimonials'}, 'quote'],
+  ['admin-partners', {ar:'الشركاء', en:'Partners'}, 'partners'],
+  ['admin-documents', {ar:'المستندات', en:'Documents'}, 'folder'],
+  ['g3', ''],
+  ['admin-users', {ar:'المستخدمون', en:'Users'}, 'people'],
+  ['admin-settings', {ar:'الإعدادات', en:'Settings'}, 'gear']
+];
+
+function adminShell(active, title, sub, actions, body) {
+  const nav = ANAV.map(item => {
+    const [k, l, icon, n, col] = item;
+    if (k === 'g3') return '<div class="grow"></div>';
+    if (k.startsWith('g')) return `<div class="sbh">${T(l)}</div>`;
+    return `<a href="#/${k}" class="sbl ${k === active ? 'on' : ''}">${ic(icon, 19)}<span>${T(l)}</span>${n ? `<span class="badge-n" style="background:${k === active ? 'rgba(0,0,0,.28)' : col};color:${k === active ? 'var(--on-primary)' : 'var(--badge-tx)'}">${AR(n)}</span>` : ''}</a>`;
+  }).join('');
+  return `<div class="app">
+    <aside class="side" id="side">
+      <a href="#/admin" class="sbrand">${LOGO(54)}<span><b>${T({ar:'لوحة التحكم', en:'Dashboard'})}</b><span>${T(ORG)}</span></span></a>
+      ${nav}
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <button class="iconbtn burger" onclick="document.getElementById('side').classList.toggle('open')" aria-label="menu">${ic('menu')}</button>
+        <div class="col"><span class="t">${T(title)}</span><span class="cap">${T(sub)}</span></div>
+        <div class="grow"></div>
+        ${actions || ''}
+        <button class="langbtn" onclick="toggleLang()">${LANG === 'ar' ? 'EN' : 'ع'}</button>
+        <button class="iconbtn" onclick="toggleTheme()" aria-label="theme">${ic(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon')}</button>
+        <a href="#/home" class="btn line sm">${T({ar:'عرض الموقع', en:'View site'})}</a>
+        <span class="who"><span class="avatar">ش</span>${T({ar:'[المدير التنفيذي]', en:'[Director]'})}</span>
+      </div>
+      <div class="content">${body}</div>
+    </div>
+  </div>`;
+}
+
+const addBtn = label => `<button class="btn sm">${ic('plus', 18, 2)} ${T(label)}</button>`;
+
+function aOverview() {
+  const stats = [
+    [{ar:'طلبات جديدة', en:'New applications'}, 12, {ar:'بانتظار المراجعة الأولية', en:'Awaiting first review'}, 'file'],
+    [{ar:'قيد المراجعة', en:'Under review'}, 28, {ar:'لدى فريق رعاية الطلاب', en:'With the student care team'}, 'clock'],
+    [{ar:'مقبولة هذا الشهر', en:'Accepted this month'}, 9, {ar:'بدأ برنامج الرعاية', en:'Care programme started'}, 'check'],
+    [{ar:'رسائل غير مقروءة', en:'Unread messages'}, 5, {ar:'من نموذج «تواصل معنا»', en:'From the contact form'}, 'mail']
+  ];
+  const bars = [[92, 44], [118, 58], [76, 38], [146, 70], [104, 52], [166, 82]];
+  const rows = [
+    ['SA-2026-00184', {ar:'قيد المراجعة', en:'Under review'}, 'teal'],
+    ['SA-2026-00183', {ar:'مستندات ناقصة', en:'Documents missing'}, 'warn'],
+    ['SA-2026-00182', {ar:'مقبول', en:'Accepted'}, 'ok'],
+    ['SA-2026-00181', {ar:'جديد', en:'New'}, 'plain']
+  ];
+  const body = `
+    <div class="grid g4">${stats.map(([t, n, d, i]) => `<div class="card stat">
+      <div class="spread" style="align-items:center"><span class="muted">${T(t)}</span><span class="ico sm">${ic(i, 19)}</span></div>
+      <div class="n counter" data-n="${n}" style="margin-top:10px">${AR(n)}</div>
+      <div class="cap">${T(d)}</div></div>`).join('')}</div>
+
+    <div class="row g24">
+      <div class="card col g24 grow">
+        <div class="spread"><strong style="font-size:20px;color:var(--primary)">${T({ar:'الطلبات خلال الأشهر الستة الماضية', en:'Applications over the last six months'})}</strong>
+          <span class="row keep g16 cap"><span class="row keep g8 mid"><i style="width:12px;height:12px;border-radius:3px;background:var(--primary);display:block"></i>${T({ar:'مستلمة', en:'Received'})}</span>
+            <span class="row keep g8 mid"><i style="width:12px;height:12px;border-radius:3px;background:var(--secondary);display:block"></i>${T({ar:'مقبولة', en:'Accepted'})}</span></span></div>
+        <div class="bars">${bars.map(([a, b], i) => `<div class="b"><div class="bb">
+          <i style="height:${a}px;background:var(--primary)"></i><i style="height:${b}px;background:var(--secondary)"></i></div>
+          <span class="cap">${T({ar:'[شهر]', en:'[Month]'})}</span></div>`).join('')}</div>
+        <div class="cap" style="border-top:1px solid var(--border);padding-top:14px">${T({ar:'الأعمدة هنا توضيحية للتخطيط — تُربط بالأرقام الفعلية عند التنفيذ.', en:'Bars are illustrative — wired to real figures at build time.'})}</div>
+      </div>
+      <div class="card col g20" style="flex:0 0 360px">
+        <strong style="font-size:20px;color:var(--primary)">${T({ar:'إجراءات سريعة', en:'Quick actions'})}</strong>
+        ${[['admin-news', {ar:'إضافة خبر جديد', en:'Add a news item'}], ['admin-documents', {ar:'رفع محضر اجتماع', en:'Upload meeting minutes'}], ['admin-partners', {ar:'إضافة شريك', en:'Add a partner'}]]
+          .map(([r, l]) => `<a href="#/${r}" class="tile row keep g14 mid" style="font-weight:600;color:var(--primary)">${ic('plus', 20)}${T(l)}</a>`).join('')}
+        <div class="note warn col g8" style="display:flex;flex-direction:column">
+          <strong>${T({ar:'تنبيه محتوى', en:'Content alert'})}</strong>
+          <span>${T({ar:'صفحة «الشركاء» ما زالت فارغة، و٦ مقالات قديمة بمحتوى تجريبي إنجليزي تحتاج حذفاً أو استبدالاً.', en:'The Partners page is still empty, and 6 legacy English template articles need deleting or replacing.'})}</span>
+          <a href="#/admin-news" style="color:inherit;font-weight:700">${T({ar:'مراجعة الآن', en:'Review now'})}</a></div>
+      </div>
+    </div>
+
+    <div class="card col g20">
+      <div class="spread"><strong style="font-size:20px;color:var(--primary)">${T({ar:'أحدث طلبات المنح', en:'Latest applications'})}</strong>
+        <a href="#/admin-apps" style="font-weight:600">${T({ar:'عرض كل الطلبات', en:'View all'})}</a></div>
+      <div class="tbl">
+        <div class="th"><span style="width:160px">${T({ar:'رقم الطلب', en:'Reference'})}</span><span class="grow">${T({ar:'الاسم', en:'Name'})}</span>
+          <span style="width:150px">${T({ar:'الجنسية', en:'Nationality'})}</span><span style="width:180px">${T({ar:'الجامعة', en:'University'})}</span><span style="width:160px">${T({ar:'الحالة', en:'Status'})}</span></div>
+        ${rows.map(([ref, st, k]) => `<div class="tr" onclick="location.hash='#/admin-review'" style="cursor:pointer">
+          <span style="width:160px" class="ltr"><strong style="color:var(--primary)">${ref}</strong></span>
+          <span class="grow">${T({ar:'[اسم الطالب]', en:'[Student name]'})}</span>
+          <span style="width:150px" class="muted">${T({ar:'[الجنسية]', en:'[Nationality]'})}</span>
+          <span style="width:180px" class="muted">${T({ar:'[الجامعة]', en:'[University]'})}</span>
+          <span style="width:160px"><span class="pill ${k}">${T(st)}</span></span></div>`).join('')}
+      </div>
+    </div>`;
+  return adminShell('admin', {ar:'نظرة عامة', en:'Overview'}, {ar:'آخر تحديث [التاريخ والوقت]', en:'Updated [date and time]'}, '', body);
+}
+
+function aApps() {
+  const chips = [[{ar:'الكل', en:'All'}, 49, 1], [{ar:'جديد', en:'New'}, 12], [{ar:'قيد المراجعة', en:'Under review'}, 28], [{ar:'مستندات ناقصة', en:'Docs missing'}, 6], [{ar:'مقبول', en:'Accepted'}, 9], [{ar:'مرفوض', en:'Rejected'}, 0]];
+  const rows = [
+    ['SA-2026-00184', {ar:'بكالوريوس', en:'Bachelor'}, {ar:'قيد المراجعة', en:'Under review'}, 'teal', true],
+    ['SA-2026-00183', {ar:'ماجستير', en:'Master'}, {ar:'مستندات ناقصة', en:'Docs missing'}, 'warn', true],
+    ['SA-2026-00182', {ar:'بكالوريوس', en:'Bachelor'}, {ar:'مقبول', en:'Accepted'}, 'ok', true],
+    ['SA-2026-00181', {ar:'دكتوراه', en:'PhD'}, {ar:'جديد', en:'New'}, 'plain', false],
+    ['SA-2026-00180', {ar:'بكالوريوس', en:'Bachelor'}, {ar:'مرفوض', en:'Rejected'}, 'warn', false],
+    ['SA-2026-00179', {ar:'ماجستير', en:'Master'}, {ar:'قيد المراجعة', en:'Under review'}, 'teal', false]
+  ];
+  const body = `
+    <div class="spread" style="flex-wrap:wrap;gap:12px">
+      <div class="row keep g12" style="flex-wrap:wrap">${chips.map(([l, n, on]) => `<button class="chip ${on ? 'on' : ''}">${T(l)} ${n ? AR(n) : ''}</button>`).join('')}</div>
+      <input type="search" style="max-width:300px" placeholder="${T({ar:'بحث بالاسم أو رقم الطلب', en:'Search by name or reference'})}">
+    </div>
+    <div class="note row keep mid" style="padding:16px 20px">
+      <input type="checkbox" checked><strong>${T({ar:'حُدّد ٣ طلبات', en:'3 applications selected'})}</strong><span class="grow"></span>
+      <button class="btn line xs">${T({ar:'تعيين لمراجع', en:'Assign reviewer'})}</button>
+      <button class="btn line xs">${T({ar:'طلب مستندات', en:'Request documents'})}</button>
+      <button class="btn xs">${T({ar:'تغيير الحالة', en:'Change status'})}</button>
+    </div>
+    <div class="tbl">
+      <div class="th"><span style="width:22px"></span><span style="width:150px">${T({ar:'رقم الطلب', en:'Reference'})}</span><span class="grow">${T({ar:'الاسم', en:'Name'})}</span>
+        <span style="width:120px">${T({ar:'الجنسية', en:'Nationality'})}</span><span style="width:160px">${T({ar:'الجامعة', en:'University'})}</span>
+        <span style="width:110px">${T({ar:'المرحلة', en:'Degree'})}</span><span style="width:160px">${T({ar:'الحالة', en:'Status'})}</span><span style="width:60px"></span></div>
+      ${rows.map(([ref, deg, st, k, sel]) => `<div class="tr">
+        <span style="width:22px"><input type="checkbox" ${sel ? 'checked' : ''} aria-label="${ref}"></span>
+        <span style="width:150px" class="ltr"><strong style="color:var(--primary)">${ref}</strong></span>
+        <span class="grow">${T({ar:'[اسم الطالب]', en:'[Student name]'})}</span>
+        <span style="width:120px" class="muted">${T({ar:'[الجنسية]', en:'[Nationality]'})}</span>
+        <span style="width:160px" class="muted">${T({ar:'[الجامعة]', en:'[University]'})}</span>
+        <span style="width:110px" class="muted">${T(deg)}</span>
+        <span style="width:160px"><span class="pill ${k}">${T(st)}</span></span>
+        <span style="width:60px"><a href="#/admin-review" style="font-weight:700">${T({ar:'فتح', en:'Open'})}</a></span></div>`).join('')}
+    </div>
+    <div class="spread"><span class="muted">${T({ar:'عرض ١–٦ من ٤٩', en:'Showing 1–6 of 49'})}</span>
+      <span class="row keep g8"><button class="iconbtn">${ic('arrowL', 17, 2)}</button>
+      ${[1, 2, 3].map(n => `<button class="iconbtn" style="${n === 1 ? 'background:var(--primary);color:var(--on-primary);border-color:var(--primary)' : ''}">${AR(n)}</button>`).join('')}
+      <button class="iconbtn">${ic('arrow', 17, 2)}</button></span></div>`;
+  return adminShell('admin-apps', {ar:'طلبات المنح', en:'Applications'}, {ar:'٤٩ طلباً إجمالاً', en:'49 applications in total'},
+    `<button class="btn line sm">${ic('download', 18)} ${T({ar:'تصدير CSV', en:'Export CSV'})}</button>`, body);
+}
+
+function aReview() {
+  const fields = [
+    [{ar:'الاسم الكامل', en:'Full name'}, {ar:'[الاسم الثلاثي]', en:'[Full name]'}], [{ar:'تاريخ الميلاد', en:'Date of birth'}, {ar:'[التاريخ]', en:'[Date]'}],
+    [{ar:'الجنس', en:'Gender'}, {ar:'ذكر', en:'Male'}], [{ar:'الجنسية', en:'Nationality'}, {ar:'[الجنسية]', en:'[Nationality]'}],
+    [{ar:'رقم الهوية', en:'ID number'}, {ar:'[الرقم]', en:'[Number]'}], [{ar:'العمل الحالي', en:'Current job'}, {ar:'[العمل]', en:'[Job]'}],
+    [{ar:'الهاتف', en:'Phone'}, {ar:'[الرقم]', en:'[Number]'}], [{ar:'البريد الإلكتروني', en:'Email'}, {ar:'[البريد]', en:'[Email]'}],
+    [{ar:'تاريخ التقديم', en:'Submitted'}, {ar:'[التاريخ]', en:'[Date]'}]
+  ];
+  const body = `
+    <div class="row g24">
+      <div class="col g22 grow" style="gap:22px">
+        <div class="card col g20"><strong style="font-size:19px;color:var(--primary)">${T({ar:'البيانات الشخصية', en:'Personal details'})}</strong>
+          <div class="grid g3" style="gap:20px 32px">${fields.map(([k, v]) => `<div class="col g4"><span class="cap">${T(k)}</span><strong>${T(v)}</strong></div>`).join('')}</div></div>
+        <div class="card col g20"><strong style="font-size:19px;color:var(--primary)">${T({ar:'البيانات الأكاديمية', en:'Academic details'})}</strong>
+          <div class="grid g3" style="gap:20px 32px">
+            <div class="col g4"><span class="cap">${T({ar:'الجامعة', en:'University'})}</span><strong>${T({ar:'[اسم الجامعة]', en:'[University]'})}</strong></div>
+            <div class="col g4"><span class="cap">${T({ar:'المرحلة', en:'Degree'})}</span><strong>${T({ar:'بكالوريوس', en:'Bachelor'})}</strong></div>
+            <div class="col g4"><span class="cap">${T({ar:'التخصص', en:'Major'})}</span><strong>${T({ar:'[التخصص]', en:'[Major]'})}</strong></div></div>
+          <div class="col g8" style="border-top:1px solid var(--border);padding-top:18px">
+            <span class="cap">${T({ar:'نبذة مختصرة عن المنحة', en:'Note about the scholarship'})}</span>
+            <span style="line-height:1.9">${T({ar:'[النص الذي كتبه الطالب في نموذج التقديم.]', en:'[Text the student wrote in the application form.]'})}</span></div></div>
+        <div class="card col g20"><strong style="font-size:19px;color:var(--primary)">${T({ar:'المستندات', en:'Documents'})}</strong>
+          <div class="grid g3" style="gap:18px">
+            <div class="card pad0" style="border-radius:14px">${ph({ar:'صورة الهوية', en:'ID copy'}, 130, true)}
+              <div class="col g10" style="padding:16px"><strong class="small">${T({ar:'صورة الهوية', en:'ID copy'})}</strong>
+                <div class="row keep g8"><button class="btn soft xs grow">${T({ar:'قبول', en:'Accept'})}</button>
+                  <button class="btn xs grow" style="background:var(--alert-bg);color:var(--alert-tx)">${T({ar:'رفض', en:'Reject'})}</button></div></div></div>
+            ${[[{ar:'الشهادة الثانوية', en:'High school certificate'}, {ar:'مقبول', en:'Accepted'}, 'ok'], [{ar:'خطاب القبول', en:'Admission letter'}, {ar:'قيد المراجعة', en:'Under review'}, 'plain']]
+              .map(([t, st, k]) => `<div class="card pad0" style="border-radius:14px">${ph({ar:'[ملف PDF]', en:'[PDF file]'}, 130, true)}
+                <div class="col g10" style="padding:16px"><strong class="small">${T(t)}</strong>
+                  <div class="row keep g10 mid"><span class="pill ${k}">${T(st)}</span><a href="#/admin-review" class="cap" style="font-weight:700">${T({ar:'معاينة', en:'Preview'})}</a></div></div></div>`).join('')}
+          </div></div>
+      </div>
+      <aside class="col g22" style="flex:0 0 360px;gap:22px">
+        <div class="card col g16"><strong style="font-size:18px;color:var(--primary)">${T({ar:'المراجع المسؤول', en:'Assigned reviewer'})}</strong>
+          <select aria-label="reviewer"><option>${T({ar:'[اسم المراجع]', en:'[Reviewer name]'})}</option><option>${T({ar:'غير معيّن', en:'Unassigned'})}</option></select>
+          <strong style="font-size:18px;color:var(--primary);margin-top:6px">${T({ar:'الحالة', en:'Status'})}</strong>
+          <select aria-label="status">${[{ar:'قيد المراجعة', en:'Under review'}, {ar:'جديد', en:'New'}, {ar:'مستندات ناقصة', en:'Docs missing'}, {ar:'مقابلة', en:'Interview'}, {ar:'مقبول', en:'Accepted'}, {ar:'مرفوض', en:'Rejected'}]
+            .map(o => `<option>${T(o)}</option>`).join('')}</select></div>
+        <div class="card col g16"><strong style="font-size:18px;color:var(--primary)">${T({ar:'ملاحظات داخلية', en:'Internal notes'})}</strong>
+          <textarea rows="4" aria-label="note" placeholder="${T({ar:'ملاحظة لا يراها الطالب', en:'Note the student cannot see'})}"></textarea>
+          <button class="btn soft sm">${T({ar:'إضافة ملاحظة', en:'Add note'})}</button>
+          <div class="row keep g12" style="border-top:1px solid var(--border);padding-top:16px;align-items:flex-start">
+            <span class="avatar" style="width:32px;height:32px;background:var(--sl);color:var(--primary)">م</span>
+            <span class="col"><span class="small">${T({ar:'[نص الملاحظة]', en:'[Note text]'})}</span><span class="cap">${T({ar:'[المراجع] · [التاريخ]', en:'[Reviewer] · [date]'})}</span></span></div></div>
+        <div class="card col g14"><strong style="font-size:18px;color:var(--primary)">${T({ar:'سجل الإجراءات', en:'Activity log'})}</strong>
+          ${[[{ar:'بدأت المراجعة — [المراجع] · [التاريخ]', en:'Review started — [reviewer] · [date]'}, 1],
+             [{ar:'استُلمت المستندات · [التاريخ]', en:'Documents received · [date]'}, 0],
+             [{ar:'أُرسل الطلب من البوابة · [التاريخ]', en:'Submitted from the portal · [date]'}, 0]]
+            .map(([t, on]) => `<div class="row keep g12" style="align-items:flex-start">
+              <span style="width:9px;height:9px;border-radius:50%;margin-top:8px;flex-shrink:0;background:${on ? 'var(--secondary)' : 'var(--border)'}"></span>
+              <span class="small">${T(t)}</span></div>`).join('')}</div>
+      </aside>
+    </div>`;
+  const actions = `<button class="btn line sm" style="color:var(--alert-tx);border-color:var(--alert-br)">${T({ar:'طلب مستندات', en:'Request documents'})}</button>
+    <button class="btn ghost sm" style="color:var(--alert);border-color:var(--alert)">${T({ar:'رفض الطلب', en:'Reject'})}</button>
+    <button class="btn sm">${T({ar:'قبول ومتابعة', en:'Accept'})}</button>`;
+  return adminShell('admin-apps', {ar:'[اسم الطالب]', en:'[Student name]'},
+    {ar:'SA-2026-00184 · قيد المراجعة · قُدّم في [التاريخ]', en:'SA-2026-00184 · under review · submitted [date]'}, actions, body);
+}
+
+function aMessages() {
+  const msgs = [
+    [{ar:'استفسار عن المنح', en:'Scholarship enquiry'}, {ar:'أرغب في معرفة شروط التقديم على المنحة...', en:'I would like to know the conditions for applying...'}, {ar:'منذ ساعتين', en:'2 hours ago'}, 1],
+    [{ar:'طلب شراكة', en:'Partnership request'}, {ar:'نحن جهة مهتمة بدعم برامج رعاية الطلاب...', en:'We are interested in supporting student care programmes...'}, {ar:'أمس', en:'Yesterday'}, 1],
+    [{ar:'ملاحظة أو اقتراح', en:'Feedback'}, {ar:'أقترح زيادة الموارد التعليمية المنشورة...', en:'I suggest publishing more educational resources...'}, {ar:'منذ يومين', en:'2 days ago'}, 0],
+    [{ar:'استفسار عن المنح', en:'Scholarship enquiry'}, {ar:'هل يمكن التقديم لمرحلة الدكتوراه؟', en:'Can I apply for a PhD?'}, {ar:'منذ ٣ أيام', en:'3 days ago'}, 0],
+    [{ar:'موضوع آخر', en:'Other'}, {ar:'شكراً لكم على الجهود المبذولة...', en:'Thank you for your efforts...'}, {ar:'منذ أسبوع', en:'A week ago'}, 0]
+  ];
+  const body = `<div class="row g24" style="align-items:stretch">
+    <div class="card pad0" style="flex:0 0 400px;display:flex;flex-direction:column">
+      <div class="row keep g10" style="padding:18px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <button class="chip on" style="min-height:38px;padding:0 16px;font-size:14px">${T({ar:'الكل', en:'All'})}</button>
+        <button class="chip" style="min-height:38px;padding:0 16px;font-size:14px">${T({ar:'غير مقروء', en:'Unread'})} ${AR(2)}</button>
+        <button class="chip" style="min-height:38px;padding:0 16px;font-size:14px">${T({ar:'مؤرشف', en:'Archived'})}</button>
+      </div>
+      ${msgs.map(([s, x, w, unread], i) => `<div style="padding:20px 22px;border-bottom:1px solid var(--border);display:flex;gap:14px;align-items:flex-start;cursor:pointer;${i === 0 ? 'background:var(--surface);border-inline-start:3px solid var(--secondary)' : ''}">
+        <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:8px;background:${unread ? 'var(--secondary)' : 'transparent'}"></span>
+        <span class="col g6 grow"><span class="spread" style="gap:10px"><strong style="color:var(--primary)">${T({ar:'[اسم المرسل]', en:'[Sender name]'})}</strong><span class="cap">${T(w)}</span></span>
+          <span class="cap" style="color:var(--secondary);font-weight:600">${T(s)}</span>
+          <span class="cap">${T(x)}</span></span></div>`).join('')}
+    </div>
+    <div class="card col g24 grow">
+      <div class="row keep g18" style="border-bottom:1px solid var(--border);padding-bottom:22px;align-items:flex-start">
+        <span class="avatar" style="width:52px;height:52px;border-radius:15px;background:var(--sl);color:var(--primary);font-size:18px">م</span>
+        <span class="col g6 grow"><strong style="font-size:22px;color:var(--primary)">${T({ar:'[اسم المرسل]', en:'[Sender name]'})}</strong>
+          <span class="cap ltr">[email] · [phone]</span></span>
+        <span class="pill teal">${T({ar:'غير مقروءة', en:'Unread'})}</span></div>
+      <div class="col g10"><span class="cap">${T({ar:'الموضوع', en:'Subject'})}</span>
+        <strong style="font-size:20px;color:var(--primary)">${T({ar:'استفسار عن المنح', en:'Scholarship enquiry'})}</strong></div>
+      <div class="tile" style="padding:26px 28px;font-size:17px;line-height:2">${T({ar:'[نص الرسالة كما أرسلها الزائر من نموذج «تواصل معنا».]', en:'[The message as sent from the website contact form.]'})}</div>
+      <div class="field"><label for="rp">${T({ar:'الرد', en:'Reply'})}</label>
+        <textarea id="rp" rows="5" placeholder="${T({ar:'اكتب ردك هنا — يُرسل من info@safeer-sa.org', en:'Write your reply — sent from info@safeer-sa.org'})}"></textarea></div>
+      <div class="row keep g12 mid"><button class="btn">${T({ar:'إرسال الرد', en:'Send reply'})}</button>
+        <button class="btn line">${T({ar:'أرشفة', en:'Archive'})}</button><span class="grow"></span>
+        <button class="btn soft">${T({ar:'تحويل إلى شهادة', en:'Convert to testimonial'})}</button></div>
+    </div>
+  </div>`;
+  return adminShell('admin-messages', {ar:'الرسائل', en:'Messages'}, {ar:'٥ رسائل · ٢ غير مقروءة', en:'5 messages · 2 unread'}, '', body);
+}
+function aPages() {
+  const pages = [
+    [{ar:'الرئيسية', en:'Home'}, '/', {ar:'٩ أقسام', en:'9 sections'}, 1],
+    [{ar:'من نحن', en:'About'}, '/من-نحن', {ar:'٥ أقسام', en:'5 sections'}, 1],
+    [{ar:'مجلس الإدارة', en:'Board'}, '/مجلس-الإدارة', {ar:'٦ أعضاء', en:'6 members'}, 1],
+    [{ar:'مجالات عملنا', en:'Our work'}, '/مجالات-عملنا', {ar:'٤ مجالات', en:'4 areas'}, 1],
+    [{ar:'منح الوافدين', en:'Scholarships'}, '/منح-الوافدين', {ar:'٤ محاور', en:'4 pillars'}, 1],
+    [{ar:'تسجيل طلب منحة', en:'Apply'}, '/تسجيل-طلب-منحة', {ar:'١٥ حقلاً', en:'15 fields'}, 1],
+    [{ar:'الأخبار', en:'News'}, '/الأخبار', {ar:'٦ مقالات تجريبية', en:'6 template articles'}, 0],
+    [{ar:'قالوا عنا', en:'Testimonials'}, '/قالوا-عنا', {ar:'٥ محاور', en:'5 themes'}, 1],
+    [{ar:'شركاؤنا', en:'Partners'}, '/شركاؤنا', {ar:'بلا محتوى', en:'No content'}, 0],
+    [{ar:'التراخيص والسياسات', en:'Licences'}, '/التراخيص', {ar:'ملفات PDF', en:'PDF files'}, 1],
+    [{ar:'تواصل معنا', en:'Contact'}, '/تواصل-معنا', {ar:'نموذج + خريطة', en:'Form + map'}, 1]
+  ];
+  const body = `
+    <div class="note">${ic('info', 22)}<span>${T({ar:'كل صفحة مبنية من أقسام قابلة لإعادة الترتيب والإخفاء — لا يحتاج المحرر إلى لمس القالب.', en:'Every page is built from sections that can be reordered and hidden — no need to touch the theme.'})}</span></div>
+    <div class="tbl">
+      <div class="th"><span class="grow">${T({ar:'الصفحة', en:'Page'})}</span><span style="width:240px">${T({ar:'الرابط', en:'Slug'})}</span>
+        <span style="width:180px">${T({ar:'المحتوى', en:'Content'})}</span><span style="width:130px">${T({ar:'آخر تعديل', en:'Updated'})}</span>
+        <span style="width:150px">${T({ar:'الحالة', en:'Status'})}</span><span style="width:90px"></span></div>
+      ${pages.map(([t, slug, meta, ok]) => `<div class="tr">
+        <span class="grow"><strong style="color:var(--primary)">${T(t)}</strong></span>
+        <span style="width:240px" class="cap ltr">${slug}</span>
+        <span style="width:180px" class="muted">${T(meta)}</span>
+        <span style="width:130px" class="muted">${T({ar:'[التاريخ]', en:'[Date]'})}</span>
+        <span style="width:150px"><span class="pill ${ok ? 'ok' : 'warn'}">${ok ? T({ar:'منشورة', en:'Published'}) : T({ar:'تحتاج مراجعة', en:'Needs review'})}</span></span>
+        <span style="width:90px"><a href="#/admin-page" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a></span></div>`).join('')}
+    </div>`;
+  return adminShell('admin-pages', {ar:'صفحات الموقع', en:'Site pages'}, {ar:'١١ صفحة منشورة', en:'11 published pages'}, addBtn({ar:'صفحة جديدة', en:'New page'}), body);
+}
+
+function aPageEditor() {
+  const secs = [
+    [{ar:'الواجهة الرئيسية', en:'Hero'}, {ar:'عنوان + نص + زرّان + صورة', en:'Heading + text + 2 buttons + image'}, 1],
+    [{ar:'من نحن', en:'About'}, {ar:'نص تعريفي + قائمة الأهداف', en:'Intro text + goals list'}, 1],
+    [{ar:'الأثر بالأرقام', en:'Impact'}, {ar:'٤ أرقام قابلة للتحرير', en:'4 editable figures'}, 1],
+    [{ar:'مجالات العمل', en:'Work areas'}, {ar:'٤ بطاقات من مجموعة «مجالات العمل»', en:'4 cards from the Work areas collection'}, 1],
+    [{ar:'رعاية طلاب المنح', en:'Student care'}, {ar:'٤ محاور دعم', en:'4 support pillars'}, 1],
+    [{ar:'الأخبار', en:'News'}, {ar:'آخر ٣ أخبار — تلقائي', en:'Latest 3 — automatic'}, 1],
+    [{ar:'قالوا عنا', en:'Testimonials'}, {ar:'شهادتان مختارتان', en:'2 selected testimonials'}, 1],
+    [{ar:'شركاء النجاح', en:'Partners'}, {ar:'شبكة شعارات', en:'Logo grid'}, 0],
+    [{ar:'دعوة للتسجيل', en:'Call to action'}, {ar:'عنوان + زرّان', en:'Heading + 2 buttons'}, 1]
+  ];
+  const body = `<div class="row g24">
+    <div class="col g16 grow">
+      <div class="spread"><strong style="font-size:19px;color:var(--primary)">${T({ar:'أقسام الصفحة', en:'Page sections'})}</strong>
+        <span class="cap">${T({ar:'اسحب لإعادة الترتيب · المفتاح يُظهر القسم أو يُخفيه', en:'Drag to reorder · the switch shows or hides'})}</span></div>
+      ${secs.map(([t, m, on]) => `<div class="card row keep g18 mid" style="padding:18px 22px">
+        <span class="muted">${ic('drag', 20)}</span>
+        <span class="col g4 grow"><strong style="color:var(--primary)">${T(t)}</strong><span class="cap">${T(m)}</span></span>
+        <a href="#/admin-page" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a>
+        <span class="toggle ${on ? 'on' : ''}" role="switch" aria-checked="${!!on}"><i></i></span></div>`).join('')}
+    </div>
+    <aside class="col g20" style="flex:0 0 420px">
+      <div class="card col g18">
+        <strong style="font-size:18px;color:var(--primary)">${T({ar:'تحرير: الواجهة الرئيسية', en:'Editing: Hero'})}</strong>
+        <div class="field"><label for="ht">${T({ar:'العنوان', en:'Heading'})}</label>
+          <input id="ht" type="text" value="${T({ar:'نرعى طلاب المنح ونبني جسور المعرفة', en:'We care for scholarship students'})}"></div>
+        <div class="field"><label for="hd">${T({ar:'النص التعريفي', en:'Intro text'})}</label>
+          <textarea id="hd" rows="4">${T(BLURB)}</textarea></div>
+        <div class="row keep g14">
+          <div class="field grow"><label for="c1">${T({ar:'زر أساسي', en:'Primary button'})}</label><input id="c1" type="text" value="${T({ar:'قدّم طلب منحة', en:'Apply'})}"></div>
+          <div class="field grow"><label for="c2">${T({ar:'زر ثانوي', en:'Secondary button'})}</label><input id="c2" type="text" value="${T({ar:'تعرّف على الجمعية', en:'About us'})}"></div></div>
+        <div class="drop" style="padding:24px">${ic('upload', 26)}<strong class="small">${T({ar:'صورة الواجهة', en:'Hero image'})}</strong>
+          <span class="cap">${T({ar:'١٦٠٠×١١٠٠ بكسل على الأقل', en:'1600×1100 px minimum'})}</span></div>
+        <div class="row keep g12" style="border-top:1px solid var(--border);padding-top:18px">
+          <button class="btn grow">${T({ar:'حفظ ونشر', en:'Save and publish'})}</button>
+          <a href="#/home" class="btn line">${T({ar:'معاينة', en:'Preview'})}</a></div>
+      </div>
+      <div class="note">${T({ar:'كل حقل هنا يقابل عنصراً مرئياً في الصفحة — لا يوجد محرر صفحات كامل ولا قوالب مخفية.', en:'Every field here maps to something visible on the page — no full page builder, no hidden templates.'})}</div>
+    </aside>
+  </div>`;
+  return adminShell('admin-pages', {ar:'تحرير: الصفحة الرئيسية', en:'Editing: Home page'}, {ar:'آخر نشر [التاريخ]', en:'Last published [date]'},
+    `<a href="#/home" class="btn line sm">${T({ar:'عرض الصفحة', en:'View page'})}</a>`, body);
+}
+
+function aNews() {
+  const rows = [
+    [{ar:'توزيع ٥٠٠ كرتونة تمور مقدمة من جمعية سفير', en:'Distributing 500 boxes of dates'}, {ar:'أنشطة مجتمعية', en:'Community'}, {ar:'٣٠ يوليو ٢٠٢٠', en:'30 Jul 2020'}, {ar:'منشور', en:'Published'}, 'ok'],
+    ['Everyone is worried when the test results come back positive', 'Neurology', '30 Jul 2020', {ar:'محتوى قالب — يُحذف', en:'Template content — delete'}, 'warn'],
+    ['6 Tips to Protect Your Mental Health When You Are Sick', 'Laboratory', '30 Jul 2020', {ar:'محتوى قالب — يُحذف', en:'Template content — delete'}, 'warn'],
+    ['Tips for Eating Healthy When You Are Working From Home', 'Pathology', '30 Jul 2020', {ar:'محتوى قالب — يُحذف', en:'Template content — delete'}, 'warn'],
+    [{ar:'[عنوان الخبر الجديد]', en:'[New article title]'}, {ar:'[التصنيف]', en:'[Category]'}, {ar:'[التاريخ]', en:'[Date]'}, {ar:'مسودة', en:'Draft'}, 'plain']
+  ];
+  const body = `
+    <div class="spread" style="flex-wrap:wrap;gap:12px">
+      <div class="row keep g12" style="flex-wrap:wrap">
+        <button class="chip on">${T({ar:'الكل', en:'All'})}</button><button class="chip">${T({ar:'منشور', en:'Published'})}</button>
+        <button class="chip">${T({ar:'مسودة', en:'Draft'})}</button>
+        <button class="chip" style="color:var(--alert-tx);border-color:var(--alert-br)">${T({ar:'محتوى قالب', en:'Template content'})} ${AR(6)}</button></div>
+      <input type="search" style="max-width:280px" placeholder="${T({ar:'بحث في الأخبار', en:'Search news'})}">
+    </div>
+    <div class="note warn row keep mid">${ic('warn', 22)}
+      <span class="grow">${T({ar:'ستة مقالات إنجليزية من قالب الموقع الطبي ما زالت منشورة، وتصنيفاتها (Neurology · Cardiology · Pathology) لا علاقة لها بعمل الجمعية.',
+        en:'Six English articles from the medical template are still live, with categories (Neurology · Cardiology · Pathology) unrelated to the association.'})}</span>
+      <button class="btn danger sm">${T({ar:'حذف الكل', en:'Delete all'})}</button></div>
+    <div class="tbl">
+      <div class="th"><span style="width:60px"></span><span class="grow">${T({ar:'العنوان', en:'Title'})}</span>
+        <span style="width:170px">${T({ar:'التصنيف', en:'Category'})}</span><span style="width:150px">${T({ar:'التاريخ', en:'Date'})}</span>
+        <span style="width:190px">${T({ar:'الحالة', en:'Status'})}</span><span style="width:90px"></span></div>
+      ${rows.map(([t, cat, d, st, k]) => `<div class="tr">
+        <span style="width:60px;height:46px;border-radius:9px;background:var(--surface);border:1px solid var(--border);flex-shrink:0"></span>
+        <span class="grow"><strong style="color:var(--primary)">${T(t)}</strong></span>
+        <span style="width:170px" class="muted">${T(cat)}</span><span style="width:150px" class="muted">${T(d)}</span>
+        <span style="width:190px"><span class="pill ${k}">${T(st)}</span></span>
+        <span style="width:90px"><a href="#/admin-news" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a></span></div>`).join('')}
+    </div>`;
+  return adminShell('admin-news', {ar:'الأخبار', en:'News'}, {ar:'٧ مقالات · ٦ منها محتوى قالب', en:'7 articles · 6 are template content'}, addBtn({ar:'خبر جديد', en:'New article'}), body);
+}
+
+function aWork() {
+  const body = `
+    <div class="note">${ic('info', 22)}<span>${T({ar:'هذه المجالات تظهر في صفحة «مجالات عملنا» وفي بطاقات الصفحة الرئيسية معاً — تعديل واحد ينعكس في الموضعين.',
+      en:'These areas appear both on the Our work page and in the home page cards — one edit updates both.'})}</span></div>
+    ${AREAS.map(a => `<div class="card col g16">
+      <div class="row keep g14 mid">
+        <span class="muted">${ic('drag', 20)}</span>
+        <span class="ico sm">${ic(a.icon, 21)}</span>
+        <strong class="grow" style="font-size:20px;color:var(--primary)">${T(a.t)}</strong>
+        <button class="btn line xs">${T({ar:'تغيير الأيقونة', en:'Change icon'})}</button>
+        <span class="toggle on" role="switch" aria-checked="true"><i></i></span></div>
+      <div class="col g10">${a.items.map(x => `<div class="tile row keep g12 mid" style="padding:12px 16px">
+        <span class="muted">${ic('drag', 18)}</span><span class="grow">${T(x)}</span>
+        <a href="#/admin-work" class="cap" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a></div>`).join('')}</div>
+      <button class="btn soft xs" style="align-self:flex-start">+ ${T({ar:'إضافة بند', en:'Add item'})}</button>
+    </div>`).join('')}`;
+  return adminShell('admin-work', {ar:'مجالات العمل', en:'Work areas'}, {ar:'٤ مجالات · ١١ بنداً', en:'4 areas · 11 items'}, addBtn({ar:'مجال جديد', en:'New area'}), body);
+}
+
+function aBoard() {
+  const body = `
+    <div class="note warn row keep mid">${ic('warn', 22)}
+      <span class="grow">${T({ar:'صفحة مجلس الإدارة الحالية تحتوي على بطاقتين من القالب الأصلي (Drone Service · Photography) بنص إنجليزي تجريبي.',
+        en:'The current board page still carries two template cards (Drone Service · Photography) with English placeholder text.'})}</span>
+      <button class="btn danger sm">${T({ar:'حذفهما', en:'Delete both'})}</button></div>
+    <div class="tbl">
+      <div class="th"><span style="width:20px"></span><span style="width:52px"></span><span class="grow">${T({ar:'الاسم', en:'Name'})}</span>
+        <span style="width:180px">${T({ar:'المنصب', en:'Role'})}</span><span style="width:140px">${T({ar:'الحالة', en:'Status'})}</span><span style="width:90px"></span></div>
+      ${BOARD.map(m => `<div class="tr">
+        <span style="width:20px" class="muted">${ic('drag', 18)}</span>
+        <span style="width:52px;height:52px;border-radius:14px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--muted)">${ic('user', 22, 1.6)}</span>
+        <span class="grow"><strong style="color:var(--primary)">${LANG === 'ar' ? m.n : m.ne}</strong></span>
+        <span style="width:180px" class="muted">${T(m.r)}</span>
+        <span style="width:140px"><span class="pill ok">${T({ar:'منشور', en:'Published'})}</span></span>
+        <span style="width:90px"><a href="#/admin-board" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a></span></div>`).join('')}
+    </div>
+    <div class="card col g18">
+      <div class="spread"><strong style="font-size:19px;color:var(--primary)">${T({ar:'الإدارة التنفيذية', en:'Executive management'})}</strong>
+        <button class="btn soft xs">+ ${T({ar:'إضافة عضو', en:'Add member'})}</button></div>
+      <div class="grid g3" style="gap:18px">
+        <div class="tile col g10"><span class="cap" style="color:var(--secondary);font-weight:600">${T(EXEC.r)}</span>
+          <strong style="font-size:18px;color:var(--primary);line-height:1.5">${LANG === 'ar' ? EXEC.n : EXEC.ne}</strong>
+          <a href="#/admin-board" class="cap" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a></div>
+        <div class="card col g10" style="border-style:dashed;align-items:center;justify-content:center;min-height:130px">
+          <span class="muted">${ic('plus', 24)}</span><span class="cap" style="font-weight:600">${T({ar:'إضافة عضو تنفيذي', en:'Add executive'})}</span></div>
+      </div>
+    </div>`;
+  return adminShell('admin-board', {ar:'مجلس الإدارة', en:'Board of directors'}, {ar:'٥ أعضاء مجلس · عضو تنفيذي واحد', en:'5 board members · 1 executive'}, addBtn({ar:'عضو جديد', en:'New member'}), body);
+}
+
+function aTestimonials() {
+  const rows = [
+    [{ar:'كنت في زيارة لأحد الأصدقاء وحضرت معهم محاضرة...', en:'I was visiting a friend and attended a lecture...'}, 'ع. ج', {ar:'مميّزة', en:'Featured'}, 'ok'],
+    [{ar:'[نص شهادة بانتظار المراجعة]', en:'[Testimonial awaiting review]'}, {ar:'[الاسم]', en:'[Name]'}, {ar:'بانتظار الموافقة', en:'Awaiting approval'}, 'warn'],
+    [{ar:'[نص شهادة منشورة]', en:'[Published testimonial]'}, {ar:'[الاسم]', en:'[Name]'}, {ar:'منشورة', en:'Published'}, 'ok']
+  ];
+  const body = `
+    <div class="card col g16">
+      <div class="spread"><strong style="font-size:19px;color:var(--primary)">${T({ar:'محاور الآراء', en:'Feedback themes'})}</strong>
+        <span class="cap">${T({ar:'تظهر في صفحة «قالوا عنا» وفي صفحة مجالات العمل', en:'Shown on Testimonials and on the Our work page'})}</span></div>
+      <div class="col g10">${THEMES.map(t => `<div class="card row keep g14 mid" style="padding:18px 22px">
+        <span class="muted">${ic('drag', 18)}</span><strong class="grow" style="color:var(--primary)">${T(t.t)}</strong>
+        ${t.flag ? `<span class="pill warn">${T({ar:'فرصة تحسين', en:'Improvement'})}</span>` : ''}
+        <a href="#/admin-testimonials" class="cap" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a></div>`).join('')}</div>
+    </div>
+    <div class="tbl">
+      <div class="th"><span class="grow">${T({ar:'الشهادة', en:'Testimonial'})}</span><span style="width:170px">${T({ar:'صاحبها', en:'Author'})}</span>
+        <span style="width:180px">${T({ar:'الحالة', en:'Status'})}</span><span style="width:190px">${T({ar:'إجراء', en:'Action'})}</span><span style="width:90px"></span></div>
+      ${rows.map(([t, who, st, k]) => `<div class="tr">
+        <span class="grow">${T(t)}</span><span style="width:170px" class="muted"><strong>${T(who)}</strong></span>
+        <span style="width:180px"><span class="pill ${k}">${T(st)}</span></span>
+        <span style="width:190px" class="row keep g8"><button class="btn soft xs">${T({ar:'نشر', en:'Publish'})}</button>
+          <button class="btn xs" style="background:var(--alert-bg);color:var(--alert-tx)">${T({ar:'إخفاء', en:'Hide'})}</button></span>
+        <span style="width:90px"><a href="#/admin-testimonials" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a></span></div>`).join('')}
+    </div>
+    <div class="note">${T({ar:'الشهادات الواردة من نموذج «تواصل معنا» تصل هنا بحالة «بانتظار الموافقة» ولا تُنشر تلقائياً.', en:'Testimonials arriving from the contact form land here as “awaiting approval” and are never auto-published.'})}</div>`;
+  return adminShell('admin-testimonials', {ar:'قالوا عنا', en:'Testimonials'}, {ar:'٣ شهادات · ٥ محاور', en:'3 testimonials · 5 themes'}, addBtn({ar:'شهادة جديدة', en:'New testimonial'}), body);
+}
+
+function aPartners() {
+  const body = `
+    <div class="note warn row keep mid">${ic('warn', 22)}
+      <span>${T({ar:'صفحة «شركاؤنا» على الموقع الحالي منشورة بعنوان فقط ولا تحتوي على أي شعار — أضف الشركاء هنا لتظهر الصفحة وقسم الشركاء في الرئيسية.',
+        en:'The live Partners page has a heading and no logos — add partners here to populate the page and the home section.'})}</span></div>
+    <div class="row g24">
+      <div class="col g18 grow">
+        <div class="row keep g10" style="flex-wrap:wrap">
+          ${[{ar:'الكل', en:'All'}, {ar:'جهات حكومية', en:'Government'}, {ar:'جامعات', en:'Universities'}, {ar:'داعمون', en:'Supporters'}]
+            .map((c, i) => `<button class="chip ${i === 0 ? 'on' : ''}" style="min-height:40px;font-size:14px">${T(c)}</button>`).join('')}</div>
+        <div class="grid g4" style="gap:18px">
+          ${[1, 2, 3, 4, 5, 6, 7].map(() => `<div class="card col g10" style="height:160px;align-items:center;justify-content:center;padding:16px">
+            <span style="width:84px;height:52px;border-radius:8px;background:var(--surface)"></span>
+            <span class="cap" style="font-weight:600">${T({ar:'[اسم الشريك]', en:'[Partner name]'})}</span>
+            <span class="row keep g8"><a href="#/admin-partners" class="cap" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a>
+              <a href="#/admin-partners" class="cap" style="font-weight:700;color:var(--alert)">${T({ar:'حذف', en:'Delete'})}</a></span></div>`).join('')}
+          <div class="drop" style="height:160px;padding:16px;justify-content:center">${ic('plus', 26)}<strong class="small">${T({ar:'إضافة شريك', en:'Add partner'})}</strong></div>
+        </div>
+      </div>
+      <aside class="card col g18" style="flex:0 0 380px">
+        <strong style="font-size:18px;color:var(--primary)">${T({ar:'شريك جديد', en:'New partner'})}</strong>
+        <div class="field"><label for="pn">${T({ar:'اسم الجهة', en:'Organisation name'})}</label><input id="pn" type="text"></div>
+        <div class="field"><label for="pc">${T({ar:'التصنيف', en:'Category'})}</label><select id="pc">
+          ${[{ar:'جهات حكومية', en:'Government'}, {ar:'جامعات', en:'Universities'}, {ar:'جمعيات ومؤسسات', en:'Associations'}, {ar:'داعمون', en:'Supporters'}].map(o => `<option>${T(o)}</option>`).join('')}</select></div>
+        <div class="field"><label for="pu">${T({ar:'رابط الموقع', en:'Website'})}</label><input id="pu" type="url" class="ltr" placeholder="https://"></div>
+        <div class="drop" style="padding:24px">${ic('upload', 26)}<strong class="small">${T({ar:'شعار الجهة', en:'Logo'})}</strong>
+          <span class="cap">${T({ar:'SVG أو PNG بخلفية شفافة', en:'SVG or transparent PNG'})}</span></div>
+        <button class="btn">${T({ar:'حفظ الشريك', en:'Save partner'})}</button>
+      </aside>
+    </div>`;
+  return adminShell('admin-partners', {ar:'الشركاء', en:'Partners'}, {ar:'٧ شركاء · الصفحة العامة فارغة حالياً', en:'7 partners · public page currently empty'}, '', body);
+}
+
+function aDocs() {
+  const docs = [
+    [{ar:'[ترخيص الجمعية]', en:'[Association licence]'}, {ar:'التراخيص', en:'Licences'}, {ar:'منشور', en:'Published'}, 'ok'],
+    [{ar:'[اللائحة الأساسية]', en:'[Articles of association]'}, {ar:'السياسات واللوائح', en:'Policies'}, {ar:'منشور', en:'Published'}, 'ok'],
+    [{ar:'تقارير الأنشطة', en:'Activity reports'}, {ar:'التقارير السنوية', en:'Annual reports'}, {ar:'منشور', en:'Published'}, 'ok'],
+    [{ar:'[محضر اجتماع مجلس الإدارة]', en:'[Board meeting minutes]'}, {ar:'محاضر الاجتماعات', en:'Minutes'}, {ar:'منشور', en:'Published'}, 'ok'],
+    [{ar:'[محضر الجمعية العمومية]', en:'[General assembly minutes]'}, {ar:'محاضر الاجتماعات', en:'Minutes'}, {ar:'مسودة', en:'Draft'}, 'plain']
+  ];
+  const body = `<div class="row g24">
+    <div class="col g18 grow">
+      <div class="tbl">
+        <div class="th"><span style="width:46px"></span><span class="grow">${T({ar:'الملف', en:'File'})}</span>
+          <span style="width:200px">${T({ar:'القسم', en:'Section'})}</span><span style="width:180px">${T({ar:'التفاصيل', en:'Details'})}</span>
+          <span style="width:130px">${T({ar:'الحالة', en:'Status'})}</span><span style="width:90px"></span></div>
+        ${docs.map(([t, cat, st, k]) => `<div class="tr">
+          <span class="ico sm" style="width:46px;height:46px">${ic('file', 21)}</span>
+          <span class="grow"><strong style="color:var(--primary)">${T(t)}</strong></span>
+          <span style="width:200px" class="muted">${T(cat)}</span>
+          <span style="width:180px" class="cap">PDF · ${T({ar:'[الحجم]', en:'[Size]'})}</span>
+          <span style="width:130px"><span class="pill ${k}">${T(st)}</span></span>
+          <span style="width:90px"><a href="#/admin-documents" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a></span></div>`).join('')}
+      </div>
+      <div class="drop" style="padding:34px">${ic('upload', 30)}<strong style="font-size:17px">${T({ar:'اسحب ملفات PDF إلى هنا', en:'Drop PDF files here'})}</strong>
+        <span class="cap">${T({ar:'يُطلب القسم والتاريخ بعد الرفع', en:'Section and date are requested after upload'})}</span></div>
+    </div>
+    <aside class="col g20" style="flex:0 0 360px">
+      <div class="card col g14"><strong style="font-size:18px;color:var(--primary)">${T({ar:'الأقسام', en:'Sections'})}</strong>
+        ${[[{ar:'التراخيص', en:'Licences'}, 1], [{ar:'السياسات واللوائح', en:'Policies'}, 1], [{ar:'محاضر الاجتماعات', en:'Minutes'}, 2], [{ar:'التقارير السنوية', en:'Annual reports'}, 1]]
+          .map(([t, n]) => `<div class="spread" style="padding:12px 0;border-bottom:1px solid var(--border)"><span>${T(t)}</span><strong class="muted">${AR(n)}</strong></div>`).join('')}
+        <button class="btn soft sm">+ ${T({ar:'قسم جديد', en:'New section'})}</button></div>
+      <div class="note">${T({ar:'الموقع الحالي يعرض هذه الملفات عبر مشغّل PDF مضمّن بلا عنوان ولا تاريخ. التصميم الجديد يعرض لكل ملف بطاقة باسمه وحجمه وزر تحميل مباشر.',
+        en:'The current site shows these through an embedded PDF viewer with no title or date. The new design gives each file a card with its name, size and a download button.'})}</div>
+    </aside>
+  </div>`;
+  return adminShell('admin-documents', {ar:'المستندات', en:'Documents'}, {ar:'٥ ملفات في ٤ أقسام', en:'5 files across 4 sections'}, addBtn({ar:'رفع ملف', en:'Upload file'}), body);
+}
+
+function aUsers() {
+  const users = [
+    [{ar:'[المدير التنفيذي]', en:'[Director]'}, 'admin@safeer-sa.org', {ar:'مدير عام', en:'Administrator'}, {ar:'نشط', en:'Active'}, 'ok'],
+    [{ar:'[اسم الموظف]', en:'[Staff name]'}, 'reviewer@safeer-sa.org', {ar:'مراجع طلبات', en:'Application reviewer'}, {ar:'نشط', en:'Active'}, 'ok'],
+    [{ar:'[اسم الموظف]', en:'[Staff name]'}, 'editor@safeer-sa.org', {ar:'محرر محتوى', en:'Content editor'}, {ar:'نشط', en:'Active'}, 'ok'],
+    [{ar:'[اسم الموظف]', en:'[Staff name]'}, 'support@safeer-sa.org', {ar:'دعم ومراسلات', en:'Support & messages'}, {ar:'دعوة معلّقة', en:'Invite pending'}, 'plain']
+  ];
+  const perms = [
+    [{ar:'طلبات المنح ومستنداتها', en:'Applications and documents'}, [1, 1, 0, 0]],
+    [{ar:'محتوى الصفحات والأخبار', en:'Pages and news content'}, [1, 0, 1, 0]],
+    [{ar:'المستندات والتراخيص', en:'Documents and licences'}, [1, 0, 1, 0]],
+    [{ar:'الرسائل والشهادات', en:'Messages and testimonials'}, [1, 0, 0, 1]],
+    [{ar:'المستخدمون والإعدادات', en:'Users and settings'}, [1, 0, 0, 0]]
+  ];
+  const roles = [{ar:'مدير عام', en:'Admin'}, {ar:'مراجع طلبات', en:'Reviewer'}, {ar:'محرر محتوى', en:'Editor'}, {ar:'دعم ومراسلات', en:'Support'}];
+  const body = `
+    <div class="tbl">
+      <div class="th"><span style="width:44px"></span><span class="grow">${T({ar:'الاسم', en:'Name'})}</span>
+        <span style="width:260px">${T({ar:'البريد', en:'Email'})}</span><span style="width:190px">${T({ar:'الدور', en:'Role'})}</span>
+        <span style="width:150px">${T({ar:'الحالة', en:'Status'})}</span><span style="width:90px"></span></div>
+      ${users.map(([n, mail, role, st, k]) => `<div class="tr">
+        <span class="avatar" style="width:44px;height:44px;background:var(--sl);color:var(--primary)">م</span>
+        <span class="grow"><strong style="color:var(--primary)">${T(n)}</strong></span>
+        <span style="width:260px" class="muted ltr">${mail}</span>
+        <span style="width:190px" class="muted">${T(role)}</span>
+        <span style="width:150px"><span class="pill ${k}">${T(st)}</span></span>
+        <span style="width:90px"><a href="#/admin-users" style="font-weight:700">${T({ar:'تحرير', en:'Edit'})}</a></span></div>`).join('')}
+    </div>
+    <div class="tbl">
+      <div class="th"><span class="grow">${T({ar:'الصلاحية', en:'Permission'})}</span>
+        ${roles.map(r => `<span style="width:150px;text-align:center">${T(r)}</span>`).join('')}</div>
+      ${perms.map(([label, vals]) => `<div class="tr"><span class="grow">${T(label)}</span>
+        ${vals.map(v => `<span style="width:150px;display:flex;justify-content:center;color:${v ? 'var(--secondary)' : 'var(--border)'}">${ic(v ? 'check' : 'x', 21, 2.4)}</span>`).join('')}</div>`).join('')}
+    </div>
+    <div class="note">${T({ar:'بيانات الطلاب الشخصية والمستندات لا يصل إليها إلا «مدير عام» و«مراجع طلبات» — ومحرر المحتوى لا يرى أي طلب.',
+      en:'Student data and documents are reachable only by Administrator and Reviewer — the content editor sees no applications at all.'})}</div>`;
+  return adminShell('admin-users', {ar:'المستخدمون والصلاحيات', en:'Users and permissions'}, {ar:'٤ مستخدمين · ٤ أدوار', en:'4 users · 4 roles'}, addBtn({ar:'دعوة مستخدم', en:'Invite user'}), body);
+}
+
+function aSettings() {
+  const body = `<div class="row g24">
+    <aside class="col g8" style="flex:0 0 260px">
+      ${[{ar:'بيانات الجمعية', en:'Organisation'}, {ar:'اللغات', en:'Languages'}, {ar:'تحسين الظهور SEO', en:'SEO'}, {ar:'الإشعارات', en:'Notifications'}, {ar:'النسخ الاحتياطي', en:'Backups'}]
+        .map((s, i) => `<a href="#/admin-settings" class="tile" style="${i === 0 ? 'background:var(--primary);color:var(--on-primary)' : 'background:var(--card);border:1px solid var(--border);color:var(--text)'};font-weight:${i === 0 ? 600 : 500}">${T(s)}</a>`).join('')}
+    </aside>
+    <div class="col g20 grow">
+      <div class="card col g20"><strong style="font-size:19px;color:var(--primary)">${T({ar:'بيانات الجمعية', en:'Organisation details'})}</strong>
+        <div class="grid g2" style="gap:18px">
+          <div class="field"><label for="s1">${T({ar:'اسم الجمعية', en:'Name (Arabic)'})}</label><input id="s1" type="text" value="جمعية سفير الدعوية"></div>
+          <div class="field"><label for="s2">${T({ar:'الاسم بالإنجليزية', en:'Name (English)'})}</label><input id="s2" type="text" class="ltr" value="Safeer Association"></div>
+          <div class="field"><label for="s3">${T({ar:'الهاتف', en:'Phone'})}</label><input id="s3" type="tel" class="ltr" value="${PHONE}"></div>
+          <div class="field"><label for="s4">${T({ar:'البريد الإلكتروني', en:'Email'})}</label><input id="s4" type="email" class="ltr" value="${EMAIL}"></div>
+        </div>
+        <div class="field"><label for="s5">${T({ar:'العنوان', en:'Address'})}</label><input id="s5" type="text" value="${T(ADDR)}"></div>
+        <div class="field"><label for="s6">${T({ar:'نبذة تظهر في التذييل', en:'Footer blurb'})}</label><textarea id="s6" rows="3">${T(BLURB)}</textarea></div>
+      </div>
+      <div class="card col g18"><strong style="font-size:19px;color:var(--primary)">${T({ar:'اللغات', en:'Languages'})}</strong>
+        <div class="row keep g16">
+          <div class="tile row keep g14 mid grow" style="background:var(--sl)"><strong class="grow" style="color:var(--primary)">${T({ar:'العربية — الافتراضية · RTL', en:'Arabic — default · RTL'})}</strong><span class="toggle on"><i></i></span></div>
+          <div class="tile row keep g14 mid grow"><strong class="grow">${T({ar:'الإنجليزية — LTR', en:'English — LTR'})}</strong><span class="toggle on"><i></i></span></div>
+        </div>
+        <span class="cap">${T({ar:'كل حقل نصي في اللوحة له نسختان: عربية وإنجليزية. الصفحة التي تنقصها الترجمة الإنجليزية تعود إلى العربية بدل أن تظهر فارغة.',
+          en:'Every text field has an Arabic and an English version. A page missing its English translation falls back to Arabic rather than showing empty.'})}</span></div>
+      <div class="card col g18"><strong style="font-size:19px;color:var(--primary)">${T({ar:'روابط التواصل', en:'Social links'})}</strong>
+        <div class="grid g3" style="gap:18px">
+          ${['Facebook', 'Instagram', 'X'].map((n, i) => `<div class="field"><label for="so${i}">${n}</label><input id="so${i}" type="url" class="ltr" placeholder="https://"></div>`).join('')}
+        </div></div>
+      <div class="row keep g14"><button class="btn">${T({ar:'حفظ التغييرات', en:'Save changes'})}</button>
+        <button class="btn line">${T({ar:'تراجع', en:'Cancel'})}</button></div>
+    </div>
+  </div>`;
+  return adminShell('admin-settings', {ar:'الإعدادات', en:'Settings'}, {ar:'بيانات الجمعية واللغات والروابط', en:'Organisation, languages and links'}, '', body);
+}
+
+/* ============================ router ============================ */
+const ROUTES = {
+  home: pHome, about: pAbout, board: pBoard, work: pWork, scholarships: pScholar,
+  news: pNews, article: pArticle, testimonials: pTestimonials, partners: pPartners,
+  documents: pDocuments, contact: pContact, apply: pApply,
+  'portal-login': pPortalLogin, 'portal-status': pPortalStatus, 'portal-docs': pPortalDocs,
+  admin: aOverview, 'admin-apps': aApps, 'admin-review': aReview, 'admin-messages': aMessages,
+  'admin-pages': aPages, 'admin-page': aPageEditor, 'admin-news': aNews, 'admin-work': aWork,
+  'admin-board': aBoard, 'admin-testimonials': aTestimonials, 'admin-partners': aPartners,
+  'admin-documents': aDocs, 'admin-users': aUsers, 'admin-settings': aSettings
+};
+
+function route() {
+  const key = (location.hash.replace(/^#\/?/, '') || 'home').split('?')[0];
+  const fn = ROUTES[key] || ROUTES.home;
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="page">${fn()}</div>`;
+  window.scrollTo(0, 0);
+  closeDrawer();
+  observe();
+  document.title = (key === 'home' ? '' : key + ' — ') + T(ORG);
+}
+
+function observe() {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const items = document.querySelectorAll('.rv');
+  if (reduce) { items.forEach(e => e.classList.add('in')); return; }
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }), {threshold: .12, rootMargin: '0px 0px -60px 0px'});
+  items.forEach(e => io.observe(e));
+
+  document.querySelectorAll('.counter').forEach(el => {
+    const target = parseInt(el.dataset.n, 10);
+    if (isNaN(target)) return;
+    const co = new IntersectionObserver(es => es.forEach(e => {
+      if (!e.isIntersecting) return;
+      co.unobserve(e.target);
+      if (reduce) { el.textContent = AR(target); return; }
+      let cur = 0; const t0 = performance.now(), dur = 1400;
+      const tick = now => {
+        const p = Math.min(1, (now - t0) / dur);
+        cur = Math.round(target * (1 - Math.pow(1 - p, 3)));
+        el.textContent = AR(cur);
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }), {threshold: .4});
+    co.observe(el);
+  });
+
+  document.querySelectorAll('.toggle').forEach(t => t.addEventListener('click', () => t.classList.toggle('on')));
+  document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+    const sibs = c.parentElement.querySelectorAll('.chip');
+    sibs.forEach(s => s.classList.remove('on')); c.classList.add('on');
+  }));
+  document.querySelectorAll('.check').forEach(c => c.addEventListener('click', () => {
+    const inp = c.querySelector('input');
+    if (inp && inp.type === 'radio') {
+      document.querySelectorAll('input[name="' + inp.name + '"]').forEach(r => r.closest('.check') && r.closest('.check').classList.remove('on'));
+      c.classList.add('on');
+    }
+  }));
+}
+
+function toggleTheme() {
+  const r = document.documentElement;
+  const next = r.dataset.theme === 'dark' ? 'light' : 'dark';
+  r.dataset.theme = next;
+  try { localStorage.setItem('safeer-theme', next); } catch (e) {}
+  route();
+}
+function toggleLang() {
+  LANG = LANG === 'ar' ? 'en' : 'ar';
+  const r = document.documentElement;
+  r.lang = LANG; r.dir = LANG === 'ar' ? 'rtl' : 'ltr';
+  try { localStorage.setItem('safeer-lang', LANG); } catch (e) {}
+  route();
+}
+function openDrawer() {
+  const p = document.getElementById('drawerPanel');
+  p.innerHTML = `<div class="spread" style="margin-bottom:8px"><strong style="color:var(--primary)">${T({ar:'القائمة', en:'Menu'})}</strong>
+      <button class="iconbtn" onclick="closeDrawer()" aria-label="close">${ic('x')}</button></div>`
+    + NAV.map(([r, l]) => `<a href="#/${r}" onclick="closeDrawer()">${T(l)}</a>`).join('')
+    + `<div class="divider" style="margin:8px 0"></div>`
+    + `<a href="#/portal-login" onclick="closeDrawer()">${T({ar:'بوابة الطالب', en:'Student portal'})}</a>`
+    + `<a href="#/admin" onclick="closeDrawer()">${T({ar:'لوحة التحكم', en:'Dashboard'})}</a>`
+    + `<a href="#/apply" onclick="closeDrawer()" style="background:var(--primary);color:var(--on-primary);text-align:center">${T({ar:'قدّم طلب منحة', en:'Apply'})}</a>`;
+  document.getElementById('drawer').classList.add('show');
+}
+function closeDrawer() { const d = document.getElementById('drawer'); if (d) d.classList.remove('show'); }
+
+/* ============================ boot ============================ */
+try {
+  const th = localStorage.getItem('safeer-theme');
+  if (th) document.documentElement.dataset.theme = th;
+  else if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark';
+  const lg = localStorage.getItem('safeer-lang');
+  if (lg) { LANG = lg; document.documentElement.lang = lg; document.documentElement.dir = lg === 'ar' ? 'rtl' : 'ltr'; }
+} catch (e) {}
+
+const _ll = document.getElementById('loaderLogo');
+if (_ll) _ll.src = LOGO_SRC;
+
+window.addEventListener('hashchange', route);
+window.addEventListener('scroll', () => {
+  const n = document.getElementById('nav');
+  if (n) n.classList.toggle('stuck', window.scrollY > 8);
+});
+route();
+setTimeout(() => {
+  const l = document.getElementById('loader');
+  if (l) { l.classList.add('gone'); setTimeout(() => l.remove(), 500); }
+}, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1250);
+
+</script>
+</body>
+</html>
