@@ -1,0 +1,133 @@
+name: CI
+
+# 26-backend-code-review.md Task 6.1: no CI existed in this repo at all —
+# a stale openapi.json sat two days behind every source file through an
+# entire remediation pass with nothing to catch it. This adds a build +
+# lint + openapi-contract + boot-and-smoke pipeline against a real MySQL
+# service, since "nest build succeeding" has masked a broken app here
+# before (see the project's own notes on that).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      # MySQL 8.0 — the database.module.ts charset comment explains why the
+      # exact collation (utf8mb4_unicode_ci, used everywhere in this repo
+      # so it also works unchanged on Hostinger's MariaDB) matters: a
+      # mismatch breaks any query mixing a string literal with a table
+      # column with "Illegal mix of collations" and silently drops Arabic
+      # accent-insensitivity.
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: safeer
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      # NODE_ENV=development (not test/staging) so migrate.mjs includes
+      # migrations/dev/003_dev_sample.sql — several smoke cases (the
+      # editor-role gates, the lockout/reset flow) need that seeded data
+      # and skip themselves cleanly when it's absent, but running with it
+      # is what actually exercises them.
+      NODE_ENV: development
+      PORT: 3900
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ''
+      DB_NAME: safeer
+      SESSION_COOKIE_NAME: sf_sid
+      SESSION_IDLE_HOURS: '8'
+      SESSION_ABSOLUTE_DAYS: '30'
+      # CI-only value, not a real secret — no production data ever touches
+      # this database. Generated once with the same command env.ts's own
+      # comment gives (`node -e "console.log(require('crypto').
+      # randomBytes(32).toString('base64'))"`).
+      APP_ENCRYPTION_KEY: ukhiU9W4qpmJr9pwnzL01FaECwZTTOF3Y2vPKga7xrk=
+      STORAGE_ROOT: ./var/assets
+      BOOTSTRAP_ADMIN_EMAIL: admin@safeer-sa.org
+      BOOTSTRAP_ADMIN_PASSWORD: ci-only-password-not-a-secret
+      IP_HASH_SALT: ci-only-salt-not-a-secret
+      CORS_ORIGINS: http://localhost:4200
+      PUBLIC_BASE_URL: http://localhost:3900
+      CACHE_TTL_SECONDS: '60'
+      CACHE_MAX_ENTRIES: '500'
+      # B0-5: refused outright if NODE_ENV=production — safe here since
+      # NODE_ENV is development, and it's what lets the seeded editor
+      # actually sign in for the role-gate smoke cases.
+      ALLOW_DEV_PASSWORD_FIXUP: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22, not 20: jsdom 30 (loaded at module scope by
+      # markdown.service.ts), file-type 22 (media.service.ts) and undici 8
+      # all declare engines >=22, and undici reaches for
+      # worker_threads.markAsUncloneable, which only exists from v22.10.0.
+      # On Node 20 `npm ci` still installs — engines are advisory — and the
+      # break surfaces later as "markAsUncloneable is not a function" the
+      # first time anything imports jsdom: openapi:check here, and the API
+      # boot step right after it. Keep at or above package.json engines.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: npm run lint
+
+      - name: Wait for MySQL
+        run: |
+          for i in $(seq 1 30); do
+            mysqladmin ping -h 127.0.0.1 -P 3306 -u root --silent && break
+            sleep 1
+          done
+
+      - run: npm run migrate
+
+      # openapi.json must reflect what's actually implemented in source at
+      # HEAD, every time — a stale contract is exactly what
+      # export-openapi.mjs's own header warns about, and any generated
+      # frontend API client depends on it.
+      - run: npm run openapi:check
+
+      - name: Boot the API
+        run: |
+          node --enable-source-maps dist/main.js > api.log 2>&1 &
+          echo $! > api.pid
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3900/health > /dev/null && exit 0
+            sleep 1
+          done
+          echo "API did not become healthy in time"
+          cat api.log
+          exit 1
+
+      # A clean build is not a working app (this project's own recorded
+      # lesson, three times over) — boot the process and hit the endpoint,
+      # via the extended smoke suite, rather than trusting the build alone.
+      - run: npm run smoke
+
+      - name: API logs (always, for debugging)
+        if: always()
+        run: cat api.log || true
+
+      - name: Stop the API
+        if: always()
+        run: kill "$(cat api.pid)" 2>/dev/null || true

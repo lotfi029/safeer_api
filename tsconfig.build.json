@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    // Keeping the incremental cache inside outDir means nest-cli's own
+    // `deleteOutDir: true` (nest-cli.json) always removes it together with
+    // dist/, so the two can never drift — a stale buildinfo pointing at a
+    // now-deleted dist/ makes tsc skip re-emitting files it wrongly believes
+    // are already up to date, silently leaving dist/ missing whatever
+    // wasn't touched since the last build. Discovered by actually checking
+    // `dist/` after a build rather than trusting a clean exit code.
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+}
