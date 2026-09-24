@@ -5,6 +5,7 @@ import { User } from '../database/entities/user.entity.js';
 import { Session } from '../database/entities/session.entity.js';
 import { AuthToken } from '../database/entities/auth-token.entity.js';
 import { AuditLog } from '../database/entities/audit-log.entity.js';
+import { ApplicantSession } from '../database/entities/applicant-session.entity.js';
 import { ConfigModule } from '../config/config.module.js';
 import { MailModule } from '../mail/mail.module.js';
 import { UsersModule } from '../users/users.module.js';
@@ -18,7 +19,7 @@ import { BootstrapService } from './bootstrap.service.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Session, AuthToken, AuditLog]),
+    TypeOrmModule.forFeature([User, Session, AuthToken, AuditLog, ApplicantSession]),
     ConfigModule,
     MailModule,
     UsersModule,

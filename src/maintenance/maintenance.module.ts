@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Session } from '../database/entities/session.entity.js';
 import { AuthToken } from '../database/entities/auth-token.entity.js';
 import { MailLog } from '../database/entities/mail-log.entity.js';
+import { ApplicantSession } from '../database/entities/applicant-session.entity.js';
+import { ApplicantOtp } from '../database/entities/applicant-otp.entity.js';
 import { MaintenanceService } from './maintenance.service.js';
 import { CacheModule } from '../cache/cache.module.js';
 
@@ -19,7 +21,7 @@ import { CacheModule } from '../cache/cache.module.js';
  * that check itself is not being ported.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Session, AuthToken, MailLog]), CacheModule],
+  imports: [TypeOrmModule.forFeature([Session, AuthToken, MailLog, ApplicantSession, ApplicantOtp]), CacheModule],
   providers: [MaintenanceService],
 })
 export class MaintenanceModule {}

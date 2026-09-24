@@ -13,23 +13,29 @@ import { UsersModule } from './users/users.module.js';
 import { MediaModule } from './media/media.module.js';
 import { FilesModule } from './files/files.module.js';
 import { MailModule } from './mail/mail.module.js';
+import { SmsModule } from './sms/sms.module.js';
 import { RedirectsModule } from './redirects/redirects.module.js';
 import { MaintenanceModule } from './maintenance/maintenance.module.js';
 import { PreviewModule } from './preview/preview.module.js';
+import { StorageModule } from './storage/storage.module.js';
+import { SiteSettingsModule } from './site-settings/site-settings.module.js';
 import { LocaleInterceptor } from './common/interceptors/locale.interceptor.js';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor.js';
 
-// TODO(phase 2): no new modules — phase 2 adds the schema (001_schema.sql)
-// and entities for the roles/applicant-session/private-storage/SMS/settings
-// infra changes described in the project plan; it does not add a content
-// module of its own.
+// Phase 2 (done): the full schema (001_schema.sql) and entities for every
+// table the project plan's "Data model" section lists, plus the infra
+// changes it calls for — four-role permission matrix (phase 1), applicant
+// sessions (SessionGuard + @ApplicantRoute(), src/auth), private document
+// storage (StorageModule), the SMS module (SmsModule, mirroring MailModule)
+// and the site-settings singleton (SiteSettingsModule, mirrored below).
 // TODO(phase 4): import content modules as they're built — pages/sections,
 // stats, about-items, work-areas, board, news/news-categories,
-// testimonials/testimonial-themes, partners, doc-categories/documents,
-// site-settings, home, site (chrome) aggregates.
+// testimonials/testimonial-themes, partners, doc-categories/documents, plus
+// the home and site (chrome) public aggregates.
 // TODO(phase 5): import MessagesModule (contact inbox).
 // TODO(phase 6): import ApplicationsModule (apply flow) and PortalModule
-// (OTP student portal + private documents).
+// (OTP student portal + private documents — wires StorageModule's
+// PrivateFileStore into real upload/download endpoints for the first time).
 // TODO(phase 7): admin applications module (list/counts/CSV/review/bulk/
 // interview-slots) and the admin overview aggregate.
 @Module({
@@ -51,9 +57,12 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor.js';
     MediaModule,
     FilesModule,
     MailModule,
+    SmsModule,
     RedirectsModule,
     MaintenanceModule,
     PreviewModule,
+    StorageModule,
+    SiteSettingsModule,
   ],
   providers: [
     // Guards run before interceptors regardless of relative registration

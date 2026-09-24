@@ -32,6 +32,15 @@ const envSchema = z.object({
   SESSION_IDLE_HOURS: z.coerce.number().positive().default(8),
   SESSION_ABSOLUTE_DAYS: z.coerce.number().positive().default(30),
 
+  // Student-portal session (Safeer infra change §2) — a second, completely
+  // separate cookie/table pair from the staff session above. Longer idle
+  // timeout than staff (an applicant fills a multi-step form over lunch),
+  // shorter absolute lifetime (nothing sensitive stays reachable for 30 days
+  // after a one-time OTP sign-in).
+  APPLICANT_SESSION_COOKIE_NAME: z.string().min(1).default('sf_app_sid'),
+  APPLICANT_SESSION_IDLE_HOURS: z.coerce.number().positive().default(12),
+  APPLICANT_SESSION_ABSOLUTE_DAYS: z.coerce.number().positive().default(7),
+
   // 32 raw bytes, base64-encoded — encrypts the stored SMTP password (AES-256-GCM).
   // PERMANENT: rotating it makes the stored password unreadable (trap 10).
   APP_ENCRYPTION_KEY: z

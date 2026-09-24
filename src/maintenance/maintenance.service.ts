@@ -5,6 +5,8 @@ import { LessThan, Repository } from 'typeorm';
 import { Session } from '../database/entities/session.entity.js';
 import { AuthToken } from '../database/entities/auth-token.entity.js';
 import { MailLog } from '../database/entities/mail-log.entity.js';
+import { ApplicantSession } from '../database/entities/applicant-session.entity.js';
+import { ApplicantOtp } from '../database/entities/applicant-otp.entity.js';
 
 const MAIL_LOG_RETENTION_DAYS = 90;
 
@@ -33,6 +35,8 @@ export class MaintenanceService {
     @InjectRepository(Session) private readonly sessionRepo: Repository<Session>,
     @InjectRepository(AuthToken) private readonly authTokenRepo: Repository<AuthToken>,
     @InjectRepository(MailLog) private readonly mailLogRepo: Repository<MailLog>,
+    @InjectRepository(ApplicantSession) private readonly applicantSessionRepo: Repository<ApplicantSession>,
+    @InjectRepository(ApplicantOtp) private readonly applicantOtpRepo: Repository<ApplicantOtp>,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
@@ -47,6 +51,8 @@ export class MaintenanceService {
       await this.purgeExpiredSessions();
       await this.purgeSpentAuthTokens();
       await this.purgeOldMailLog();
+      await this.purgeExpiredApplicantSessions();
+      await this.purgeSpentApplicantOtps();
     } finally {
       this.running = false;
     }
@@ -90,6 +96,36 @@ export class MaintenanceService {
       this.logger.log(`Purged ${result.affected ?? 0} mail_log row(s) older than ${MAIL_LOG_RETENTION_DAYS} days`);
     } catch (err) {
       this.logger.error('Failed to purge old mail_log rows', err instanceof Error ? err.stack : String(err));
+    }
+  }
+
+  /** Same purgeable rule as staff sessions (Safeer infra change §2: "Maintenance purges expired rows"). */
+  private async purgeExpiredApplicantSessions(): Promise<void> {
+    try {
+      const result = await this.applicantSessionRepo
+        .createQueryBuilder()
+        .delete()
+        .where('expires_at < :now', { now: new Date() })
+        .orWhere('revoked_at IS NOT NULL')
+        .execute();
+      this.logger.log(`Purged ${result.affected ?? 0} dead applicant session(s)`);
+    } catch (err) {
+      this.logger.error('Failed to purge expired applicant sessions', err instanceof Error ? err.stack : String(err));
+    }
+  }
+
+  /** An OTP row is safely purgeable once it can never be verified again — spent (consumed) or past its 10-minute expiry. */
+  private async purgeSpentApplicantOtps(): Promise<void> {
+    try {
+      const result = await this.applicantOtpRepo
+        .createQueryBuilder()
+        .delete()
+        .where('consumed_at IS NOT NULL')
+        .orWhere('expires_at < :now', { now: new Date() })
+        .execute();
+      this.logger.log(`Purged ${result.affected ?? 0} spent/expired applicant OTP(s)`);
+    } catch (err) {
+      this.logger.error('Failed to purge spent applicant OTPs', err instanceof Error ? err.stack : String(err));
     }
   }
 }

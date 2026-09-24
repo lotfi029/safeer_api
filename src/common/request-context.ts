@@ -19,14 +19,25 @@ export interface AuthenticatedUser {
   role: UserRole;
 }
 
+export interface AuthenticatedApplicant {
+  applicationId: string;
+}
+
 /**
  * The request shape after the cross-cutting pieces have run:
  * - `locale` — set by LocaleInterceptor (P5)
  * - `id` — set by requestIdMiddleware (P1)
  * - `ipHash` — set by ipHashMiddleware (P5), SHA-256(IP + IP_HASH_SALT)
- * - `user` — set by SessionGuard (P6); absent on public routes
- * - `sessionId` / `sessionTokenHash` — set by SessionGuard (P6); the latter
- *   is what CsrfGuard derives the expected token from
+ * - `user` — set by SessionGuard (P6) on a staff route; absent on public
+ *   routes and on `@ApplicantRoute()` routes
+ * - `applicant` — set by SessionGuard (Safeer infra change §2) on an
+ *   `@ApplicantRoute()` handler, resolved from the `sf_app_sid` cookie
+ *   against `applicant_sessions` instead of the staff `sessions` table;
+ *   `user` and `applicant` are never both set on the same request — the two
+ *   cookies and the two guard code paths are kept completely separate
+ * - `sessionId` / `sessionTokenHash` — set by SessionGuard (P6) for either
+ *   kind of session; the latter is what CsrfGuard derives the expected
+ *   token from, unchanged for both staff and applicant routes
  * - `auditContext` — set by a service/controller before returning, for
  *   AuditInterceptor (P5) to pick up after a successful write
  */
@@ -35,6 +46,7 @@ export interface RequestContext extends Request {
   locale: Locale;
   ipHash?: string | null;
   user?: AuthenticatedUser;
+  applicant?: AuthenticatedApplicant;
   sessionId?: string;
   sessionTokenHash?: string;
   auditContext?: AuditContext;
