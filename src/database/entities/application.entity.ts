@@ -1,0 +1,107 @@
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from 'typeorm';
+import { User } from './user.entity.js';
+import type { Locale } from '../../common/request-context.js';
+
+export type ApplicationStatus = 'draft' | 'new' | 'under_review' | 'docs_missing' | 'interview' | 'accepted' | 'rejected';
+export type ApplicationGender = 'male' | 'female';
+export type ApplicationDegreeLevel = 'bachelor' | 'master' | 'phd';
+
+@Entity('applications')
+@Unique('uq_applications_reference', ['reference'])
+@Index('ix_applications_status', ['status', 'submittedAt'])
+@Index('ix_applications_email', ['email'])
+export class Application {
+  @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
+  id: string;
+
+  /** e.g. SA-2026-00184, minted from `counters` on creation */
+  @Column({ type: 'varchar', length: 30 })
+  reference: string;
+
+  @Column({
+    type: 'enum',
+    enum: ['draft', 'new', 'under_review', 'docs_missing', 'interview', 'accepted', 'rejected'] as ApplicationStatus[],
+    default: 'draft',
+  })
+  status: ApplicationStatus;
+
+  @Column({ name: 'current_step', type: 'tinyint', unsigned: true, default: 1 })
+  currentStep: number;
+
+  // personal
+  @Column({ name: 'first_name', type: 'varchar', length: 120, nullable: true })
+  firstName: string | null;
+
+  @Column({ name: 'middle_name', type: 'varchar', length: 120, nullable: true })
+  middleName: string | null;
+
+  @Column({ name: 'last_name', type: 'varchar', length: 120, nullable: true })
+  lastName: string | null;
+
+  @Column({ name: 'birth_date', type: 'date', nullable: true })
+  birthDate: string | null;
+
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  phone: string | null;
+
+  /** ISO2 */
+  @Column({ type: 'char', length: 2, nullable: true })
+  nationality: string | null;
+
+  @Column({ name: 'id_number', type: 'varchar', length: 40, nullable: true })
+  idNumber: string | null;
+
+  @Column({ type: 'varchar', length: 191, nullable: true })
+  email: string | null;
+
+  @Column({ name: 'current_job', type: 'varchar', length: 191, nullable: true })
+  currentJob: string | null;
+
+  @Column({ type: 'enum', enum: ['male', 'female'] as ApplicationGender[], nullable: true })
+  gender: ApplicationGender | null;
+
+  // study
+  @Column({ type: 'varchar', length: 191, nullable: true })
+  university: string | null;
+
+  @Column({ type: 'varchar', length: 191, nullable: true })
+  major: string | null;
+
+  @Column({ name: 'degree_level', type: 'enum', enum: ['bachelor', 'master', 'phd'] as ApplicationDegreeLevel[], nullable: true })
+  degreeLevel: ApplicationDegreeLevel | null;
+
+  @Column({ name: 'scholarship_note', type: 'text', nullable: true })
+  scholarshipNote: string | null;
+
+  // dates
+  @Column({ name: 'consent_at', type: 'datetime', precision: 3, nullable: true })
+  consentAt: Date | null;
+
+  @Column({ name: 'submitted_at', type: 'datetime', precision: 3, nullable: true })
+  submittedAt: Date | null;
+
+  @Column({ name: 'decided_at', type: 'datetime', precision: 3, nullable: true })
+  decidedAt: Date | null;
+
+  @Column({ name: 'assigned_reviewer_id', type: 'bigint', unsigned: true, nullable: true })
+  assignedReviewerId: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'assigned_reviewer_id', foreignKeyConstraintName: 'fk_applications_reviewer' })
+  assignedReviewer?: User | null;
+
+  @Column({ type: 'enum', enum: ['ar', 'en'] as Locale[], default: 'ar' })
+  locale: Locale;
+
+  @CreateDateColumn({ name: 'created_at', type: 'datetime', precision: 3, default: () => 'CURRENT_TIMESTAMP(3)' })
+  createdAt: Date;
+
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'datetime',
+    precision: 3,
+    default: () => 'CURRENT_TIMESTAMP(3)',
+    onUpdate: 'CURRENT_TIMESTAMP(3)',
+  })
+  updatedAt: Date;
+}
