@@ -21,6 +21,19 @@ import { StorageModule } from './storage/storage.module.js';
 import { SiteSettingsModule } from './site-settings/site-settings.module.js';
 import { LocaleInterceptor } from './common/interceptors/locale.interceptor.js';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor.js';
+import { PagesModule } from './pages/pages.module.js';
+import { StatsModule } from './stats/stats.module.js';
+import { AboutItemsModule } from './about-items/about-items.module.js';
+import { WorkAreasModule } from './work-areas/work-areas.module.js';
+import { BoardModule } from './board/board.module.js';
+import { NewsModule } from './news/news.module.js';
+import { TestimonialsModule } from './testimonials/testimonials.module.js';
+import { PartnersModule } from './partners/partners.module.js';
+import { DocumentsModule } from './documents/documents.module.js';
+import { HomeModule } from './home/home.module.js';
+import { SiteModule } from './site/site.module.js';
+import { ContactModule } from './contact/contact.module.js';
+import { MetaModule } from './meta/meta.module.js';
 
 // Phase 2 (done): the full schema (001_schema.sql) and entities for every
 // table the project plan's "Data model" section lists, plus the infra
@@ -28,10 +41,11 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor.js';
 // sessions (SessionGuard + @ApplicantRoute(), src/auth), private document
 // storage (StorageModule), the SMS module (SmsModule, mirroring MailModule)
 // and the site-settings singleton (SiteSettingsModule, mirrored below).
-// TODO(phase 4): import content modules as they're built — pages/sections,
-// stats, about-items, work-areas, board, news/news-categories,
-// testimonials/testimonial-themes, partners, doc-categories/documents, plus
-// the home and site (chrome) public aggregates.
+// Phase 4 (done): content modules — pages/sections, stats, about-items,
+// work-areas, board, news/news-categories, testimonials/testimonial-themes,
+// partners, doc-categories/documents, contact/newsletter, meta, plus the
+// home and site (chrome) public aggregates. PreviewModule now covers
+// `posts` (see auth/preview-token.util.ts's PreviewCollection).
 // TODO(phase 5): import MessagesModule (contact inbox).
 // TODO(phase 6): import ApplicationsModule (apply flow) and PortalModule
 // (OTP student portal + private documents — wires StorageModule's
@@ -63,6 +77,19 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor.js';
     PreviewModule,
     StorageModule,
     SiteSettingsModule,
+    PagesModule,
+    StatsModule,
+    AboutItemsModule,
+    WorkAreasModule,
+    BoardModule,
+    NewsModule,
+    TestimonialsModule,
+    PartnersModule,
+    DocumentsModule,
+    HomeModule,
+    SiteModule,
+    ContactModule,
+    MetaModule,
   ],
   providers: [
     // Guards run before interceptors regardless of relative registration

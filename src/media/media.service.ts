@@ -16,19 +16,16 @@ import { CacheService } from '../cache/cache.service.js';
 
 /**
  * The tags `isPubliclyReadable`'s memo is stored under — every collection
- * that can own a media asset should purge at least one of these on a
+ * that can own a media asset purges at least one of these on a
  * publish-affecting write, so that whichever owning row's publish state
  * actually changed, one of its collection's existing purge points
- * invalidates this memo for free.
- *
- * TODO(phase 4+): extend this list (and `queryIsPubliclyReadable`'s /
- * `findUsages`' UNION below) as content modules land — e.g. 'news',
- * 'pages', 'documents', 'partners', 'board', 'testimonials' — matching
- * whichever public tags those collections' own writes purge. Empty in
- * this infra-only phase: no table besides media_assets/media_variants
- * exists yet, so nothing can reference an asset yet either.
+ * invalidates this memo for free. Matches the five asset-owning tables in
+ * `queryIsPubliclyReadable`/`findUsages` below: `pages` (page_sections'
+ * image, which also purges 'pages'), `board_members`, `news` (posts' cover),
+ * `partners`, `documents`. 'home' stays too — every one of these also feeds
+ * the home aggregate via `extraPurgeTags`.
  */
-const ASSET_PUBLIC_MEMO_TAGS: string[] = ['home'];
+const ASSET_PUBLIC_MEMO_TAGS: string[] = ['home', 'pages', 'board_members', 'news', 'partners', 'documents'];
 
 // FR-F-02 governs (your decision) — 20 MB is the outer multipart body guard
 // (main.ts / multer limits); these are the real per-kind limits checked
@@ -251,17 +248,30 @@ export class MediaService {
   }
 
   /**
-   * TODO(phase 4+): every content table with a `*_asset_id` FK to
-   * media_assets must add a `UNION ALL SELECT 1 FROM <table> WHERE
-   * <col> = ? AND is_published = 1` branch here as it lands (news,
-   * pages/page_sections' image, board_members' photo, partners' logo,
-   * documents' asset, etc. — see the project plan's schema section for the
-   * full list of asset-owning columns). Until then no table can reference
-   * a media asset at all, so nothing is ever publicly readable through
-   * `/files` — the safe default.
+   * The five asset-owning tables in Safeer's schema (project plan's "Data
+   * model" section — about_items/work_areas/stats/testimonials/
+   * testimonial_themes have no `*_asset_id` column). `page_sections.image_asset_id`
+   * joins to its parent `pages` row — a section can only be public when
+   * both its own `is_published` ("visible" toggle) and its page's are true.
+   *
+   * TypeORM's mysql2 driver returns a computed `EXISTS(...)` column as the
+   * *string* "1"/"0", not a JS number (confirmed directly against this
+   * connection) — `Number(...)` below, not a strict `=== 1`, which would
+   * silently always be false.
    */
-  private async queryIsPubliclyReadable(_assetId: string): Promise<boolean> {
-    return false;
+  private async queryIsPubliclyReadable(assetId: string): Promise<boolean> {
+    const [row] = await this.dataSource.query<{ isPublic: number | string }[]>(
+      `SELECT EXISTS(
+         SELECT 1 FROM page_sections ps JOIN pages p ON p.id = ps.page_id
+           WHERE ps.image_asset_id = ? AND ps.is_published = 1 AND p.is_published = 1
+         UNION ALL SELECT 1 FROM board_members WHERE photo_asset_id = ? AND is_published = 1
+         UNION ALL SELECT 1 FROM posts WHERE cover_asset_id = ? AND is_published = 1
+         UNION ALL SELECT 1 FROM partners WHERE logo_asset_id = ? AND is_published = 1
+         UNION ALL SELECT 1 FROM documents WHERE asset_id = ? AND is_published = 1
+       ) AS isPublic`,
+      [assetId, assetId, assetId, assetId, assetId],
+    );
+    return Number(row?.isPublic) === 1;
   }
 
   /** An image with no Arabic alt text cannot be attached to anything (FR-F-03). */
@@ -277,31 +287,34 @@ export class MediaService {
    * failure here must never become an unhandled rejection — caught and
    * logged instead of thrown.
    *
-   * TODO(phase 4+): african_api's equivalent bumps a `documents.download_count`
-   * column; wire that back in once the Documents module and its `documents`
-   * table land. A no-op until then — there is no such column anywhere yet.
    */
-  async incrementDownloadCount(_publicId: string): Promise<void> {
-    // Intentionally empty — see TODO above.
+  async incrementDownloadCount(publicId: string): Promise<void> {
+    try {
+      await this.dataSource.query(
+        'UPDATE documents SET download_count = download_count + 1 WHERE asset_id = (SELECT id FROM media_assets WHERE public_id = ?)',
+        [publicId],
+      );
+    } catch (err) {
+      this.logger.error(`Failed to increment download count for ${publicId}`, err instanceof Error ? err.stack : String(err));
+    }
   }
 
   /**
-   * Every FK with ON DELETE RESTRICT pointing at media_assets, all nine
-   * tables (12-database.md §5 — the conformance pass added channels and
-   * meeting_attachments, the two that get forgotten). ER_ROW_IS_REFERENCED_2
+   * Every FK with ON DELETE RESTRICT pointing at media_assets — the same
+   * five tables as `queryIsPubliclyReadable` above. ER_ROW_IS_REFERENCED_2
    * (trap 3) is the backstop this query exists to make unnecessary; the
    * global filter still maps it if some future write path bypasses this.
    */
-  /**
-   * TODO(phase 4+): add a `UNION ALL SELECT '<table>', id, <label column>
-   * FROM <table> WHERE <col> = ?` branch per asset-owning table, mirroring
-   * `queryIsPubliclyReadable` above — same list, same reasoning. Empty for
-   * now: no table besides media_assets/media_variants exists yet, so
-   * nothing can reference an asset (and therefore nothing blocks its
-   * deletion) until those tables land.
-   */
-  async findUsages(_assetId: string): Promise<AssetUsage[]> {
-    return [];
+  async findUsages(assetId: string): Promise<AssetUsage[]> {
+    const rows = await this.dataSource.query<AssetUsage[]>(
+      `SELECT 'page_sections' AS entity, id, section_key AS label FROM page_sections WHERE image_asset_id = ?
+       UNION ALL SELECT 'board_members', id, name_ar FROM board_members WHERE photo_asset_id = ?
+       UNION ALL SELECT 'posts',         id, title_ar FROM posts        WHERE cover_asset_id = ?
+       UNION ALL SELECT 'partners',      id, name_ar  FROM partners     WHERE logo_asset_id = ?
+       UNION ALL SELECT 'documents',     id, title_ar FROM documents    WHERE asset_id = ?`,
+      [assetId, assetId, assetId, assetId, assetId],
+    );
+    return rows;
   }
 
   async remove(id: string): Promise<MediaAsset> {

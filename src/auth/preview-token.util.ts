@@ -20,15 +20,8 @@ import { createHmac, hkdfSync, timingSafeEqual } from 'node:crypto';
  */
 const PREVIEW_TOKEN_INFO = 'safeer-preview-v1';
 
-/**
- * Table names — also the CRUD kernel's `entityType`/audit `entity_type` for
- * whichever collections opt into preview (crud.factory.ts).
- *
- * TODO(phase 4+): add the previewable collections as their modules land
- * (e.g. 'news' for the posts-equivalent content, once the News module and
- * entity exist) — see preview.controller.ts's PREVIEW_COLLECTIONS.
- */
-export type PreviewCollection = never;
+/** Table names — also the CRUD kernel's `entityType`/audit `entity_type` for whichever collections opt into preview (crud.factory.ts). */
+export type PreviewCollection = 'posts';
 
 export const PREVIEW_TOKEN_TTL_SECONDS = 15 * 60;
 
