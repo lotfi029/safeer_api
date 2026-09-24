@@ -35,6 +35,8 @@ import { SiteModule } from './site/site.module.js';
 import { ContactModule } from './contact/contact.module.js';
 import { MetaModule } from './meta/meta.module.js';
 import { MessagesModule } from './messages/messages.module.js';
+import { ApplicationsModule } from './applications/applications.module.js';
+import { PortalModule } from './portal/portal.module.js';
 
 // Phase 2 (done): the full schema (001_schema.sql) and entities for every
 // table the project plan's "Data model" section lists, plus the infra
@@ -49,9 +51,11 @@ import { MessagesModule } from './messages/messages.module.js';
 // `posts` (see auth/preview-token.util.ts's PreviewCollection).
 // Phase 5 (done): MessagesModule (contact inbox — reply, status, convert to
 // testimonial, delete), hand-written and admin/support-gated per the plan.
-// TODO(phase 6): import ApplicationsModule (apply flow) and PortalModule
-// (OTP student portal + private documents — wires StorageModule's
-// PrivateFileStore into real upload/download endpoints for the first time).
+// Phase 6 (done): ApplicationsModule (the public "start an application"
+// step — mints the reference number and the first applicant_sessions row)
+// and PortalModule (autosave/submit, OTP sign-in, private document
+// upload/download via StorageModule's PrivateFileStore, interview-slot
+// booking, notifications) — the plan's "Apply flow and portal" section.
 // TODO(phase 7): admin applications module (list/counts/CSV/review/bulk/
 // interview-slots) and the admin overview aggregate.
 @Module({
@@ -93,6 +97,8 @@ import { MessagesModule } from './messages/messages.module.js';
     ContactModule,
     MetaModule,
     MessagesModule,
+    ApplicationsModule,
+    PortalModule,
   ],
   providers: [
     // Guards run before interceptors regardless of relative registration

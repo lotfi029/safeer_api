@@ -20,6 +20,16 @@ export const ErrorCode = {
   FEATURE_DISABLED: 'FEATURE_DISABLED',
   /** 7.3: distinct from FEATURE_DISABLED — the flag is on, but no payment provider is wired up yet. */
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
+  /** Phase 6 (apply flow/portal): a write to `applications` was attempted while its `status` is not `draft`/`docs_missing`. */
+  APPLICATION_LOCKED: 'APPLICATION_LOCKED',
+  /** Phase 6: `portal/auth/verify-otp` — wrong code, expired, no matching row, or the 5-attempt cap was hit. Deliberately one generic code for every failure branch (non-enumeration). */
+  OTP_INVALID: 'OTP_INVALID',
+  /** Phase 6: `portal/application/submit` — one or more of the 3 required document types has no current, non-rejected document. `extra.missing` lists the doc types still needed. */
+  DOCUMENTS_INCOMPLETE: 'DOCUMENTS_INCOMPLETE',
+  /** Phase 6: `portal/interview` — the chosen slot was already booked (or no longer open) by the time the row was locked. */
+  SLOT_ALREADY_BOOKED: 'SLOT_ALREADY_BOOKED',
+  /** Phase 6: `portal/interview-slots` and `portal/interview` — the application's `status` is not `interview`. */
+  INTERVIEW_NOT_AVAILABLE: 'INTERVIEW_NOT_AVAILABLE',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

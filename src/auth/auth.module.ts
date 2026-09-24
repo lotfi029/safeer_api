@@ -12,6 +12,7 @@ import { UsersModule } from '../users/users.module.js';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { PasswordService } from './password.service.js';
+import { ApplicantSessionService } from './applicant-session.service.js';
 import { SessionGuard } from './guards/session.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
 import { CsrfGuard } from './guards/csrf.guard.js';
@@ -28,6 +29,7 @@ import { BootstrapService } from './bootstrap.service.js';
   providers: [
     AuthService,
     PasswordService,
+    ApplicantSessionService,
     BootstrapService,
     // Registered here, not in AppModule: APP_GUARD providers are applied
     // globally regardless of which module declares them, and this is the
@@ -41,6 +43,6 @@ import { BootstrapService } from './bootstrap.service.js';
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },
   ],
-  exports: [AuthService, PasswordService],
+  exports: [AuthService, PasswordService, ApplicantSessionService],
 })
 export class AuthModule {}
