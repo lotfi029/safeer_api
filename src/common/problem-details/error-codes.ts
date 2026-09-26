@@ -48,6 +48,8 @@ export const ErrorCode = {
   QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
   /** C34: `PATCH admin/applications/:id/documents/:docId` — the document was superseded, or the application is draft/accepted/rejected. */
   DOCUMENT_NOT_REVIEWABLE: 'DOCUMENT_NOT_REVIEWABLE',
+  /** C10: `admin/redirects` — the redirect would chain through another redirect, or duplicates one's source. */
+  REDIRECT_CHAIN: 'REDIRECT_CHAIN',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

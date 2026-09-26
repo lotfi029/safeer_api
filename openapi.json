@@ -1263,6 +1263,33 @@
       }
     },
     "/admin/redirects": {
+      "post": {
+        "operationId": "RedirectsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRedirectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "Redirects"
+        ]
+      },
       "get": {
         "operationId": "RedirectsController_list",
         "parameters": [
@@ -1312,62 +1339,9 @@
         "tags": [
           "Redirects"
         ]
-      },
-      "post": {
-        "operationId": "RedirectsController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/admin_redirectsCreateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "Redirects"
-        ]
       }
     },
     "/admin/redirects/{id}": {
-      "get": {
-        "operationId": "RedirectsController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "Redirects"
-        ]
-      },
       "patch": {
         "operationId": "RedirectsController_update",
         "parameters": [
@@ -1385,11 +1359,37 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/admin_redirectsUpdateDto"
+                "$ref": "#/components/schemas/UpdateRedirectDto"
               }
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "Redirects"
+        ]
+      },
+      "get": {
+        "operationId": "RedirectsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -6514,8 +6514,18 @@
               "support"
             ]
           },
-          "isLocked": {
-            "type": "boolean"
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          },
+          "unlock": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
           }
         },
         "additionalProperties": false
@@ -6634,18 +6644,20 @@
         },
         "additionalProperties": false
       },
-      "admin_redirectsCreateDto": {
+      "CreateRedirectDto": {
         "type": "object",
         "properties": {
           "fromPath": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 255
+            "minLength": 2,
+            "maxLength": 255,
+            "pattern": "^\\/(?!\\/)[^\\s\\\\]*$"
           },
           "toPath": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 255
+            "minLength": 2,
+            "maxLength": 255,
+            "pattern": "^\\/(?!\\/)[^\\s\\\\]*$"
           },
           "statusCode": {
             "anyOf": [
@@ -6670,6 +6682,40 @@
         ],
         "additionalProperties": false
       },
+      "UpdateRedirectDto": {
+        "type": "object",
+        "properties": {
+          "fromPath": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 255,
+            "pattern": "^\\/(?!\\/)[^\\s\\\\]*$"
+          },
+          "toPath": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 255,
+            "pattern": "^\\/(?!\\/)[^\\s\\\\]*$"
+          },
+          "statusCode": {
+            "anyOf": [
+              {
+                "type": "number",
+                "enum": [
+                  301
+                ]
+              },
+              {
+                "type": "number",
+                "enum": [
+                  302
+                ]
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "admin_redirectsReorderDto": {
         "minItems": 1,
         "type": "array",
@@ -6691,38 +6737,6 @@
             "sortOrder"
           ]
         }
-      },
-      "admin_redirectsUpdateDto": {
-        "type": "object",
-        "properties": {
-          "fromPath": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255
-          },
-          "toPath": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255
-          },
-          "statusCode": {
-            "anyOf": [
-              {
-                "type": "number",
-                "enum": [
-                  301
-                ]
-              },
-              {
-                "type": "number",
-                "enum": [
-                  302
-                ]
-              }
-            ]
-          }
-        },
-        "additionalProperties": false
       },
       "admin_redirectsPublishDto": {
         "type": "object",
@@ -6799,43 +6813,36 @@
           "facebookUrl": {
             "type": "string",
             "maxLength": 255,
-            "format": "uri",
             "nullable": true
           },
           "instagramUrl": {
             "type": "string",
             "maxLength": 255,
-            "format": "uri",
             "nullable": true
           },
           "xUrl": {
             "type": "string",
             "maxLength": 255,
-            "format": "uri",
             "nullable": true
           },
           "youtubeUrl": {
             "type": "string",
             "maxLength": 255,
-            "format": "uri",
             "nullable": true
           },
           "linkedinUrl": {
             "type": "string",
             "maxLength": 255,
-            "format": "uri",
             "nullable": true
           },
           "whatsappUrl": {
             "type": "string",
             "maxLength": 255,
-            "format": "uri",
             "nullable": true
           },
           "tiktokUrl": {
             "type": "string",
             "maxLength": 255,
-            "format": "uri",
             "nullable": true
           },
           "enEnabled": {

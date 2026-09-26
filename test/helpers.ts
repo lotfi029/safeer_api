@@ -95,7 +95,7 @@ export async function createTempUser(role: StaffRole): Promise<Session & { id: s
   const email = `jest-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   const id = await withDb(async (conn) => {
     const [result] = await conn.execute(
-      'INSERT INTO users (name, email, password_hash, role, is_locked, failed_logins) VALUES (?, ?, ?, ?, 0, 0)',
+      "INSERT INTO users (name, email, password_hash, role, status, failed_logins) VALUES (?, ?, ?, ?, 'active', 0)",
       [`Jest ${role}`, email, passwordHash, role],
     );
     return String((result as any).insertId);

@@ -4,7 +4,7 @@
 //   C16 names are letters only; contact_ack echoes nothing; typed text never autolinks
 //   C1  the OTP mail subject carries no code
 
-import { adminApi, api, createApplication, deleteApplication, readMailOtpCode, withDb } from './helpers';
+import { adminApi, api, createApplication, createTempUser, deleteApplication, deleteTempUser, readMailOtpCode, withDb } from './helpers';
 import { withMailSink } from './smtp-sink';
 
 const FRONTEND = process.env.FRONTEND_BASE_URL ?? 'http://localhost:4200';
@@ -48,9 +48,17 @@ describe('mail links and content', () => {
         const invite = await sink.waitFor((m) => m.to.includes(email));
         expect(invite.text).toMatch(new RegExp(`${escapeRe(FRONTEND)}/ar/admin/accept/[A-Za-z0-9_-]{20,}`));
 
+        // C3: a pending invitation gets no reset link — forgot-password only serves active accounts.
         await api('POST', '/admin/auth/forgot', { body: { email } });
-        const reset = await sink.waitFor((m) => m.to.includes(email) && /admin\/reset\//.test(m.text));
-        expect(reset.text).toMatch(new RegExp(`${escapeRe(FRONTEND)}/ar/admin/reset/[A-Za-z0-9_-]{20,}`));
+        const active = await createTempUser('editor');
+        try {
+          await api('POST', '/admin/auth/forgot', { body: { email: active.email } });
+          const reset = await sink.waitFor((m) => m.to.includes(active.email) && /admin\/reset\//.test(m.text));
+          expect(reset.text).toMatch(new RegExp(`${escapeRe(FRONTEND)}/ar/admin/reset/[A-Za-z0-9_-]{20,}`));
+          expect(sink.messages.some((m) => m.to.includes(email) && /admin\/reset\//.test(m.text))).toBe(false);
+        } finally {
+          await deleteTempUser(active.id);
+        }
       } finally {
         await withDb((conn) => conn.execute('DELETE FROM users WHERE email = ?', [email]));
       }

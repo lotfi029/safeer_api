@@ -63,10 +63,13 @@ export const MAX_INPUT_PIXELS = 50_000_000;
  * it never needs a second call on that output just for its metadata.
  */
 export async function generateWebpVariants(original: Buffer): Promise<ImagePipelineResult> {
-  const img = sharp(original, { limitInputPixels: MAX_INPUT_PIXELS, pages: 1 });
-  const meta = await img.metadata();
-  const width = meta.width ?? 0;
-  const height = meta.height ?? 0;
+  // C7: `.rotate()` with no angle auto-orients from EXIF, so a phone photo
+  // taken sideways isn't served sideways; the reported size is the size
+  // after that rotation.
+  const img = sharp(original, { limitInputPixels: MAX_INPUT_PIXELS, pages: 1 }).rotate();
+  const { info } = await img.clone().toBuffer({ resolveWithObject: true });
+  const width = info.width ?? 0;
+  const height = info.height ?? 0;
 
   const variants: ImageVariant[] = [];
   for (const spec of VARIANT_SPECS) {
@@ -79,4 +82,31 @@ export async function generateWebpVariants(original: Buffer): Promise<ImagePipel
   }
 
   return { width, height, variants };
+}
+
+export interface NormalizedOriginal {
+  buffer: Buffer;
+  width: number;
+  height: number;
+}
+
+/**
+ * C7: the original image as it is actually stored and served at
+ * `/files/:publicId` — re-encoded in its own format after `.rotate()`
+ * (EXIF orientation applied). sharp writes no metadata unless asked
+ * (`withMetadata`), so EXIF — GPS position, device, timestamps — is
+ * stripped. `width`/`height` are the dimensions after rotation.
+ */
+export async function normalizeOriginal(original: Buffer, mime: string): Promise<NormalizedOriginal> {
+  const img = sharp(original, { limitInputPixels: MAX_INPUT_PIXELS, pages: 1 }).rotate();
+  const encoded =
+    mime === 'image/png'
+      ? img.png()
+      : mime === 'image/webp'
+        ? img.webp({ quality: 90 })
+        : mime === 'image/avif'
+          ? img.avif({ quality: 70 })
+          : img.jpeg({ quality: 90, mozjpeg: true });
+  const { data, info } = await encoded.toBuffer({ resolveWithObject: true });
+  return { buffer: data, width: info.width, height: info.height };
 }

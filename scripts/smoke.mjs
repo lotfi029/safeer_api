@@ -138,7 +138,7 @@ async function createTempUser(role) {
   const email = `smoke-${role}-${Date.now()}@example.com`;
   const id = await withDb(async (conn) => {
     const [result] = await conn.execute(
-      'INSERT INTO users (name, email, password_hash, role, is_locked, failed_logins) VALUES (?, ?, ?, ?, 0, 0)',
+      "INSERT INTO users (name, email, password_hash, role, status, failed_logins) VALUES (?, ?, ?, ?, 'active', 0)",
       [`Smoke ${role}`, email, passwordHash, role],
     );
     return String(result.insertId);
@@ -163,8 +163,8 @@ async function createTempUserNoLogin(role, overrides = {}) {
   const email = `smoke-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   const id = await withDb(async (conn) => {
     const [result] = await conn.execute(
-      'INSERT INTO users (name, email, password_hash, role, is_locked, failed_logins) VALUES (?, ?, ?, ?, ?, 0)',
-      [`Smoke ${role}`, email, passwordHash, role, overrides.isLocked ? 1 : 0],
+      'INSERT INTO users (name, email, password_hash, role, status, failed_logins) VALUES (?, ?, ?, ?, ?, 0)',
+      [`Smoke ${role}`, email, passwordHash, role, overrides.isLocked ? 'disabled' : 'active'],
     );
     return String(result.insertId);
   });

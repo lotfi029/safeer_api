@@ -16,7 +16,8 @@ export interface SunkMail {
 }
 
 function decodeWords(value: string): string {
-  return value.replace(/=\?utf-8\?([bq])\?([^?]*)\?=/gi, (_, enc: string, data: string) =>
+  // Whitespace between two adjacent encoded-words is not part of the text (RFC 2047 §6.2).
+  return value.replace(/(\?=)\s+(=\?)/g, '$1$2').replace(/=\?utf-8\?([bq])\?([^?]*)\?=/gi, (_, enc: string, data: string) =>
     enc.toLowerCase() === 'b'
       ? Buffer.from(data, 'base64').toString('utf8')
       : decodeQuotedPrintable(data.replace(/_/g, ' ')),

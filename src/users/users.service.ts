@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository, type EntityManager } from 'typeorm';
+import { IsNull, Not, Repository, type EntityManager } from 'typeorm';
 import { User, type UserRole } from '../database/entities/user.entity.js';
 import { Session } from '../database/entities/session.entity.js';
+import { AuthToken } from '../database/entities/auth-token.entity.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { toPublicUser, type PublicUser } from './public-user.js';
@@ -21,7 +22,8 @@ export interface UpdateUserInput {
   name?: string;
   email?: string;
   role?: UserRole;
-  isLocked?: boolean;
+  status?: 'active' | 'disabled';
+  unlock?: true;
 }
 
 @Injectable()
@@ -57,7 +59,7 @@ export class UsersService {
       name,
       role,
       passwordHash: UNUSABLE_PASSWORD_HASH,
-      isLocked: false,
+      status: 'invited',
       failedLogins: 0,
     });
     return this.userRepo.save(user);
@@ -72,16 +74,16 @@ export class UsersService {
    * as long as a second, already-locked admin row existed.
    */
   private async usableAdminsBesides(manager: EntityManager, excludeId: string): Promise<number> {
-    return manager.count(User, { where: { role: 'admin', isLocked: false, id: Not(excludeId) } });
+    return manager.count(User, { where: { role: 'admin', status: 'active', id: Not(excludeId) } });
   }
 
   /**
    * FR-A-03, three rules: a user cannot change their own role; the last
-   * remaining *usable* admin cannot be demoted, locked or deleted; locking
+   * remaining *usable* (active) admin cannot be demoted, disabled or deleted; disabling
    * cascades to revoke every active session for that user immediately (so
    * SessionGuard's own `revoked_at IS NULL` check is what actually kills a
    * locked account's live session on the next request — this is the
-   * primary mechanism, the guard's `is_locked` join is the defence-in-depth
+   * primary mechanism, the guard's `status = 'active'` join is the defence-in-depth
    * layer).
    *
    * B1-9: wrapped in a transaction that takes a pessimistic write lock on
@@ -105,7 +107,7 @@ export class UsersService {
       const target = await manager.findOne(User, { where: { id: targetId } });
       if (!target) throw new ProblemException(404, ErrorCode.NOT_FOUND, 'User not found');
       const before = toPublicUser(target);
-      const wouldRemoveAdminCover = target.role === 'admin' && !target.isLocked;
+      const wouldRemoveAdminCover = target.role === 'admin' && target.status === 'active';
 
       if (input.role !== undefined && input.role !== target.role) {
         if (targetId === actorId) {
@@ -118,17 +120,30 @@ export class UsersService {
       }
 
       if (input.name !== undefined) target.name = input.name;
+      const emailChanged = input.email !== undefined && input.email !== target.email;
       if (input.email !== undefined) target.email = input.email;
 
-      const wasLocking = input.isLocked === true && !target.isLocked;
-      if (wasLocking && wouldRemoveAdminCover && (await this.usableAdminsBesides(manager, targetId)) === 0) {
-        throw new ProblemException(409, ErrorCode.LAST_ADMIN, 'The last remaining admin cannot be locked');
+      const disabling = input.status === 'disabled' && target.status !== 'disabled';
+      if (disabling && wouldRemoveAdminCover && (await this.usableAdminsBesides(manager, targetId)) === 0) {
+        throw new ProblemException(409, ErrorCode.LAST_ADMIN, 'The last remaining admin cannot be disabled');
       }
-      if (input.isLocked !== undefined) target.isLocked = input.isLocked;
+      if (input.status !== undefined) {
+        if (input.status === 'active' && target.status === 'invited') {
+          throw new ProblemException(409, ErrorCode.VALIDATION_FAILED, 'An invited user becomes active by accepting the invitation');
+        }
+        target.status = input.status;
+      }
+      if (input.unlock) {
+        // C12: an admin unlock clears the lock *and* the counter, so the next
+        // single typo doesn't lock the account straight back up.
+        target.lockedUntil = null;
+        target.failedLogins = 0;
+        target.lockCount = 0;
+      }
 
       const saved = await manager.save(target);
 
-      if (wasLocking) {
+      if (disabling) {
         await manager
           .createQueryBuilder()
           .update(Session)
@@ -136,6 +151,11 @@ export class UsersService {
           .where('user_id = :userId', { userId: targetId })
           .andWhere('revoked_at IS NULL')
           .execute();
+      }
+      // C3: an outstanding invitation or reset link must not outlive a
+      // disable or an address change (it was sent to the old address).
+      if (disabling || emailChanged) {
+        await manager.delete(AuthToken, { userId: targetId, usedAt: IsNull() });
       }
 
       return { before, after: toPublicUser(saved) };
@@ -162,7 +182,7 @@ export class UsersService {
       if (targetId === actorId) {
         throw new ProblemException(403, ErrorCode.FORBIDDEN, 'You cannot delete your own account');
       }
-      const wouldRemoveAdminCover = target.role === 'admin' && !target.isLocked;
+      const wouldRemoveAdminCover = target.role === 'admin' && target.status === 'active';
       if (wouldRemoveAdminCover && (await this.usableAdminsBesides(manager, targetId)) === 0) {
         throw new ProblemException(409, ErrorCode.LAST_ADMIN, 'The last remaining admin cannot be deleted');
       }

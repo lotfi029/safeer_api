@@ -28,6 +28,7 @@
     "openapi:check": "node scripts/check-openapi.mjs",
     "check:admin-roles": "node scripts/check-admin-roles.mjs",
     "backup:storage": "node scripts/backup-storage.mjs",
+    "media:reprocess": "node scripts/reprocess-media.mjs",
     "smoke": "node scripts/smoke.mjs",
     "test": "jest --config jest.config.cjs --runInBand"
   },

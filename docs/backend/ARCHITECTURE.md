@@ -45,6 +45,21 @@ hidden from editors, message figures from reviewers. `GET admin/roles`, which
 will return this same matrix for the admin users screen, does not exist yet
 (B17 in `docs/safeer-backend-fix-prompt.md`, Phase 5).
 
+### Staff accounts: status and lockout
+
+- `users.status` is `active`, `disabled` or `invited`. Only an admin changes
+  it (`PATCH admin/users/:id {status}`), except that accepting an invitation
+  turns `invited` into `active`. Only an `active` account can sign in or hold
+  a session. Disabling ends its sessions and deletes its outstanding
+  invite/reset links. Forgot-password, reset and accept-invite never act on
+  a `disabled` account, so a disabled user can't re-enable themselves.
+- Ten wrong passwords lock the account for 15 minutes, then 30, 60 … (capped
+  at about 16 h) on each further lock, until a successful sign-in. The lock
+  doesn't end existing sessions. An admin clears it with
+  `PATCH admin/users/:id {unlock: true}`; a completed password reset clears it too.
+- Login only ever writes targeted `UPDATE`s, so it can't overwrite a
+  concurrent password reset or disable.
+
 ## Two cookie-session systems
 
 Staff and applicants are authenticated with two entirely separate,

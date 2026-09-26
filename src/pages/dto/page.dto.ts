@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { safeUrl } from '../../common/validation/safe-url.js';
 
 export const createPageSchema = z
   .object({
@@ -32,10 +33,10 @@ export const createPageSectionSchema = z
     bodyEn: z.string().nullable().optional(),
     primaryButtonLabelAr: z.string().max(120).nullable().optional(),
     primaryButtonLabelEn: z.string().max(120).nullable().optional(),
-    primaryButtonUrl: z.string().max(255).nullable().optional(),
+    primaryButtonUrl: safeUrl({ relative: true }).nullable().optional(), // C10
     secondaryButtonLabelAr: z.string().max(120).nullable().optional(),
     secondaryButtonLabelEn: z.string().max(120).nullable().optional(),
-    secondaryButtonUrl: z.string().max(255).nullable().optional(),
+    secondaryButtonUrl: safeUrl({ relative: true }).nullable().optional(), // C10
     imageAssetId: z.string().nullable().optional(),
     isPublished: z.boolean().optional(),
     sortOrder: z.number().int().optional(),

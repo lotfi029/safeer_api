@@ -56,7 +56,7 @@ export class BootstrapService implements OnApplicationBootstrap {
           name: 'Admin',
           role: 'admin',
           passwordHash,
-          isLocked: false,
+          status: 'active',
         }),
       );
       this.logger.log(`Bootstrap admin created: ${this.env.BOOTSTRAP_ADMIN_EMAIL}`);
@@ -85,7 +85,7 @@ export class BootstrapService implements OnApplicationBootstrap {
     await this.userRepo
       .createQueryBuilder()
       .update(User)
-      .set({ passwordHash: devHash })
+      .set({ passwordHash: devHash, status: 'active' })
       // Re-assert the placeholder in the WHERE (not just id IN (...)) so a
       // user who accepts their invite between the SELECT above and this
       // UPDATE — unlikely, but not impossible — cannot be clobbered.

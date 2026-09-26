@@ -68,11 +68,11 @@ describe('admin review', () => {
       expect(toEditor.status).toBe(422);
       expect(toEditor.body?.code).toBe('INVALID_ASSIGNEE');
 
-      await withDb((conn) => conn.execute('UPDATE users SET is_locked = 1 WHERE id = ?', [reviewer.id]));
+      await withDb((conn) => conn.execute("UPDATE users SET status = 'disabled' WHERE id = ?", [reviewer.id]));
       const toLocked = await adminApi('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: reviewer.id } });
       expect(toLocked.status).toBe(422);
 
-      await withDb((conn) => conn.execute('UPDATE users SET is_locked = 0 WHERE id = ?', [reviewer.id]));
+      await withDb((conn) => conn.execute("UPDATE users SET status = 'active' WHERE id = ?", [reviewer.id]));
       const toReviewer = await adminApi('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: reviewer.id } });
       expect(toReviewer.status).toBe(200);
 

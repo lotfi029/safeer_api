@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { safeUrl } from '../../common/validation/safe-url.js';
 
 export const updateSiteSettingsSchema = z
   .object({
@@ -15,13 +16,13 @@ export const updateSiteSettingsSchema = z
     email: z.string().email().max(191).nullable().optional(),
     addressAr: z.string().max(255).nullable().optional(),
     addressEn: z.string().max(255).nullable().optional(),
-    facebookUrl: z.string().url().max(255).nullable().optional(),
-    instagramUrl: z.string().url().max(255).nullable().optional(),
-    xUrl: z.string().url().max(255).nullable().optional(),
-    youtubeUrl: z.string().url().max(255).nullable().optional(),
-    linkedinUrl: z.string().url().max(255).nullable().optional(),
-    whatsappUrl: z.string().url().max(255).nullable().optional(),
-    tiktokUrl: z.string().url().max(255).nullable().optional(),
+    facebookUrl: safeUrl().nullable().optional(), // C10
+    instagramUrl: safeUrl().nullable().optional(), // C10
+    xUrl: safeUrl().nullable().optional(), // C10
+    youtubeUrl: safeUrl().nullable().optional(), // C10
+    linkedinUrl: safeUrl().nullable().optional(), // C10
+    whatsappUrl: safeUrl().nullable().optional(), // C10
+    tiktokUrl: safeUrl().nullable().optional(), // C10
     enEnabled: z.boolean().optional(),
     seoTitleAr: z.string().max(191).nullable().optional(),
     seoTitleEn: z.string().max(191).nullable().optional(),

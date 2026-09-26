@@ -8,6 +8,7 @@ import { verifyPreviewToken } from '../auth/preview-token.util.js';
 import { CacheInterceptor } from '../cache/cache.interceptor.js';
 import { CacheTags } from '../cache/cache-tags.decorator.js';
 import { CacheKeyParams } from '../cache/cache-key-params.decorator.js';
+import { PreviewAware } from '../cache/preview-aware.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
 import { MarkdownService } from '../common/markdown/markdown.service.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
@@ -121,12 +122,14 @@ export class NewsController {
   @Get('news/:slug')
   @UseInterceptors(CacheInterceptor)
   @CacheTags('news')
-  // `preview` bypasses the cache entirely (see cache.interceptor.ts) — this
-  // route's cache key varies on nothing but the path (the slug).
+  // C24: a verified `preview` token bypasses the cache (see
+  // cache.interceptor.ts); otherwise this route's cache key varies on
+  // nothing but the path (the slug).
   @CacheKeyParams()
-  async bySlug(@Param('slug') slug: string, @Query() query: Record<string, unknown>): Promise<PublicPostDetail> {
+  @PreviewAware()
+  async bySlug(@Param('slug') slug: string, @Query() query: Record<string, unknown>, @Req() req: RequestContext): Promise<PublicPostDetail> {
     const post = await this.repo.findOne({ where: { slug }, relations: { category: true, coverAsset: true } });
-    if (!post || !this.isVisible(post, query)) throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Not found');
+    if (!post || !this.isVisible(post, query, req)) throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Not found');
 
     const readMinutes = estimateReadMinutes(post.bodyEn && post.bodyEn.trim() ? post.bodyEn : post.bodyAr);
 
@@ -150,9 +153,11 @@ export class NewsController {
     return toPublicPostDetail(post, readMinutes, relatedFiltered);
   }
 
-  private isVisible(post: Post, query: Record<string, unknown>): boolean {
+  private isVisible(post: Post, query: Record<string, unknown>, req: RequestContext): boolean {
     if (post.isPublished) return true;
     const token = readString(query, 'preview');
-    return !!token && verifyPreviewToken(this.env.APP_ENCRYPTION_KEY, 'posts', post.id, token);
+    const verified = !!token && verifyPreviewToken(this.env.APP_ENCRYPTION_KEY, 'posts', post.id, token);
+    if (verified) req.previewVerified = true; // C24: private, never cached
+    return verified;
   }
 }

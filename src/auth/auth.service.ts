@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, type EntityManager } from 'typeorm';
 import { randomBytes } from 'node:crypto';
 import { LRUCache } from 'lru-cache';
 import { User, type UserRole } from '../database/entities/user.entity.js';
@@ -14,7 +14,7 @@ import { generateSessionToken, hashToken } from './session-token.util.js';
 import { computeCsrfToken } from './csrf.util.js';
 import { MAIL_SERVICE, type MailServiceInterface } from '../mail/mail.service.interface.js';
 import { UsersService, UNUSABLE_PASSWORD_HASH } from '../users/users.service.js';
-import { toPublicUser, type PublicUser } from '../users/public-user.js';
+import { isBruteForceLocked, toPublicUser, type PublicUser } from '../users/public-user.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import type { RequestContext } from '../common/request-context.js';
@@ -32,6 +32,9 @@ const LOGIN_ATTEMPT_WINDOW_MS = 60_000;
  */
 const LOGIN_ATTEMPT_MAX_TRACKED = 10_000;
 const INVITE_TOKEN_HOURS = 48;
+/** C12: wrong passwords before a time-boxed lock, and the first lock's length (doubling each time after). */
+const LOCK_THRESHOLD = 10;
+const LOCK_BASE_MINUTES = 15;
 const RESET_TOKEN_MINUTES = 60;
 
 export interface LoginResult {
@@ -90,31 +93,47 @@ export class AuthService {
       .where('u.email = :email', { email })
       .getOne();
 
-    // B1 (timing oracle): verify against a real hash unconditionally,
-    // before either branch below can return early. An unknown or locked
-    // account used to skip Argon2 entirely and return in the time a single
-    // indexed SELECT takes, while a known account with a wrong password
-    // paid Argon2's deliberately-expensive cost — an easily measurable,
-    // reliable signal for enumerating valid emails. UNUSABLE_PASSWORD_HASH
-    // is guaranteed to fail verification (users.service.ts) but has the
-    // same Argon2id shape and cost as a real one, so both paths now take
-    // the same time regardless of which branch is about to be taken.
-    const ok = await this.passwordService.verify(user && !user.isLocked ? user.passwordHash : UNUSABLE_PASSWORD_HASH, password);
+    // C3/C12: only an `active` account that isn't inside a brute-force lock
+    // can sign in. Every refusal below looks the same from outside.
+    const usable = user !== null && user.status === 'active' && !isBruteForceLocked(user);
 
-    if (!user || user.isLocked) {
-      await this.writeAudit(user?.id ?? null, 'login_failed', user?.id ?? null, user?.name ?? email, req.ipHash);
+    // B1 (timing oracle): verify against a real hash unconditionally,
+    // before either branch below can return early. UNUSABLE_PASSWORD_HASH
+    // is guaranteed to fail verification (users.service.ts) but has the
+    // same Argon2id shape and cost as a real one, so every path takes the
+    // same time regardless of which branch is about to be taken.
+    const ok = await this.passwordService.verify(usable ? user.passwordHash : UNUSABLE_PASSWORD_HASH, password);
+
+    if (!user || !usable) {
+      await this.writeAudit(user?.id ?? null, 'login_failed', user?.id ?? null, user?.name ?? null, req.ipHash);
       throw new ProblemException(401, ErrorCode.UNAUTHENTICATED, 'Invalid email or password');
     }
 
     if (!ok) {
-      await this.registerFailedAttempt(user);
+      await this.registerFailedAttempt(user.id);
       await this.writeAudit(user.id, 'login_failed', user.id, user.name, req.ipHash);
       throw new ProblemException(401, ErrorCode.UNAUTHENTICATED, 'Invalid email or password');
     }
 
+    // C4: a targeted UPDATE, never save(user) — a full save would write back
+    // this request's stale copy of password_hash/status, so a login racing a
+    // password reset or an admin disable could undo it. Guarded on the
+    // account still being active: a disable that committed after the SELECT
+    // above wins.
+    const signedIn = await this.userRepo
+      .createQueryBuilder()
+      .update(User)
+      .set({ failedLogins: 0, lockCount: 0, lastLoginAt: () => 'CURRENT_TIMESTAMP(3)' })
+      .where('id = :id', { id: user.id })
+      .andWhere("status = 'active'")
+      .execute();
+    if (!signedIn.affected) {
+      await this.writeAudit(user.id, 'login_failed', user.id, user.name, req.ipHash);
+      throw new ProblemException(401, ErrorCode.UNAUTHENTICATED, 'Invalid email or password');
+    }
     user.failedLogins = 0;
+    user.lockCount = 0;
     user.lastLoginAt = new Date();
-    await this.userRepo.save(user);
     this.resetEmailRateLimit(email);
 
     const token = generateSessionToken();
@@ -205,8 +224,8 @@ export class AuthService {
       throw new ProblemException(401, ErrorCode.UNAUTHENTICATED, 'Current password is incorrect');
     }
 
-    user.passwordHash = await this.passwordService.hash(newPassword);
-    await this.userRepo.save(user);
+    // C4: write only the hash.
+    await this.userRepo.update(userId, { passwordHash: await this.passwordService.hash(newPassword) });
     await this.endOtherSessions(userId, currentSessionId);
   }
 
@@ -239,12 +258,20 @@ export class AuthService {
     return toPublicUser(user);
   }
 
+  /**
+   * C3: only an account still `invited` can accept (a disabled one can't
+   * reactivate itself through an old link). Accepting sets the password and
+   * `status = 'active'` in the same transaction that spends the token.
+   */
   async acceptInvite(rawToken: string, newPassword: string): Promise<PublicUser> {
-    const user = await this.consumeToken(rawToken, 'invite');
-    user.passwordHash = await this.passwordService.hash(newPassword);
-    user.isLocked = false;
-    await this.userRepo.save(user);
-    return toPublicUser(user);
+    const passwordHash = await this.passwordService.hash(newPassword);
+    return this.consumeToken(rawToken, 'invite', ['invited'], async (manager, user) => {
+      await manager.update(User, { id: user.id }, { passwordHash, status: 'active', failedLogins: 0, lockedUntil: null, lockCount: 0 });
+      user.status = 'active';
+      user.failedLogins = 0;
+      user.lockedUntil = null;
+      user.lockCount = 0;
+    });
   }
 
   // -------------------------------------------------------------------
@@ -254,7 +281,9 @@ export class AuthService {
   /** The response is identical whether or not the email exists (FR-A-10) — never used to enumerate staff. */
   async forgotPassword(email: string): Promise<void> {
     const user = await this.userRepo.findOne({ where: { email } });
-    if (!user) return;
+    // C3: nothing for a disabled account, nor for a pending invitation (that
+    // one completes through its own invite link) — same response either way.
+    if (!user || user.status !== 'active') return;
 
     const rawToken = randomBytes(32).toString('base64url');
     await this.authTokenRepo.save(
@@ -276,36 +305,47 @@ export class AuthService {
     });
   }
 
+  /**
+   * C3: only for an `active` account — a reset never re-enables a disabled
+   * one. Completing it proves mailbox control, so it also clears a running
+   * brute-force lock (C12), and it ends every session.
+   */
   async resetPassword(rawToken: string, newPassword: string): Promise<PublicUser> {
-    const user = await this.consumeToken(rawToken, 'reset');
-    user.passwordHash = await this.passwordService.hash(newPassword);
-    // M1: acceptInvite already clears isLocked (:244); this path didn't,
-    // and never cleared failedLogins either. A user who mistypes their way
-    // to a lock, then completes an emailed reset, proved mailbox control —
-    // exactly the evidence the lock was waiting for — but previously still
-    // got the generic "Invalid email or password" from login() (:103-106
-    // deliberately lumps locked and unknown together), with unlock being
-    // admin-only. For the sole admin that is unrecoverable through the API.
-    user.isLocked = false;
-    user.failedLogins = 0;
-    await this.userRepo.save(user);
-    await this.sessionRepo
-      .createQueryBuilder()
-      .update(Session)
-      .set({ revokedAt: () => 'CURRENT_TIMESTAMP(3)' })
-      .where('user_id = :userId', { userId: user.id })
-      .andWhere('revoked_at IS NULL')
-      .execute();
-    return toPublicUser(user);
+    const passwordHash = await this.passwordService.hash(newPassword);
+    return this.consumeToken(rawToken, 'reset', ['active'], async (manager, user) => {
+      await manager.update(User, { id: user.id }, { passwordHash, failedLogins: 0, lockedUntil: null, lockCount: 0 });
+      await manager
+        .createQueryBuilder()
+        .update(Session)
+        .set({ revokedAt: () => 'CURRENT_TIMESTAMP(3)' })
+        .where('user_id = :userId', { userId: user.id })
+        .andWhere('revoked_at IS NULL')
+        .execute();
+      user.failedLogins = 0;
+      user.lockedUntil = null;
+      user.lockCount = 0;
+    });
   }
 
   // -------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------
 
-  /** Single-use: the password write and `used_at` land in the same transaction. */
-  private async consumeToken(rawToken: string, purpose: AuthTokenPurpose): Promise<User> {
+  /**
+   * Single-use, and (C33) the token's consumption and the account write
+   * (`apply`) land in one transaction. C3: the account must be in one of
+   * `allowedStatuses`, and using a token deletes every other outstanding
+   * token of that user — an older reset link can't be replayed after a
+   * newer one was used.
+   */
+  private async consumeToken(
+    rawToken: string,
+    purpose: AuthTokenPurpose,
+    allowedStatuses: User['status'][],
+    apply: (manager: EntityManager, user: User) => Promise<void>,
+  ): Promise<PublicUser> {
     const tokenHash = hashToken(rawToken);
+    const invalid = () => new ProblemException(400, ErrorCode.VALIDATION_FAILED, 'This link is invalid or has expired');
     return this.authTokenRepo.manager.transaction(async (manager) => {
       const authToken = await manager
         .createQueryBuilder(AuthToken, 't')
@@ -315,39 +355,48 @@ export class AuthService {
         .andWhere('t.used_at IS NULL')
         .andWhere('t.expires_at > NOW()')
         .getOne();
+      if (!authToken) throw invalid();
 
-      if (!authToken) {
-        throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, 'This link is invalid or has expired');
-      }
-
-      const user = await manager.findOne(User, { where: { id: authToken.userId } });
-      if (!user) {
-        throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, 'This link is invalid or has expired');
-      }
+      const user = await manager
+        .createQueryBuilder(User, 'u')
+        .setLock('pessimistic_write')
+        .where('u.id = :id', { id: authToken.userId })
+        .getOne();
+      if (!user || !allowedStatuses.includes(user.status)) throw invalid();
 
       authToken.usedAt = new Date();
       await manager.save(authToken);
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from(AuthToken)
+        .where('user_id = :userId', { userId: user.id })
+        .andWhere('used_at IS NULL')
+        .execute();
 
-      return user;
+      await apply(manager, user);
+      return toPublicUser(user);
     });
   }
 
-  private async registerFailedAttempt(user: User): Promise<void> {
-    user.failedLogins += 1;
-    if (user.failedLogins >= 10) {
-      user.isLocked = true;
-    }
-    await this.userRepo.save(user);
-
-    if (user.isLocked) {
-      await this.sessionRepo
-        .createQueryBuilder()
-        .update(Session)
-        .set({ revokedAt: () => 'CURRENT_TIMESTAMP(3)' })
-        .where('user_id = :userId', { userId: user.id })
-        .andWhere('revoked_at IS NULL')
-        .execute();
-    }
+  /**
+   * C4 + C12: one atomic UPDATE (MySQL evaluates SET left to right, each
+   * assignment seeing the previous ones): count the failure; at
+   * LOCK_THRESHOLD failures start a lock of 15 min × 2^lock_count (capped at
+   * 2^6), bump lock_count and restart the count. A brute-force lock never
+   * revokes sessions — someone hammering the login form must not be able to
+   * sign an admin out.
+   */
+  private async registerFailedAttempt(userId: string): Promise<void> {
+    await this.userRepo.query(
+      `UPDATE users
+          SET failed_logins = failed_logins + 1,
+              locked_until = IF(failed_logins >= ?, UTC_TIMESTAMP(3) + INTERVAL (? * POW(2, LEAST(lock_count, 6))) MINUTE, locked_until),
+              lock_count = IF(failed_logins >= ?, lock_count + 1, lock_count),
+              failed_logins = IF(failed_logins >= ?, 0, failed_logins)
+        WHERE id = ?`,
+      [LOCK_THRESHOLD, LOCK_BASE_MINUTES, LOCK_THRESHOLD, LOCK_THRESHOLD, userId],
+    );
   }
 
   private async writeAudit(

@@ -23,6 +23,7 @@ import type { BulkActionDto } from './dto/bulk-action.dto.js';
 import type { ReviewDocumentDto } from './dto/review-document.dto.js';
 import { portalLoginUrl } from '../common/links/frontend-url.js';
 import { toAdminDocument, type AdminApplicationDocument } from '../portal/public-document.js';
+import { isBruteForceLocked } from '../users/public-user.js';
 
 /** C34: a document can only be reviewed while its application is in the review pipeline. */
 const UNREVIEWABLE_STATUSES: ApplicationStatus[] = ['draft', 'accepted', 'rejected'];
@@ -427,10 +428,12 @@ export class AdminApplicationsService {
    */
   /** `GET admin/applications/assignees` (B7) — every account `applyAssignReviewer` would actually accept, for the reviewer picker. */
   async listAssignees(): Promise<{ id: string; name: string; email: string; role: 'admin' | 'reviewer' }[]> {
-    const users = await this.userRepo.find({
-      where: { role: In(['admin', 'reviewer']), isLocked: false },
-      order: { name: 'ASC' },
-    });
+    const users = (
+      await this.userRepo.find({
+        where: { role: In(['admin', 'reviewer']), status: 'active' },
+        order: { name: 'ASC' },
+      })
+    ).filter((u) => !isBruteForceLocked(u));
     return users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role as 'admin' | 'reviewer' }));
   }
 
@@ -440,11 +443,12 @@ export class AdminApplicationsService {
       if (!reviewer) {
         throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Reviewer not found');
       }
-      if (!['admin', 'reviewer'].includes(reviewer.role) || reviewer.isLocked) {
+      // B7 with C3's status model: an active admin/reviewer, not inside a brute-force lock.
+      if (!['admin', 'reviewer'].includes(reviewer.role) || reviewer.status !== 'active' || isBruteForceLocked(reviewer)) {
         throw new ProblemException(
           422,
           ErrorCode.INVALID_ASSIGNEE,
-          'Applications can only be assigned to an admin or reviewer account that is not locked',
+          'Applications can only be assigned to an active admin or reviewer account that is not locked',
         );
       }
     }

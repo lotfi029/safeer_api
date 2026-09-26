@@ -30,6 +30,10 @@ import { contentDisposition } from '../common/http/filenames.js';
  * available here without requiring a session for the common case (a
  * published asset, fetched anonymously).
  */
+/** C25: originals and PDFs — short-lived so an unpublish takes effect within minutes. */
+const ORIGINAL_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=60';
+const VARIANT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
 @Controller('files')
 @SkipThrottle()
 export class FilesController {
@@ -53,7 +57,14 @@ export class FilesController {
       void this.mediaService.incrementDownloadCount(publicId);
     }
 
-    await this.sendFile(res, asset.storageKey, asset.mimeType, asset.kind === 'pdf' ? asset.originalName : null, isPrivate === 'allow-private');
+    await this.sendFile(
+      res,
+      asset.storageKey,
+      asset.mimeType,
+      asset.kind === 'pdf' ? asset.originalName : null,
+      isPrivate === 'allow-private',
+      ORIGINAL_CACHE_CONTROL,
+    );
   }
 
   @Public()
@@ -73,7 +84,7 @@ export class FilesController {
     const found = await this.mediaService.findVariant(asset.id, variant);
     if (!found) throw new NotFoundException();
 
-    await this.sendFile(res, found.storageKey, 'image/webp', null, isPrivate === 'allow-private');
+    await this.sendFile(res, found.storageKey, 'image/webp', null, isPrivate === 'allow-private', VARIANT_CACHE_CONTROL);
   }
 
   /**
@@ -102,9 +113,14 @@ export class FilesController {
     mimeType: string,
     attachmentName: string | null,
     isPrivate: boolean,
+    cacheControl: string,
   ): Promise<void> {
     res.setHeader('Content-Type', mimeType);
-    res.setHeader('Cache-Control', isPrivate ? 'private, no-store' : 'public, max-age=31536000, immutable');
+    // C25: an original or a PDF can be unpublished (or replaced) at any time,
+    // so browsers and CDNs may keep it only briefly; the WebP variants' URLs
+    // are only ever handed out alongside a published row and change with the
+    // asset, so they stay long-lived.
+    res.setHeader('Cache-Control', isPrivate ? 'private, no-store' : cacheControl);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     if (attachmentName !== null) {
       // C19: RFC 5987 filename (Arabic document titles) with an ASCII fallback.

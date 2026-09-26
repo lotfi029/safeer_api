@@ -162,6 +162,20 @@ Swagger UI (`/api/docs`) is disabled in production on purpose (see
 API client or Postman/Insomnia instead if you need to explore routes
 interactively without a staging deployment.
 
+## One-off: strip EXIF from media uploaded before C7
+
+Uploads now store image originals re-encoded, with EXIF/GPS removed and the
+orientation applied. Assets uploaded before that change still carry their
+original metadata. After deploying, run once (dry run first):
+
+```bash
+npm run media:reprocess              # lists what would change
+npm run media:reprocess -- --apply   # rewrites originals + variants, updates sizes
+```
+
+It works through `STORAGE_DRIVER` (local disk or the S3 public bucket) and
+skips rows whose file is missing.
+
 ## UTC
 
 The app, `scripts/migrate.mjs` and `scripts/db-reset.mjs` run every database

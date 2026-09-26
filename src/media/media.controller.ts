@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, Upl
 import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
-import { MediaService } from './media.service.js';
+import { ASSET_PUBLIC_MEMO_TAGS, MediaService } from './media.service.js';
 import { SetAltTextDto } from './dto/set-alt-text.dto.js';
 import { CacheService } from '../cache/cache.service.js';
 import { declarePurger } from '../cache/cache-tag-registry.js';
@@ -34,11 +34,8 @@ export class MediaController {
     private readonly cache: CacheService,
   ) {
     // Alt text can appear on any public surface that renders this asset —
-    // image bytes are immutable by publicId (no purge needed there), but an
-    // alt-text correction is an accessibility fix. TODO(phase 4+): extend
-    // this list (and setAltText()'s loop below) with every public tag a
-    // content module purges, as those modules land (news, pages, ...).
-    declarePurger('home');
+    // an alt-text correction purges every one of them (C37).
+    for (const tag of ASSET_PUBLIC_MEMO_TAGS) declarePurger(tag);
   }
 
   @ApiQuery({ name: 'page', required: false, type: String })
@@ -95,7 +92,9 @@ export class MediaController {
   @Patch(':id')
   async setAltText(@Param('id') id: string, @Body() dto: SetAltTextDto, @Req() req: RequestContext) {
     const asset = await this.mediaService.setAltText(id, dto.altAr, dto.altEn ?? null);
-    for (const tag of ['home']) this.cache.purgeTag(tag);
+    // C37: alt text is served inside every public payload that shows the
+    // image (home, pages, board, news, partners, documents) — purge them all.
+    for (const tag of ASSET_PUBLIC_MEMO_TAGS) this.cache.purgeTag(tag);
     req.auditContext = {
       action: 'update',
       entityType: 'media_assets',
