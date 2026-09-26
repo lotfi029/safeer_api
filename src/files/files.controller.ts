@@ -2,6 +2,8 @@ import { Controller, Get, Inject, NotFoundException, Param, Req, Res } from '@ne
 import { ApiQuery } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
+import type { Readable } from 'node:stream';
+import { StorageObjectNotFoundError } from '../storage/storage-driver.interface.js';
 import { MediaService } from '../media/media.service.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
@@ -156,7 +158,14 @@ export class FilesController {
       // C19: RFC 5987 filename (Arabic document titles) with an ASCII fallback.
       res.setHeader('Content-Disposition', contentDisposition('attachment', attachmentName));
     }
-    const stream = await this.mediaService.getStream(storageKey);
+    let stream: Readable;
+    try {
+      stream = await this.mediaService.getStream(storageKey);
+    } catch (err) {
+      // The row exists but its file doesn't — the same 404 as a missing asset.
+      if (err instanceof StorageObjectNotFoundError) throw new NotFoundException();
+      throw err;
+    }
     stream.on('error', () => {
       if (!res.headersSent) res.status(404);
       res.end();

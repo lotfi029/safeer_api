@@ -154,11 +154,16 @@ export type Env = z.infer<typeof envSchema>;
 
 let cached: Env | undefined;
 
+/** Validates without caching or exiting — for tests and tooling. */
+export function validateEnv(source: NodeJS.ProcessEnv) {
+  return envSchema.safeParse(source);
+}
+
 /** Parses and validates process.env once. Exits the process on failure. */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   if (cached) return cached;
 
-  const result = envSchema.safeParse(source);
+  const result = validateEnv(source);
   if (!result.success) {
     // eslint-disable-next-line no-console
     console.error('Invalid environment configuration:');

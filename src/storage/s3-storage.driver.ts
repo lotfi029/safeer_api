@@ -1,10 +1,10 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { GetObjectCommand, PutObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Readable } from 'node:stream';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
-import type { SignedUrlOptions, StorageDriver } from './storage-driver.interface.js';
+import { StorageObjectNotFoundError, type SignedUrlOptions, type StorageDriver } from './storage-driver.interface.js';
 
 /** Which S3 bucket a given `S3StorageDriver` instance writes to — see storage.module.ts's two provider bindings. */
 export type S3Bucket = 'public' | 'private';
@@ -22,6 +22,7 @@ export type S3Bucket = 'public' | 'private';
  */
 @Injectable()
 export class S3StorageDriver implements StorageDriver {
+  private readonly logger = new Logger(S3StorageDriver.name);
   private readonly client: S3Client;
   private readonly bucketName: string;
 
@@ -46,17 +47,34 @@ export class S3StorageDriver implements StorageDriver {
   }
 
   async getStream(key: string): Promise<Readable> {
-    const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucketName, Key: key }));
-    // The SDK v3 types this as a union covering browser/React Native
-    // bodies too; under Node it is always a Readable.
-    return result.Body as Readable;
+    try {
+      const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucketName, Key: key }));
+      // The SDK v3 types this as a union covering browser/React Native
+      // bodies too; under Node it is always a Readable.
+      return result.Body as Readable;
+    } catch (err) {
+      if (isNotFound(err)) throw new StorageObjectNotFoundError(key);
+      throw err;
+    }
   }
 
   async remove(key: string): Promise<void> {
     try {
+      // DeleteObject succeeds for a missing key, so any error here is real.
       await this.client.send(new DeleteObjectCommand({ Bucket: this.bucketName, Key: key }));
+    } catch (err) {
+      if (isNotFound(err)) return;
+      this.logger.error(`Could not delete s3://${this.bucketName}/${key}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /** The bucket exists and these credentials can reach it (HeadBucket). */
+  async healthCheck(): Promise<boolean> {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucketName }));
+      return true;
     } catch {
-      // Already gone, or never written — not fatal to the delete itself, same as the local driver.
+      return false;
     }
   }
 
@@ -71,4 +89,9 @@ export class S3StorageDriver implements StorageDriver {
     });
     return getSignedUrl(this.client, command, { expiresIn: options.ttlSeconds ?? this.env.S3_SIGNED_URL_TTL_SECONDS });
   }
+}
+
+function isNotFound(err: unknown): boolean {
+  const e = err as { name?: string; $metadata?: { httpStatusCode?: number } } | null;
+  return e?.name === 'NoSuchKey' || e?.name === 'NotFound' || e?.$metadata?.httpStatusCode === 404;
 }

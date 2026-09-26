@@ -272,6 +272,13 @@ endpoint instead of `STORAGE_ROOT`:
   `S3_SIGNED_URL_TTL_SECONDS` (default 300).
 - Every `S3_*` variable is required at boot when `STORAGE_DRIVER=s3`
   (`src/config/env.ts`).
+- `GET /health/ready` checks both buckets with a `HeadBucket` (local mode:
+  that `STORAGE_ROOT` is writable), so wrong credentials or a missing bucket
+  show up as `storage: down` before the first upload fails.
+- The access key needs `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` and
+  `s3:ListBucket` (for `HeadBucket`) on both buckets, nothing else. A delete
+  that fails (for example, a missing permission) is logged and never fails the
+  request that triggered it. Watch the log for `Could not delete s3://…`.
 
 ## Backups
 

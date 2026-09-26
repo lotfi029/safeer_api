@@ -5,7 +5,8 @@ import { fileTypeFromBuffer } from 'file-type';
 import type { Response } from 'express';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
-import { PRIVATE_STORAGE_DRIVER, type StorageDriver } from './storage-driver.interface.js';
+import type { Readable } from 'node:stream';
+import { PRIVATE_STORAGE_DRIVER, StorageObjectNotFoundError, type StorageDriver } from './storage-driver.interface.js';
 import { contentDisposition } from '../common/http/filenames.js';
 
 export const MAX_PRIVATE_FILE_BYTES = 5 * 1024 * 1024;
@@ -99,12 +100,18 @@ export class PrivateFileStore {
       return;
     }
 
+    let stream: Readable;
+    try {
+      stream = await this.driver.getStream(doc.storageKey);
+    } catch (err) {
+      if (err instanceof StorageObjectNotFoundError) throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Not found');
+      throw err;
+    }
     res.setHeader('Content-Type', doc.mime);
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Disposition', disposition);
 
-    const stream = await this.driver.getStream(doc.storageKey);
     stream.on('error', () => {
       if (!res.headersSent) res.status(404);
       res.end();

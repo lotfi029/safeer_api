@@ -86,7 +86,7 @@ async function main() {
           asset.id,
         ]);
       } catch (err) {
-        if (err?.code === 'ENOENT' || err?.name === 'NoSuchKey') {
+        if (err?.name === 'StorageObjectNotFoundError') {
           // The row points at a file that isn't there (e.g. dev fixtures on a
           // fresh checkout) — nothing to reprocess, not a failure.
           missing++;
