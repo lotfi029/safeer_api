@@ -36,6 +36,10 @@ const INVITE_TOKEN_HOURS = 48;
 /** C12: wrong passwords before a time-boxed lock, and the first lock's length (doubling each time after). */
 const LOCK_THRESHOLD = 10;
 const LOCK_BASE_MINUTES = 15;
+/** A3: no single lock lasts longer than this. */
+const LOCK_MAX_MINUTES = 60;
+/** A3: the backoff (lock_count) and the failure count (failed_logins) reset after this long without a lock / a wrong password. */
+const LOCK_DECAY_HOURS = 24;
 const RESET_TOKEN_MINUTES = 60;
 
 export interface LoginResult {
@@ -400,22 +404,32 @@ export class AuthService {
   }
 
   /**
-   * C4 + C12: one atomic UPDATE (MySQL evaluates SET left to right, each
-   * assignment seeing the previous ones): count the failure; at
-   * LOCK_THRESHOLD failures start a lock of 15 min × 2^lock_count (capped at
-   * 2^6), bump lock_count and restart the count. A brute-force lock never
-   * revokes sessions — someone hammering the login form must not be able to
-   * sign an admin out.
+   * C4 + C12 + A3: one atomic UPDATE. MySQL and MariaDB evaluate SET left to
+   * right, each assignment seeing the previous ones (utc.ts turns MariaDB's
+   * SIMULTANEOUS_ASSIGNMENT off on every connection so this holds there too).
+   *
+   * 1. Decay: lock_count goes back to 0 LOCK_DECAY_HOURS after the last lock
+   *    ended, and failed_logins goes back to 0 LOCK_DECAY_HOURS after the
+   *    last wrong password (a NULL `last_failed_login_at` keeps the count).
+   * 2. Count this failure.
+   * 3. At LOCK_THRESHOLD failures, lock for 15 min × 2^lock_count, never more
+   *    than LOCK_MAX_MINUTES, bump lock_count and restart the count.
+   *
+   * A brute-force lock never revokes sessions — someone hammering the login
+   * form must not be able to sign an admin out — and with the cap and the
+   * decay, can't keep them out for more than an hour at a time either.
    */
   private async registerFailedAttempt(userId: string): Promise<void> {
     await this.userRepo.query(
       `UPDATE users
-          SET failed_logins = failed_logins + 1,
-              locked_until = IF(failed_logins >= ?, UTC_TIMESTAMP(3) + INTERVAL (? * POW(2, LEAST(lock_count, 6))) MINUTE, locked_until),
+          SET lock_count = IF(locked_until <= UTC_TIMESTAMP(3) - INTERVAL ? HOUR, 0, lock_count),
+              failed_logins = IF(last_failed_login_at <= UTC_TIMESTAMP(3) - INTERVAL ? HOUR, 0, failed_logins) + 1,
+              last_failed_login_at = UTC_TIMESTAMP(3),
+              locked_until = IF(failed_logins >= ?, UTC_TIMESTAMP(3) + INTERVAL LEAST(? * POW(2, LEAST(lock_count, 6)), ?) MINUTE, locked_until),
               lock_count = IF(failed_logins >= ?, lock_count + 1, lock_count),
               failed_logins = IF(failed_logins >= ?, 0, failed_logins)
         WHERE id = ?`,
-      [LOCK_THRESHOLD, LOCK_BASE_MINUTES, LOCK_THRESHOLD, LOCK_THRESHOLD, userId],
+      [LOCK_DECAY_HOURS, LOCK_DECAY_HOURS, LOCK_THRESHOLD, LOCK_BASE_MINUTES, LOCK_MAX_MINUTES, LOCK_THRESHOLD, LOCK_THRESHOLD, userId],
     );
   }
 

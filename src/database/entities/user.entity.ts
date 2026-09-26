@@ -47,15 +47,23 @@ export class User {
   @Column({ type: 'enum', enum: ['active', 'disabled', 'invited'] as UserStatus[], default: 'active' })
   status: UserStatus;
 
-  /** Wrong passwords since the last good sign-in or the last lock (C12). */
+  /** Wrong passwords since the last good sign-in or the last lock (C12); back to 0 after 24 h without one (A3). */
   @Column({ name: 'failed_logins', type: 'smallint', unsigned: true, default: 0 })
   failedLogins: number;
+
+  /** A3: when the last wrong password was entered — `failedLogins` decays 24 h after it. */
+  @Column({ name: 'last_failed_login_at', type: 'datetime', precision: 3, nullable: true })
+  lastFailedLoginAt: Date | null;
 
   /** C12: time-boxed brute-force lock — sign-in is refused until then. Never revokes sessions. */
   @Column({ name: 'locked_until', type: 'datetime', precision: 3, nullable: true })
   lockedUntil: Date | null;
 
-  /** C12: locks since the last good sign-in — the backoff exponent (15 min × 2^lockCount). */
+  /**
+   * C12: locks since the last good sign-in — the backoff exponent
+   * (15 min × 2^lockCount, capped at 1 h). A3: back to 0 once 24 h pass
+   * after the last lock.
+   */
   @Column({ name: 'lock_count', type: 'smallint', unsigned: true, default: 0 })
   lockCount: number;
 

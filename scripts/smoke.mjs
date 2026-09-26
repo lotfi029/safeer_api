@@ -33,6 +33,7 @@ import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import * as argon2 from 'argon2';
 import { requireDevDbConfirmation } from './lib/dev-db-guard.mjs';
+import { UTC_SESSION_SQL } from './lib/db-connection.mjs';
 
 requireDevDbConfirmation('smoke');
 
@@ -107,7 +108,7 @@ async function withDb(fn) {
     charset: 'utf8mb4_unicode_ci',
     timezone: 'Z', // C9: same clock as the app (src/database/utc.ts)
   });
-  await conn.query("SET time_zone = '+00:00'");
+  await conn.query(UTC_SESSION_SQL);
   try {
     return await fn(conn);
   } finally {

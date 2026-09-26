@@ -19,6 +19,7 @@ import 'reflect-metadata';
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import sharp from 'sharp';
+import { UTC_SESSION_SQL } from './lib/db-connection.mjs';
 import { loadEnv } from '../dist/config/env.js';
 import { LocalStorageDriver } from '../dist/storage/local-storage.driver.js';
 import { S3StorageDriver } from '../dist/storage/s3-storage.driver.js';
@@ -48,7 +49,7 @@ async function main() {
     charset: 'utf8mb4_unicode_ci',
     timezone: 'Z',
   });
-  await conn.query("SET time_zone = '+00:00'");
+  await conn.query(UTC_SESSION_SQL);
 
   let checked = 0;
   let changed = 0;

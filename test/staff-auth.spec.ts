@@ -7,6 +7,7 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import { adminApi, api, createTempUser, deleteTempUser, settleForgot, withDb } from './helpers';
+import { UTC_SESSION_SQL } from '../src/database/utc';
 
 const PASSWORD = 'Jest-Test-P4ssword!';
 
@@ -14,7 +15,8 @@ async function userRow(id: string): Promise<any> {
   return withDb((conn) =>
     conn
       .execute(
-        'SELECT status, failed_logins, lock_count, locked_until, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(3), locked_until) AS lock_left, password_hash FROM users WHERE id = ?',
+        'SELECT status, failed_logins, lock_count, locked_until, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(3), locked_until) AS lock_left, ' +
+          'TIMESTAMPDIFF(SECOND, last_failed_login_at, UTC_TIMESTAMP(3)) AS since_last_failure, password_hash FROM users WHERE id = ?',
         [id],
       )
       .then(([rows]: any) => rows[0]),
@@ -174,6 +176,121 @@ describe('staff auth', () => {
       } finally {
         await deleteTempUser(user.id);
       }
+    });
+
+    // A3 (safeer-delivery-review.md): lock_count never decayed, so someone
+    // who knew an admin's email could push every lock up to 16 h.
+    it('A3: no single lock lasts more than 1 h, however many locks came before', async () => {
+      const user = await createTempUser('editor');
+      try {
+        await withDb((conn) => conn.execute('UPDATE users SET lock_count = 6, failed_logins = 9, last_failed_login_at = UTC_TIMESTAMP(3) WHERE id = ?', [user.id]));
+        expect((await login(user.email, 'wrong-password')).status).toBe(401);
+        const row = await userRow(user.id);
+        expect(Number(row.lock_left)).toBeLessThanOrEqual(3600);
+        expect(Math.abs(Number(row.lock_left) - 3600)).toBeLessThanOrEqual(15);
+        expect(Number(row.lock_count)).toBe(7);
+      } finally {
+        await deleteTempUser(user.id);
+      }
+    });
+
+    it('A3: locks go 15 → 30 → 60 → 60 min', async () => {
+      const user = await createTempUser('editor');
+      try {
+        for (const minutes of [15, 30, 60, 60]) {
+          await withDb((conn) =>
+            conn.execute(
+              'UPDATE users SET locked_until = IF(locked_until IS NULL, NULL, UTC_TIMESTAMP(3) - INTERVAL 1 SECOND), failed_logins = 9, last_failed_login_at = UTC_TIMESTAMP(3) WHERE id = ?',
+              [user.id],
+            ),
+          );
+          expect((await login(user.email, 'wrong-password')).status).toBe(401);
+          expect(Math.abs(Number((await userRow(user.id)).lock_left) - minutes * 60)).toBeLessThanOrEqual(15);
+        }
+      } finally {
+        await deleteTempUser(user.id);
+      }
+    });
+
+    it('A3: the backoff resets 24 h after the last lock ended', async () => {
+      const user = await createTempUser('editor');
+      try {
+        await withDb((conn) =>
+          conn.execute(
+            'UPDATE users SET lock_count = 3, locked_until = UTC_TIMESTAMP(3) - INTERVAL 25 HOUR, failed_logins = 9, last_failed_login_at = UTC_TIMESTAMP(3) WHERE id = ?',
+            [user.id],
+          ),
+        );
+        expect((await login(user.email, 'wrong-password')).status).toBe(401);
+        const row = await userRow(user.id);
+        expect(Math.abs(Number(row.lock_left) - 15 * 60)).toBeLessThanOrEqual(15);
+        expect(Number(row.lock_count)).toBe(1);
+      } finally {
+        await deleteTempUser(user.id);
+      }
+    });
+
+    it('A3: failed_logins resets after 24 h without a wrong password', async () => {
+      const user = await createTempUser('editor');
+      try {
+        await withDb((conn) =>
+          conn.execute('UPDATE users SET failed_logins = 9, last_failed_login_at = UTC_TIMESTAMP(3) - INTERVAL 25 HOUR WHERE id = ?', [user.id]),
+        );
+        expect((await login(user.email, 'wrong-password')).status).toBe(401);
+        const row = await userRow(user.id);
+        expect(Number(row.failed_logins)).toBe(1);
+        expect(row.locked_until).toBeNull();
+        expect(Math.abs(Number(row.since_last_failure))).toBeLessThanOrEqual(15);
+
+        // Within 24 h the count keeps growing as before.
+        expect((await login(user.email, 'wrong-password')).status).toBe(401);
+        expect(Number((await userRow(user.id)).failed_logins)).toBe(2);
+      } finally {
+        await deleteTempUser(user.id);
+      }
+    });
+
+    it('A3: a failure 1 h ago still counts — 9 of them plus one more locks', async () => {
+      const user = await createTempUser('editor');
+      try {
+        await withDb((conn) =>
+          conn.execute('UPDATE users SET failed_logins = 9, last_failed_login_at = UTC_TIMESTAMP(3) - INTERVAL 1 HOUR WHERE id = ?', [user.id]),
+        );
+        expect((await login(user.email, 'wrong-password')).status).toBe(401);
+        const row = await userRow(user.id);
+        expect(Math.abs(Number(row.lock_left) - 15 * 60)).toBeLessThanOrEqual(15);
+        expect(Number(row.failed_logins)).toBe(0);
+      } finally {
+        await deleteTempUser(user.id);
+      }
+    });
+  });
+
+  // A3: the counters above rely on SET running left to right. MariaDB's
+  // SIMULTANEOUS_ASSIGNMENT mode would evaluate every right-hand side against
+  // the old row; src/database/utc.ts takes it out on every connection.
+  describe('A3: SET runs left to right on every connection', () => {
+    it('UTC_SESSION_SQL removes SIMULTANEOUS_ASSIGNMENT (MariaDB) and is a no-op elsewhere', async () => {
+      await withDb(async (conn) => {
+        const [[{ version }]]: any = await conn.query('SELECT VERSION() AS version');
+        const mariadb = /mariadb/i.test(version);
+        if (mariadb) {
+          await conn.query("SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',SIMULTANEOUS_ASSIGNMENT')");
+          const [[on]]: any = await conn.query("SELECT FIND_IN_SET('SIMULTANEOUS_ASSIGNMENT', @@SESSION.sql_mode) AS pos");
+          expect(Number(on.pos)).toBeGreaterThan(0);
+        }
+        const [[before]]: any = await conn.query('SELECT @@SESSION.sql_mode AS mode');
+        await conn.query(UTC_SESSION_SQL);
+        const [[after]]: any = await conn.query("SELECT @@SESSION.sql_mode AS mode, FIND_IN_SET('SIMULTANEOUS_ASSIGNMENT', @@SESSION.sql_mode) AS pos");
+        expect(Number(after.pos)).toBe(0);
+        if (!mariadb) expect(after.mode).toBe(before.mode);
+
+        await conn.query('CREATE TEMPORARY TABLE a3_set_order (a INT, b INT)');
+        await conn.query('INSERT INTO a3_set_order VALUES (1, 0)');
+        await conn.query('UPDATE a3_set_order SET a = a + 1, b = a');
+        const [[row]]: any = await conn.query('SELECT a, b FROM a3_set_order');
+        expect({ a: row.a, b: row.b }).toEqual({ a: 2, b: 2 });
+      });
     });
   });
 
