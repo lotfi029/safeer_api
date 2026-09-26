@@ -2,6 +2,11 @@ import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn, UpdateDateColumn 
 import { User } from './user.entity.js';
 
 /** Singleton (CHECK id = 1) — 002_seed.sql inserts the row; the service does UPDATE, never INSERT. */
+const decimalNumber = {
+  to: (value: number | null | undefined) => value,
+  from: (value: string | null) => (value === null || value === undefined ? null : Number(value)),
+};
+
 @Entity('site_settings')
 export class SiteSettings {
   @PrimaryColumn({ type: 'bigint', unsigned: true, default: 1 })
@@ -65,6 +70,17 @@ export class SiteSettings {
   @Column({ name: 'tiktok_url', type: 'varchar', length: 255, nullable: true })
   tiktokUrl: string | null;
 
+  /** A12: the contact page's map iframe `src` — an allow-listed https embed (safe-url.ts mapEmbedUrl). */
+  @Column({ name: 'map_embed_url', type: 'varchar', length: 500, nullable: true })
+  mapEmbedUrl: string | null;
+
+  /** A12: the map pin. DECIMAL comes back from mysql2 as a string; served as a number. */
+  @Column({ name: 'map_lat', type: 'decimal', precision: 9, scale: 6, nullable: true, transformer: decimalNumber })
+  mapLat: number | null;
+
+  @Column({ name: 'map_lng', type: 'decimal', precision: 9, scale: 6, nullable: true, transformer: decimalNumber })
+  mapLng: number | null;
+
   @Column({ name: 'en_enabled', type: 'boolean', default: true })
   enEnabled: boolean;
 
@@ -88,6 +104,15 @@ export class SiteSettings {
 
   @Column({ name: 'application_ref_prefix', type: 'varchar', length: 10, default: 'SA' })
   applicationRefPrefix: string;
+
+  /**
+   * A7: HMAC of a fixed label under APP_ENCRYPTION_KEY — which key this
+   * database's encrypted data belongs to. Written once, on first use, by
+   * migrate or at boot (src/database/encryption-key-check.ts); never part of
+   * any response.
+   */
+  @Column({ name: 'encryption_key_check', type: 'char', length: 64, nullable: true, select: false })
+  encryptionKeyCheck?: string | null;
 
   @Column({ name: 'updated_by', type: 'bigint', unsigned: true, nullable: true })
   updatedBy: string | null;

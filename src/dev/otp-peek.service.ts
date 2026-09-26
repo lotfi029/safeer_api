@@ -43,3 +43,24 @@ export class OtpPeekService {
     return this.enabled ? this.codes.get(applicationId) : undefined;
   }
 }
+
+/**
+ * A8: what staging/production get under the OtpPeekService token instead
+ * (DisabledDevModule) — PortalOtpService still injects it, but nothing is
+ * ever recorded and nothing can read it. The real service and its routes
+ * aren't loaded at all outside development/test.
+ */
+@Injectable()
+export class DisabledOtpPeekService implements Pick<OtpPeekService, 'isEnabled' | 'record' | 'peek'> {
+  get isEnabled(): boolean {
+    return false;
+  }
+
+  record(): void {
+    // never retained outside development/test
+  }
+
+  peek(): undefined {
+    return undefined;
+  }
+}

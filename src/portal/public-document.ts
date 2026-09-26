@@ -33,6 +33,14 @@ export interface AdminApplicationDocument extends PublicApplicationDocument {
   reviewedBy: string | null;
   reviewedAt: Date | null;
   supersededAt: Date | null;
+  /**
+   * A11: the file route relative to the API base
+   * (`admin/applications/:id/documents/:docId/file`), or null when there is
+   * no file to download — a superseded document's bytes are deleted once its
+   * replacement is committed (C18). The admin UI shows a download link only
+   * when this is set.
+   */
+  downloadPath: string | null;
 }
 
 export function toAdminDocument(doc: ApplicationDocument): AdminApplicationDocument {
@@ -41,5 +49,6 @@ export function toAdminDocument(doc: ApplicationDocument): AdminApplicationDocum
     reviewedBy: doc.reviewedBy,
     reviewedAt: doc.reviewedAt,
     supersededAt: doc.supersededAt,
+    downloadPath: doc.supersededAt ? null : `admin/applications/${doc.applicationId}/documents/${doc.id}/file`,
   };
 }
