@@ -23,7 +23,8 @@
 -- Then set DB_USER/DB_PASSWORD in the running process's .env to the values
 -- below (change the password first — this file will likely end up
 -- committed, so treat the placeholder as public, same as every other
--- secret in the repo per DEPLOYMENT-HOSTINGER.md's checklist).
+-- secret in the repo per the deployment notes' checklist,
+-- kept outside the repo).
 --
 -- Verify after running:
 --   SHOW GRANTS FOR 'safeer_app'@'%';

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Generates migrations/002_seed.sql and migrations/dev/003_dev_sample.sql
-// from the prototype's own copy (docs/prototype/safeer-prototype.html).
+// from the prototype's own copy. The prototype lives outside this repo;
+// its path comes from PROTOTYPE_PATH (default ../../docs/safeer-prototype.html,
+// resolved against the repo root).
 //
 // The prototype's <script> block has a clean run of top-level `const`
 // declarations with no function calls inside the object literals — from
@@ -30,7 +32,7 @@
 //                  `users` rows — the first admin comes from
 //                  BOOTSTRAP_ADMIN_EMAIL/PASSWORD, as in african_api.
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import vm from 'node:vm';
@@ -51,7 +53,7 @@ import { storeAsset, makePlaceholderImage, makePlaceholderPdf } from './lib/asse
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const PROTOTYPE_PATH = path.resolve(ROOT, 'docs/prototype/safeer-prototype.html');
+const PROTOTYPE_PATH = path.resolve(ROOT, process.env.PROTOTYPE_PATH || '../../docs/safeer-prototype.html');
 const MIGRATIONS_DIR = path.join(ROOT, 'migrations');
 const DEV_MIGRATIONS_DIR = path.join(MIGRATIONS_DIR, 'dev');
 const STORAGE_ROOT = path.resolve(ROOT, process.env.STORAGE_ROOT || './var/assets');
@@ -101,6 +103,14 @@ function loadLogoSrc(html) {
 }
 
 function loadPrototype() {
+  if (!existsSync(PROTOTYPE_PATH)) {
+    console.error(
+      `Prototype HTML not found at ${PROTOTYPE_PATH}.\n` +
+        'It is kept outside the repo. Set PROTOTYPE_PATH to its location (absolute, or relative to the repo root), e.g.\n' +
+        '  PROTOTYPE_PATH=../../docs/safeer-prototype.html npm run seed',
+    );
+    process.exit(1);
+  }
   const html = readFileSync(PROTOTYPE_PATH, 'utf8');
   const shared = loadSharedCopy(html);
   const logoSrc = loadLogoSrc(html);
@@ -110,7 +120,7 @@ function loadPrototype() {
 // ===========================================================================
 // Hand-transcribed copy that isn't in the clean const block (see the file
 // header comment). Each block names the render function and the approximate
-// line range it was read from in docs/prototype/safeer-prototype.html.
+// line range it was read from in the prototype HTML (PROTOTYPE_PATH).
 // ===========================================================================
 
 // pAbout(), "مهمتنا" section (~line 750-751): the eye/msg cards, not the

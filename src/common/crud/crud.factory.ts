@@ -28,7 +28,7 @@ import type { UserRole } from '../../database/entities/user.entity.js';
 type AnyZodSchema = any;
 
 // B3-2: was `pageSize` — every public list endpoint already uses
-// `{data, total, page, limit}` (KNOWN-ISSUES.md #6); standardising the
+// `{data, total, page, limit}`; standardising the
 // admin kernel onto the same shape now, before Session B (the admin
 // dashboard) exists to generate against either one, is the version of this
 // fix that breaks nothing.

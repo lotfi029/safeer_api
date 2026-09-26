@@ -9,3 +9,4 @@ var/
 Thumbs.db
 *.tsbuildinfo
 .claude/
+docs/
