@@ -68,7 +68,10 @@ module.exports = async function globalSetup() {
   // does. NODE_ENV=test (not 'development') matters again in step 3: it's
   // what TestAwareThrottlerGuard checks to bypass the per-route throttles
   // this suite would otherwise blow through in minutes.
-  const migrateEnv = { ...rootDbEnv, NODE_ENV: 'test', DB_NAME: TEST_DB_NAME };
+  // The same APP_ENCRYPTION_KEY the app gets below: migration 012 encrypts
+  // id numbers with it (C28), and the app must be able to decrypt them.
+  const appEncryptionKey = process.env.APP_ENCRYPTION_KEY ?? 'ukhiU9W4qpmJr9pwnzL01FaECwZTTOF3Y2vPKga7xrk=';
+  const migrateEnv = { ...rootDbEnv, NODE_ENV: 'test', DB_NAME: TEST_DB_NAME, APP_ENCRYPTION_KEY: appEncryptionKey };
   runNode('scripts/migrate.mjs', migrateEnv);
 
   // 3. Boot the real (compiled) app against that database, on its own port.
@@ -83,7 +86,7 @@ module.exports = async function globalSetup() {
     STORAGE_ROOT: process.env.TEST_STORAGE_ROOT ?? './var/assets-test',
     BOOTSTRAP_ADMIN_EMAIL: process.env.BOOTSTRAP_ADMIN_EMAIL ?? 'admin@safeer-sa.org',
     BOOTSTRAP_ADMIN_PASSWORD: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? 'test-only-password',
-    APP_ENCRYPTION_KEY: process.env.APP_ENCRYPTION_KEY ?? 'ukhiU9W4qpmJr9pwnzL01FaECwZTTOF3Y2vPKga7xrk=',
+    APP_ENCRYPTION_KEY: appEncryptionKey,
     IP_HASH_SALT: process.env.IP_HASH_SALT ?? 'test-only-salt',
     CORS_ORIGINS: process.env.CORS_ORIGINS ?? 'http://localhost:4200',
     FRONTEND_BASE_URL: process.env.FRONTEND_BASE_URL ?? 'http://localhost:4200',
@@ -103,6 +106,8 @@ module.exports = async function globalSetup() {
   process.env.TEST_BASE_URL = `http://localhost:${TEST_PORT}/api/v1`;
   process.env.TEST_HEALTH_URL = `http://localhost:${TEST_PORT}/health`;
   process.env.TEST_APP_TZ = appEnv.TZ;
+  // C27 specs sign a newsletter unsubscribe link with the same key the app uses.
+  process.env.TEST_APP_ENCRYPTION_KEY = appEncryptionKey;
   process.env.TEST_DB_NAME = TEST_DB_NAME;
   process.env.TEST_DB_HOST = rootDbEnv.DB_HOST;
   process.env.TEST_DB_PORT = rootDbEnv.DB_PORT;

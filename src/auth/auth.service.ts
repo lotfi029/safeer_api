@@ -19,6 +19,7 @@ import { ProblemException } from '../common/problem-details/problem.exception.js
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import type { RequestContext } from '../common/request-context.js';
 import { frontendUrl } from '../common/links/frontend-url.js';
+import { roleLabel } from '../common/labels.js';
 
 const LOGIN_ATTEMPT_LIMIT = 5;
 const LOGIN_ATTEMPT_WINDOW_MS = 60_000;
@@ -250,7 +251,8 @@ export class AuthService {
     await this.mailService.send({
       key: 'user_invite',
       to: user.email,
-      vars: { name: user.name, inviter: inviter.name, link },
+      // C23: the template names the role — a label, in the mail's language.
+      vars: { name: user.name, inviter: inviter.name, role: roleLabel(role, 'ar'), link },
       locale: 'ar',
       entity: { type: 'users', id: user.id },
     });

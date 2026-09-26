@@ -30,3 +30,13 @@ export const newsletterSchema = z
   .strict();
 
 export class NewsletterDto extends createZodDto(newsletterSchema) {}
+
+/** C27: `POST newsletter/confirm` and `POST newsletter/unsubscribe` — the email and signed token from the link. */
+export const newsletterTokenSchema = z
+  .object({
+    email: z.string().email().max(191),
+    token: z.string().min(10).max(200),
+  })
+  .strict();
+
+export class NewsletterTokenDto extends createZodDto(newsletterTokenSchema) {}

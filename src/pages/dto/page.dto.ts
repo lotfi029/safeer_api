@@ -1,10 +1,11 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { safeUrl } from '../../common/validation/safe-url.js';
+import { slugSchema } from '../../common/validation/slug.js';
 
 export const createPageSchema = z
   .object({
-    slug: z.string().min(1).max(191),
+    slug: slugSchema(), // C14
     titleAr: z.string().min(1).max(191),
     titleEn: z.string().max(191).nullable().optional(),
     metaTitleAr: z.string().max(191).nullable().optional(),
@@ -16,7 +17,13 @@ export const createPageSchema = z
   })
   .strict();
 
-export const updatePageSchema = createPageSchema.partial();
+/**
+ * C14: a page's slug is read-only once created — system pages (`home`,
+ * `about`, …) are addressed by slug from the site nav, the home aggregate
+ * and the frontend's routes, so renaming one breaks them. Sending `slug`
+ * on update is a 400 (strict schema).
+ */
+export const updatePageSchema = createPageSchema.omit({ slug: true }).partial().strict();
 
 export class CreatePageDto extends createZodDto(createPageSchema) {}
 export class UpdatePageDto extends createZodDto(updatePageSchema) {}

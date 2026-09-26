@@ -4958,6 +4958,54 @@
         ]
       }
     },
+    "/newsletter/confirm": {
+      "post": {
+        "operationId": "ContactController_confirm",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsletterTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contact"
+        ]
+      }
+    },
+    "/newsletter/unsubscribe": {
+      "post": {
+        "operationId": "ContactController_unsubscribe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsletterTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Contact"
+        ]
+      }
+    },
     "/admin/newsletter": {
       "get": {
         "operationId": "AdminNewsletterController_list",
@@ -4985,6 +5033,7 @@
             "schema": {
               "enum": [
                 "subscribed",
+                "pending",
                 "unsubscribed"
               ],
               "type": "string"
@@ -5017,6 +5066,7 @@
             "schema": {
               "enum": [
                 "subscribed",
+                "pending",
                 "unsubscribed"
               ],
               "type": "string"
@@ -5558,6 +5608,18 @@
         "tags": [
           "PortalInterview"
         ]
+      },
+      "delete": {
+        "operationId": "PortalInterviewController_cancel",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PortalInterview"
+        ]
       }
     },
     "/portal/auth/request-otp": {
@@ -5855,6 +5917,32 @@
         "tags": [
           "AdminApplications"
         ]
+      },
+      "delete": {
+        "operationId": "AdminApplicationsController_anonymise",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminApplications"
+        ]
       }
     },
     "/admin/applications/{id}/request-documents": {
@@ -6016,6 +6104,42 @@
       }
     },
     "/admin/interview-slots/{id}": {
+      "patch": {
+        "operationId": "AdminInterviewSlotsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/admin_interview_slotsUpdateSlotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminInterviewSlots"
+        ]
+      },
       "delete": {
         "operationId": "AdminInterviewSlotsController_remove",
         "parameters": [
@@ -6054,42 +6178,6 @@
             }
           }
         ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminInterviewSlots"
-        ]
-      },
-      "patch": {
-        "operationId": "AdminInterviewSlotsController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/admin_interview_slotsUpdateDto"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": ""
@@ -6889,7 +6977,8 @@
           "slug": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 191
+            "maxLength": 180,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
           },
           "titleAr": {
             "type": "string",
@@ -6959,11 +7048,6 @@
       "admin_pagesUpdateDto": {
         "type": "object",
         "properties": {
-          "slug": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
           "titleAr": {
             "type": "string",
             "minLength": 1,
@@ -7909,7 +7993,8 @@
           "slug": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 191
+            "maxLength": 180,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
           }
         },
         "additionalProperties": false
@@ -7951,7 +8036,8 @@
           "slug": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 191
+            "maxLength": 180,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
           },
           "nameAr": {
             "type": "string",
@@ -8003,7 +8089,8 @@
           "slug": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 191
+            "maxLength": 180,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
           },
           "nameAr": {
             "type": "string",
@@ -8431,7 +8518,8 @@
           "slug": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 64
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
           },
           "nameAr": {
             "type": "string",
@@ -8486,7 +8574,8 @@
           "slug": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 64
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
           },
           "nameAr": {
             "type": "string",
@@ -8704,6 +8793,27 @@
         "required": [
           "email",
           "formRenderedAt"
+        ],
+        "additionalProperties": false
+      },
+      "NewsletterTokenDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 191,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "email",
+          "token"
         ],
         "additionalProperties": false
       },
@@ -9298,6 +9408,32 @@
         ],
         "additionalProperties": false
       },
+      "admin_interview_slotsUpdateSlotDto": {
+        "type": "object",
+        "properties": {
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "locationAr": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
+          "locationEn": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "admin_interview_slotsCreateDto": {
         "type": "object",
         "properties": {
@@ -9349,32 +9485,6 @@
             "sortOrder"
           ]
         }
-      },
-      "admin_interview_slotsUpdateDto": {
-        "type": "object",
-        "properties": {
-          "startsAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-          },
-          "endsAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-          },
-          "locationAr": {
-            "type": "string",
-            "maxLength": 255,
-            "nullable": true
-          },
-          "locationEn": {
-            "type": "string",
-            "maxLength": 255,
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
       },
       "admin_interview_slotsPublishDto": {
         "type": "object",

@@ -17,6 +17,7 @@ export type SmsLogStatus = 'queued' | 'sent' | 'failed' | 'skipped';
 @Index('ix_sms_retry', ['status', 'nextRetryAt'])
 @Index('ix_sms_entity', ['entityType', 'entityId'])
 @Index('ix_sms_template', ['templateKey', 'createdAt'])
+@Index('ix_sms_log_created', ['createdAt'])
 export class SmsLog {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: string;

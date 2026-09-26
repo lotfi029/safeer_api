@@ -24,6 +24,8 @@ import type { ReviewDocumentDto } from './dto/review-document.dto.js';
 import { portalLoginUrl } from '../common/links/frontend-url.js';
 import { toAdminDocument, type AdminApplicationDocument } from '../portal/public-document.js';
 import { isBruteForceLocked } from '../users/public-user.js';
+import { docTypeLabel, docTypeList, statusLabel } from '../common/labels.js';
+import { PrivateFileStore } from '../storage/private-file-store.service.js';
 
 /** C34: a document can only be reviewed while its application is in the review pipeline. */
 const UNREVIEWABLE_STATUSES: ApplicationStatus[] = ['draft', 'accepted', 'rejected'];
@@ -98,6 +100,7 @@ export class AdminApplicationsService {
     @Inject(MAIL_SERVICE) private readonly mailService: MailServiceInterface,
     @Inject(SMS_SERVICE) private readonly smsService: SmsServiceInterface,
     @Inject(ENV) private readonly env: Env,
+    private readonly fileStore: PrivateFileStore,
   ) {}
 
   // -------------------------------------------------------------------
@@ -178,6 +181,8 @@ export class AdminApplicationsService {
       { header: 'Reference', value: (a) => a.reference },
       { header: 'Name', value: (a) => fullName(a) },
       { header: 'Nationality', value: (a) => a.nationality },
+      // C28: the ID number never leaves in full in an export — last 4 digits only.
+      { header: 'ID (last 4)', value: (a) => (a.idNumber ? `••••${a.idNumber.slice(-4)}` : '') },
       { header: 'University', value: (a) => a.university },
       { header: 'Degree', value: (a) => a.degreeLevel },
       { header: 'Status', value: (a) => a.status },
@@ -403,7 +408,8 @@ export class AdminApplicationsService {
       await this.mailService.send({
         key: 'application_status_changed',
         to: application.email ?? '',
-        vars: { name, reference: application.reference, status, note: '', link },
+        // C23: a label in the applicant's language, never the raw code; no empty {{note}}.
+        vars: { name, reference: application.reference, status: statusLabel(status, application.locale), link },
         locale: application.locale,
         entity: { type: 'applications', id: application.id },
       });
@@ -412,7 +418,7 @@ export class AdminApplicationsService {
       await this.smsService.send({
         key: 'application_status_changed',
         to: application.phoneE164 ?? application.phone ?? '',
-        vars: { reference: application.reference, status },
+        vars: { reference: application.reference, status: statusLabel(status, application.locale) },
         locale: application.locale,
         entity: { type: 'applications', id: application.id },
       });
@@ -547,7 +553,13 @@ export class AdminApplicationsService {
       await this.mailService.send({
         key: 'documents_requested',
         to: application.email ?? '',
-        vars: { name: fullName(application), reference: application.reference, docTypes: docTypes.join(', '), message: message ?? '', link },
+        vars: {
+          name: fullName(application),
+          reference: application.reference,
+          docTypes: docTypeList(docTypes, application.locale),
+          message: message ?? '',
+          link,
+        },
         locale: application.locale,
         entity: { type: 'applications', id: application.id },
       });
@@ -645,7 +657,13 @@ export class AdminApplicationsService {
         await this.mailService.send({
           key: 'document_rejected',
           to: application.email ?? '',
-          vars: { name: fullName(application), reference: application.reference, docType: doc.docType, reason: saved.rejectionReason ?? '', link },
+          vars: {
+            name: fullName(application),
+            reference: application.reference,
+            docType: docTypeLabel(doc.docType, application.locale),
+            reason: saved.rejectionReason ?? '',
+            link,
+          },
           locale: application.locale,
           entity: { type: 'applications', id: applicationId },
         });
@@ -666,6 +684,52 @@ export class AdminApplicationsService {
 
   async getDocumentForStream(applicationId: string, docId: string): Promise<ApplicationDocument> {
     return this.findDocumentOrNotFound(applicationId, docId);
+  }
+
+  // -------------------------------------------------------------------
+  // Anonymise (C27)
+  // -------------------------------------------------------------------
+
+  async anonymise(id: string, req: RequestContext): Promise<{ anonymized: true; reference: string }> {
+    const { reference, storageKeys } = await this.applicationRepo.manager.transaction(async (manager) => {
+      const application = await this.lockApplication(manager, id);
+      const files: Array<{ storage_key: string }> = await manager.query(
+        'SELECT storage_key FROM application_documents WHERE application_id = ?',
+        [id],
+      );
+      await manager.query('DELETE FROM application_documents WHERE application_id = ?', [id]);
+      await manager.query('DELETE FROM application_notes WHERE application_id = ?', [id]);
+      await manager.query('DELETE FROM application_events WHERE application_id = ?', [id]);
+      await manager.query('DELETE FROM applicant_sessions WHERE application_id = ?', [id]);
+      await manager.query('DELETE FROM applicant_otps WHERE application_id = ?', [id]);
+      await manager.query('UPDATE interview_slots SET application_id = NULL WHERE application_id = ?', [id]);
+      await manager.query("DELETE FROM mail_log WHERE entity_type = 'applications' AND entity_id = ?", [id]);
+      await manager.query("DELETE FROM sms_log WHERE entity_type = 'applications' AND entity_id = ?", [id]);
+      await manager.query(
+        `UPDATE applications
+            SET first_name = NULL, middle_name = NULL, last_name = NULL, birth_date = NULL,
+                phone = NULL, phone_e164 = NULL, nationality = NULL, id_number_encrypted = NULL, email = NULL,
+                current_job = NULL, gender = NULL, university = NULL, major = NULL, scholarship_note = NULL,
+                anonymized_at = COALESCE(anonymized_at, UTC_TIMESTAMP(3))
+          WHERE id = ?`,
+        [id],
+      );
+      return { reference: application.reference, storageKeys: files.map((f) => f.storage_key) };
+    });
+
+    // Files go after the commit: a rolled-back anonymisation must not have deleted them.
+    for (const key of storageKeys) {
+      await this.fileStore.remove(key);
+    }
+
+    req.auditContext = {
+      action: 'delete',
+      entityType: 'applications',
+      entityId: id,
+      entityLabel: `anonymised application ${reference}`,
+      after: { anonymized: true, filesDeleted: storageKeys.length },
+    };
+    return { anonymized: true, reference };
   }
 
   // -------------------------------------------------------------------

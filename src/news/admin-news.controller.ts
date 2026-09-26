@@ -5,6 +5,7 @@ import { Post } from '../database/entities/post.entity.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { generateUniqueSlug } from '../common/text/slugify.js';
+import { RESERVED_POST_SLUGS } from '../common/validation/slug.js';
 import type { RequestContext } from '../common/request-context.js';
 import { CreatePostDto, UpdatePostDto, createPostSchema, updatePostSchema } from './dto/post.dto.js';
 
@@ -21,12 +22,12 @@ const BaseAdminNewsController = CrudController<Post>({
   label: (p) => p.titleAr,
   // Matches news.controller.ts's public `GET news/:slug`.
   redirectFrom: (p) => (p.slug ? `/news/${p.slug}` : null),
-  publishRules: (p) => {
-    if (!p.coverAssetId) {
-      throw new ProblemException(409, ErrorCode.PUBLISH_BLOCKED, 'A cover image is required before publishing', {
-        field: 'coverAssetId',
-      });
-    }
+  // C13: the spec keeps images as labelled placeholders until real photos
+  // arrive, so a missing cover is a warning on the response, not a block.
+  publishWarnings: (p) => (p.coverAssetId ? [] : ['COVER_MISSING']),
+  // C13: a post published without a date goes out dated today (UTC), not last in the feed.
+  onPublish: (p) => {
+    if (!p.publishedOn) p.publishedOn = new Date().toISOString().slice(0, 10);
   },
 });
 
@@ -35,7 +36,7 @@ const BaseAdminNewsController = CrudController<Post>({
 export class AdminNewsController extends BaseAdminNewsController {
   @HttpPost()
   override async create(@Body() dto: CreatePostDto, @Req() req: RequestContext): Promise<Post> {
-    const slug = await generateUniqueSlug(this.repo, dto.titleEn, dto.titleAr, `post-${Date.now()}`);
+    const slug = await generateUniqueSlug(this.repo, dto.titleEn, dto.titleAr, `post-${Date.now()}`, RESERVED_POST_SLUGS);
     return super.create({ ...dto, slug, createdBy: req.user!.id } as unknown as CreatePostDto, req);
   }
 

@@ -10,6 +10,10 @@ import type { Env } from '../config/env.js';
 import type { Locale } from '../common/request-context.js';
 import type { ContactDto, NewsletterDto } from './dto/contact.dto.js';
 import { frontendUrl } from '../common/links/frontend-url.js';
+import { contactSubjectLabel } from '../common/labels.js';
+import { issueNewsletterToken, verifyNewsletterToken } from './newsletter-token.util.js';
+import { ProblemException } from '../common/problem-details/problem.exception.js';
+import { ErrorCode } from '../common/problem-details/error-codes.js';
 
 const MIN_FORM_SECONDS = 3;
 
@@ -81,7 +85,7 @@ export class ContactService {
         name: dto.name,
         email: dto.email,
         phone: dto.phone ?? '',
-        subject: dto.subject,
+        subject: contactSubjectLabel(dto.subject, 'ar'), // C23: a label, not the enum
         message: dto.body,
         link: frontendUrl(this.env, 'ar', `admin/messages/${saved.id}`),
       },
@@ -93,25 +97,82 @@ export class ContactService {
   }
 
   /**
-   * Idempotent on email: a repeat subscription (or a re-subscribe after
-   * unsubscribing) simply un-sets `unsubscribed_at` on the existing row
-   * rather than erroring on the unique constraint.
+   * C27: double opt-in. The row is (re)created unconfirmed and a
+   * `newsletter_confirm` mail with a signed link goes to the address; the
+   * subscription only counts once `POST newsletter/confirm` verifies it.
+   * The response is the same whatever the address's state, so it can't be
+   * used to learn who is subscribed. An already-confirmed, active
+   * subscription gets no second mail.
    */
   async subscribe(dto: NewsletterDto, ipHash: string | null, locale: Locale): Promise<{ ok: true }> {
     if (isHoneypotTripped(dto)) {
       return { ok: true };
     }
 
-    const existing = await this.newsletterRepo.findOne({ where: { email: dto.email } });
-    if (existing) {
-      if (existing.unsubscribedAt !== null) {
-        existing.unsubscribedAt = null;
-        await this.newsletterRepo.save(existing);
-      }
+    const email = dto.email.trim().toLowerCase();
+    const existing = await this.newsletterRepo.findOne({ where: { email } });
+    if (existing && existing.confirmedAt && !existing.unsubscribedAt) {
       return { ok: true };
     }
+    const row = existing ?? this.newsletterRepo.create({ email, locale, ipHash });
+    row.unsubscribedAt = null;
+    row.confirmedAt = null;
+    row.locale = locale;
+    const saved = await this.newsletterRepo.save(row);
 
-    await this.newsletterRepo.save(this.newsletterRepo.create({ email: dto.email, locale, ipHash }));
+    const token = issueNewsletterToken(this.env.APP_ENCRYPTION_KEY, 'confirm', email);
+    const link = frontendUrl(this.env, locale, `newsletter/confirm?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`);
+    await this.mailService.send({
+      key: 'newsletter_confirm',
+      to: email,
+      vars: { link },
+      locale,
+      entity: { type: 'newsletter_subscribers', id: saved.id },
+    });
     return { ok: true };
+  }
+
+  /** C27: `POST newsletter/confirm` — the double opt-in link. */
+  async confirmSubscription(email: string, token: string): Promise<{ ok: true }> {
+    const normalized = email.trim().toLowerCase();
+    if (!verifyNewsletterToken(this.env.APP_ENCRYPTION_KEY, 'confirm', normalized, token)) {
+      throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, 'This link is invalid or has expired');
+    }
+    await this.newsletterRepo
+      .createQueryBuilder()
+      .update(NewsletterSubscriber)
+      .set({ confirmedAt: () => 'CURRENT_TIMESTAMP(3)' })
+      .where('email = :email', { email: normalized })
+      .andWhere('confirmed_at IS NULL')
+      .andWhere('unsubscribed_at IS NULL')
+      .execute();
+    return { ok: true };
+  }
+
+  /**
+   * C27: `POST newsletter/unsubscribe` — from the signed link in a
+   * newsletter mail (unsubscribeLink()). Same response whether or not the
+   * address was subscribed.
+   */
+  async unsubscribe(email: string, token: string): Promise<{ ok: true }> {
+    const normalized = email.trim().toLowerCase();
+    if (!verifyNewsletterToken(this.env.APP_ENCRYPTION_KEY, 'unsubscribe', normalized, token)) {
+      throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, 'This link is invalid');
+    }
+    await this.newsletterRepo
+      .createQueryBuilder()
+      .update(NewsletterSubscriber)
+      .set({ unsubscribedAt: () => 'CURRENT_TIMESTAMP(3)' })
+      .where('email = :email', { email: normalized })
+      .andWhere('unsubscribed_at IS NULL')
+      .execute();
+    return { ok: true };
+  }
+
+  /** The unsubscribe link every newsletter mail must carry (C27). */
+  unsubscribeLink(email: string, locale: Locale): string {
+    const normalized = email.trim().toLowerCase();
+    const token = issueNewsletterToken(this.env.APP_ENCRYPTION_KEY, 'unsubscribe', normalized);
+    return frontendUrl(this.env, locale, `newsletter/unsubscribe?email=${encodeURIComponent(normalized)}&token=${encodeURIComponent(token)}`);
   }
 }

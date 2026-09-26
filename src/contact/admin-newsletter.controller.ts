@@ -28,7 +28,7 @@ const MAX_LIMIT = 100;
 export class AdminNewsletterController {
   constructor(@InjectRepository(NewsletterSubscriber) private readonly repo: Repository<NewsletterSubscriber>) {}
 
-  @ApiQuery({ name: 'status', required: false, enum: ['subscribed', 'unsubscribed'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['subscribed', 'pending', 'unsubscribed'] })
   @ApiQuery({ name: 'page', required: false, type: String })
   @ApiQuery({ name: 'limit', required: false, type: String })
   @Get()
@@ -46,7 +46,7 @@ export class AdminNewsletterController {
     return { data, total, page, limit };
   }
 
-  @ApiQuery({ name: 'status', required: false, enum: ['subscribed', 'unsubscribed'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['subscribed', 'pending', 'unsubscribed'] })
   @Get('export.csv')
   async exportCsv(@Query() query: Record<string, unknown>, @Res() res: Response): Promise<void> {
     const rows = await this.buildFilteredQuery(readString(query, 'status')).getMany();
@@ -54,6 +54,7 @@ export class AdminNewsletterController {
       { header: 'Email', value: (r) => r.email },
       { header: 'Locale', value: (r) => r.locale },
       { header: 'Subscribed at', value: (r) => r.createdAt.toISOString() },
+      { header: 'Confirmed at', value: (r) => r.confirmedAt?.toISOString() ?? '' },
       { header: 'Unsubscribed at', value: (r) => r.unsubscribedAt?.toISOString() ?? '' },
     ]);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -79,7 +80,10 @@ export class AdminNewsletterController {
 
   private buildFilteredQuery(status: string | undefined) {
     const qb = this.repo.createQueryBuilder('n').orderBy('n.createdAt', 'DESC');
-    if (status === 'subscribed') qb.andWhere('n.unsubscribedAt IS NULL');
+    // C27: `subscribed` means confirmed (double opt-in) and not unsubscribed;
+    // `pending` is signed up but not yet confirmed.
+    if (status === 'subscribed') qb.andWhere('n.unsubscribedAt IS NULL').andWhere('n.confirmedAt IS NOT NULL');
+    else if (status === 'pending') qb.andWhere('n.unsubscribedAt IS NULL').andWhere('n.confirmedAt IS NULL');
     else if (status === 'unsubscribed') qb.andWhere('n.unsubscribedAt IS NOT NULL');
     return qb;
   }

@@ -80,7 +80,7 @@ one means; this is the production-specific subset to double-check:
 - [ ] `DB_HOST=127.0.0.1`, `DB_PORT=3306`
 - [ ] `DB_USER` / `DB_PASSWORD` / `DB_NAME` — the *running* app's account: the least-privilege one `scripts/create-app-db-user.sql` creates (bound to `127.0.0.1`).
 - [ ] `MIGRATION_DB_USER` / `MIGRATION_DB_PASSWORD` — the DDL-capable account from the hosting panel's MariaDB screen, used only by `npm run migrate`. **Required** when `NODE_ENV` is `production`/`staging`: the runner refuses to fall back to `DB_USER` there.
-- [ ] `APP_ENCRYPTION_KEY` — generate once with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` and treat it as permanent (rotating it makes every already-stored SMTP password / SMS provider token unreadable).
+- [ ] `APP_ENCRYPTION_KEY` — generate once with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` and treat it as permanent (rotating it makes every already-stored SMTP password / SMS provider token and applicant ID number unreadable). Keep a copy outside the server (see *Backups*).
 - [ ] `STORAGE_DRIVER` — `local` (default) or `s3` (see "S3 storage mode" below).
 - [ ] `STORAGE_ROOT` — with `local`: an absolute path outside the deploy directory (see above).
 - [ ] `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_PUBLIC`, `S3_BUCKET_PRIVATE`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_SIGNED_URL_TTL_SECONDS` — only with `STORAGE_DRIVER=s3`.
@@ -275,30 +275,95 @@ endpoint instead of `STORAGE_ROOT`:
 
 ## Backups
 
-The recommended baseline for a first production deployment is a
-cron-scheduled `mysqldump` for the database plus `npm run backup:storage`
-for uploaded files, e.g. via Hostinger's cron job feature or SSH's own
-crontab. Database:
+A cron-scheduled `mysqldump` for the database plus `npm run backup:storage`
+for uploaded files, via Hostinger's cron job feature or SSH's own crontab.
+All times below are **server time**; keep the host on UTC (see *UTC*).
+
+### Database (C28)
+
+Keep the credentials out of the command line (and so out of `ps` and the
+cron log) in `~/.my.cnf`, readable only by you:
+
+```ini
+# ~/.my.cnf   (chmod 600 ~/.my.cnf)
+[mysqldump]
+host=127.0.0.1
+user=<backup_user>          # SELECT, LOCK TABLES, SHOW VIEW, TRIGGER on <db_name>
+password=<backup_password>
+```
 
 ```bash
-# Daily at 03:00 server time, keeping 14 days of dumps.
-0 3 * * * mysqldump -h 127.0.0.1 -u <db_user> -p'<db_password>' <db_name> \
+# Daily at 03:30 — after the 03:00 maintenance job (retention purge) — keeping 14 days.
+30 3 * * * mysqldump --single-transaction --quick --routines --triggers --default-character-set=utf8mb4 <db_name> \
   | gzip > /home/<hostinger-username>/backups/safeer-$(date +\%Y\%m\%d).sql.gz \
   && find /home/<hostinger-username>/backups -name 'safeer-*.sql.gz' -mtime +14 -delete
 ```
 
-Uploaded files (`STORAGE_DRIVER=local`) — `scripts/backup-storage.mjs`
-writes a dated `safeer-storage-<timestamp>.tar.gz` of `STORAGE_ROOT`:
+`--single-transaction` takes a consistent InnoDB snapshot without locking
+the tables the app is writing to. `--quick` streams rows instead of
+buffering whole tables in memory.
+
+**Offsite, encrypted copy.** A backup that lives on the same server doesn't
+survive losing that server. Copy each dump elsewhere, encrypted, e.g. with
+`age` or `gpg --symmetric` before upload. The dump holds applicant PII: names,
+phone numbers, e-mail addresses. The ID number column is already AES-256-GCM
+encrypted with `APP_ENCRYPTION_KEY` (C28), but the rest is plain text.
+
+**`APP_ENCRYPTION_KEY` is part of the backup.** Without it, the restored
+ID numbers, SMTP password and SMS token can't be decrypted. Store the key
+separately from the dumps, e.g. in the association's password manager, never
+in the same archive.
+
+**Test the restore** at least once after setting this up, and after any
+schema change of note: restore into a scratch database, point a local
+checkout at it with the production `APP_ENCRYPTION_KEY`, and open an
+application in the admin.
 
 ```bash
-# Daily at 03:15 server time, keeping 14 days of archives.
-15 3 * * * cd /path/to/safeer_api && NODE_ENV=production node scripts/backup-storage.mjs /home/<hostinger-username>/backups \
+mysql -e 'CREATE DATABASE safeer_restore_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+gunzip -c safeer-YYYYMMDD.sql.gz | mysql safeer_restore_test
+```
+
+### Uploaded files
+
+`STORAGE_DRIVER=local`: `scripts/backup-storage.mjs` writes a dated
+`safeer-storage-<timestamp>.tar.gz` of `STORAGE_ROOT`:
+
+```bash
+# Daily at 03:45, keeping 14 days of archives.
+45 3 * * * cd /path/to/safeer_api && NODE_ENV=production node scripts/backup-storage.mjs /home/<hostinger-username>/backups \
   >> /home/<hostinger-username>/logs/safeer-storage-backup.log 2>&1 \
   && find /home/<hostinger-username>/backups -name 'safeer-storage-*.tar.gz' -mtime +14 -delete
 ```
 
-With `STORAGE_DRIVER=s3` the script prints a message and does nothing: use
+The archive holds applicants' private documents, so it gets the same
+encrypted offsite copy as the dump.
+
+With `STORAGE_DRIVER=s3`, the script prints a message and does nothing. Use
 the provider's own versioning or replication for both buckets.
+
+## Data retention (C27)
+
+`MaintenanceService` runs nightly at 03:00 (server time) inside the app
+process. Nothing extra needs scheduling. It deletes:
+
+| Data | Kept for |
+|---|---|
+| Expired staff/applicant sessions, spent auth tokens and OTPs | until expiry |
+| `mail_log` | 90 days (a reply's delivery status is first copied onto `message_replies`) |
+| `sms_log` | 90 days |
+| Contact messages | 24 months |
+| Draft applications nobody touched | 180 days (their uploaded files are deleted too) |
+| Newsletter rows unsubscribed, or never confirmed | 30 days |
+
+Submitted applications are never deleted by age. When an applicant asks
+for their data to be removed, an admin uses `DELETE admin/applications/:id`.
+That anonymises the row (the reference and status stay, for the figures)
+and deletes its documents and their files, notes, events and mail/SMS logs.
+The action is audited.
+
+Backups keep deleted data for their own 14 days, which the privacy notice
+should mention.
 
 ## Rollback
 
@@ -315,8 +380,8 @@ the provider's own versioning or replication for both buckets.
   code against it will leave the schema out of sync — always roll code and
   database back together, never one without the other.
 - **A bad `APP_ENCRYPTION_KEY` change**: this key is permanent by design
-  (rotating it makes every stored SMTP password / SMS provider token
-  unreadable, not just newly-written ones). If it's ever changed by
+  (rotating it makes every stored SMTP password / SMS provider token, and
+  every applicant ID number (C28), unreadable, not just newly-written ones). If it's ever changed by
   mistake, the fix is re-entering the SMTP password and SMS provider token
   through `admin/mail/settings`/`admin/sms/settings` after rolling the key
   back — there is no way to recover a secret encrypted under a key that's

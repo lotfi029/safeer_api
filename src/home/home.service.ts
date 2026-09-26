@@ -17,6 +17,7 @@ import { toPublicWorkArea, type PublicWorkArea } from '../work-areas/public-work
 import { toPublicPostSummary, type PublicPostSummary } from '../news/public-post.js';
 import { toPublicTestimonial, type PublicTestimonial } from '../testimonials/public-testimonial.js';
 import { toPublicPartner, type PublicPartner } from '../partners/public-partner.js';
+import { MarkdownService } from '../common/markdown/markdown.service.js';
 
 const HOME_PAGE_SLUG = 'home';
 const NEWS_LATEST = 3;
@@ -48,6 +49,7 @@ export class HomeService {
     @InjectRepository(Testimonial) private readonly testimonialRepo: Repository<Testimonial>,
     @InjectRepository(Partner) private readonly partnerRepo: Repository<Partner>,
     @InjectRepository(PageSection) private readonly sectionRepo: Repository<PageSection>,
+    private readonly markdown: MarkdownService,
   ) {}
 
   /**
@@ -109,15 +111,17 @@ export class HomeService {
       else itemsByArea.set(item.workAreaId, [item]);
     }
 
+    const render = (md: string) => this.markdown.render(md); // C26
+
     return {
       // `settings` is only null if 002_seed.sql's singleton row was never
       // applied — site-settings.controller.ts throws a genuine 500 on the
       // admin side for the same case.
       settings: settings ? toPublicSiteSettings(settings) : null,
-      sections: sections.map(toPublicPageSection),
+      sections: sections.map((s) => toPublicPageSection(s, render)),
       aboutItems: {
-        goals: goals.map(toPublicAboutItem),
-        carePillars: carePillars.map(toPublicAboutItem),
+        goals: goals.map((i) => toPublicAboutItem(i, render)),
+        carePillars: carePillars.map((i) => toPublicAboutItem(i, render)),
       },
       stats: stats.map(toPublicStat),
       workAreas: workAreas.map((area) => toPublicWorkArea(area, itemsByArea.get(area.id) ?? [])),

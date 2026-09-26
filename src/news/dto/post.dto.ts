@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { RESERVED_POST_SLUGS, slugSchema } from '../../common/validation/slug.js';
 
 // `slug` and `createdBy` are never client-settable at create time — the
 // controller derives them (generated slug, req.user.id), matching
@@ -27,7 +28,7 @@ export const createPostSchema = z
   .strict();
 
 export const updatePostSchema = createPostSchema.partial().extend({
-  slug: z.string().min(1).max(191).optional(),
+  slug: slugSchema({ reserved: RESERVED_POST_SLUGS }).optional(), // C14
 });
 
 export class CreatePostDto extends createZodDto(createPostSchema) {}

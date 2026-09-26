@@ -507,9 +507,9 @@ function buildMailTemplates() {
     {
       key: 'application_status_changed', name_ar: 'تحديث حالة الطلب', name_en: 'Application status update',
       subject_ar: 'تحديث على طلبك {{reference}}: {{status}}', subject_en: 'Update on your application {{reference}}: {{status}}',
-      body_ar: 'مرحبًا {{name}}،\n\nتحدّثت حالة طلبك رقم **{{reference}}** إلى: **{{status}}**.\n\n{{note}}\n\nيمكنك مراجعة التفاصيل كاملة من بوابة الطالب:\n\n[{{link}}]({{link}})',
-      body_en: 'Hello {{name}},\n\nThe status of your application **{{reference}}** has changed to: **{{status}}**.\n\n{{note}}\n\nYou can review the full details from the student portal:\n\n[{{link}}]({{link}})',
-      variables: ['name', 'reference', 'status', 'note', 'link'],
+      body_ar: 'مرحبًا {{name}}،\n\nتحدّثت حالة طلبك رقم **{{reference}}** إلى: **{{status}}**.\n\nيمكنك مراجعة التفاصيل كاملة من بوابة الطالب:\n\n[{{link}}]({{link}})',
+      body_en: 'Hello {{name}},\n\nThe status of your application **{{reference}}** has changed to: **{{status}}**.\n\nYou can review the full details from the student portal:\n\n[{{link}}]({{link}})',
+      variables: ['name', 'reference', 'status', 'link'], // C23 (migration 009): no {{note}}
     },
     {
       key: 'document_rejected', name_ar: 'رفض مستند مرفوع', name_en: 'Uploaded document rejected',
@@ -550,6 +550,38 @@ function buildMailTemplates() {
       body_en: 'Hello {{name}},\n\nYou already have a scholarship application in progress, reference **{{reference}}**. You can continue it from the student portal at any time:\n\n[{{link}}]({{link}})',
       variables: ['name', 'reference', 'link'],
     },
+    {
+      // migration 009 (C17/C27)
+      key: 'interview_booked', name_ar: "تأكيد موعد المقابلة", name_en: "Interview booked",
+      subject_ar: "تأكيد موعد مقابلتك — {{reference}}", subject_en: "Your interview is booked — {{reference}}",
+      body_ar: "مرحبًا {{name}}،\n\nتم حجز موعد مقابلتك لطلب المنحة رقم **{{reference}}**:\n\n- **التاريخ:** {{date}}\n- **الوقت:** {{time}}\n- **المكان:** {{location}}\n\nيمكنك مراجعة الموعد أو إلغاؤه من بوابة الطالب:\n\n[{{link}}]({{link}})",
+      body_en: "Hello {{name}},\n\nYour interview for scholarship application **{{reference}}** is booked:\n\n- **Date:** {{date}}\n- **Time:** {{time}}\n- **Location:** {{location}}\n\nYou can review or cancel it from the student portal:\n\n[{{link}}]({{link}})",
+      variables: ["name", "reference", "date", "time", "location", "link"],
+    },
+    {
+      // migration 009 (C17/C27)
+      key: 'interview_cancelled', name_ar: "إلغاء موعد المقابلة", name_en: "Interview cancelled",
+      subject_ar: "تم إلغاء موعد مقابلتك — {{reference}}", subject_en: "Your interview was cancelled — {{reference}}",
+      body_ar: "مرحبًا {{name}}،\n\nتم إلغاء موعد مقابلتك لطلب المنحة رقم **{{reference}}** ({{date}}، {{time}}).\n\nيمكنك اختيار موعد جديد من بوابة الطالب:\n\n[{{link}}]({{link}})",
+      body_en: "Hello {{name}},\n\nYour interview for scholarship application **{{reference}}** ({{date}}, {{time}}) was cancelled.\n\nYou can choose a new time from the student portal:\n\n[{{link}}]({{link}})",
+      variables: ["name", "reference", "date", "time", "link"],
+    },
+    {
+      // migration 009 (C17/C27)
+      key: 'interview_updated', name_ar: "تعديل موعد المقابلة", name_en: "Interview changed",
+      subject_ar: "تغيّر موعد مقابلتك — {{reference}}", subject_en: "Your interview has changed — {{reference}}",
+      body_ar: "مرحبًا {{name}}،\n\nتم تعديل موعد مقابلتك لطلب المنحة رقم **{{reference}}**، والموعد الجديد:\n\n- **التاريخ:** {{date}}\n- **الوقت:** {{time}}\n- **المكان:** {{location}}\n\nللمراجعة أو الإلغاء:\n\n[{{link}}]({{link}})",
+      body_en: "Hello {{name}},\n\nYour interview for scholarship application **{{reference}}** has changed. The new details:\n\n- **Date:** {{date}}\n- **Time:** {{time}}\n- **Location:** {{location}}\n\nTo review or cancel it:\n\n[{{link}}]({{link}})",
+      variables: ["name", "reference", "date", "time", "location", "link"],
+    },
+    {
+      // migration 009 (C17/C27)
+      key: 'newsletter_confirm', name_ar: "تأكيد الاشتراك في النشرة", name_en: "Confirm newsletter subscription",
+      subject_ar: "أكّد اشتراكك في نشرة جمعية سفير", subject_en: "Confirm your Safeer newsletter subscription",
+      body_ar: "مرحبًا،\n\nتلقينا طلبًا لاشتراك هذا البريد في النشرة الإخبارية لجمعية سفير الدعوية. لتأكيد الاشتراك اضغط على الرابط التالي:\n\n[{{link}}]({{link}})\n\nإذا لم تطلب ذلك، تجاهل هذه الرسالة ولن يُضاف بريدك.",
+      body_en: "Hello,\n\nWe received a request to subscribe this address to the Safeer Association newsletter. To confirm, follow this link:\n\n[{{link}}]({{link}})\n\nIf you did not ask for this, ignore this message and nothing will be added.",
+      variables: ["link"],
+    },
   ];
   return templates.map((t) => ({
     key: t.key, name_ar: t.name_ar, name_en: t.name_en, subject_ar: t.subject_ar, subject_en: t.subject_en,
@@ -589,6 +621,27 @@ function buildSmsTemplates() {
       body_ar: 'جمعية سفير: لديك طلب قائم برقم {{reference}}. تابعه عبر بوابة الطالب: {{link}}',
       body_en: 'Safeer: you have an application in progress, ref {{reference}}. Continue it: {{link}}',
       variables: ['reference', 'link'],
+    },
+    {
+      // migration 009 (C17)
+      key: 'interview_booked', name_ar: "تأكيد موعد المقابلة", name_en: "Interview booked",
+      body_ar: "جمعية سفير: تم حجز مقابلتك لطلب {{reference}} يوم {{date}} الساعة {{time}}.",
+      body_en: "Safeer: your interview for application {{reference}} is booked for {{date}} at {{time}}.",
+      variables: ["reference", "date", "time"],
+    },
+    {
+      // migration 009 (C17)
+      key: 'interview_cancelled', name_ar: "إلغاء موعد المقابلة", name_en: "Interview cancelled",
+      body_ar: "جمعية سفير: تم إلغاء مقابلتك لطلب {{reference}} ({{date}} {{time}}). اختر موعدًا جديدًا من بوابة الطالب.",
+      body_en: "Safeer: your interview for application {{reference}} ({{date}} {{time}}) was cancelled. Choose a new time in the student portal.",
+      variables: ["reference", "date", "time"],
+    },
+    {
+      // migration 009 (C17)
+      key: 'interview_updated', name_ar: "تعديل موعد المقابلة", name_en: "Interview changed",
+      body_ar: "جمعية سفير: تغيّر موعد مقابلتك لطلب {{reference}} إلى {{date}} الساعة {{time}}.",
+      body_en: "Safeer: your interview for application {{reference}} moved to {{date}} at {{time}}.",
+      variables: ["reference", "date", "time"],
     },
   ];
   return templates.map((t) => ({

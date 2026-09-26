@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -98,5 +98,17 @@ export class AdminApplicationsController {
   @Post(':id/notes')
   async addNote(@Param('id') id: string, @Body() dto: CreateApplicationNoteDto, @Req() req: RequestContext) {
     return this.applications.addNote(id, dto.body, req);
+  }
+
+  /**
+   * C27: admin only. Anonymises the application — personal data cleared,
+   * private files, notes, events, sessions and mail/SMS log rows deleted —
+   * keeping only the reference, status and dates for the statistics.
+   * Audited (without any of the removed data).
+   */
+  @Roles('admin')
+  @Delete(':id')
+  async anonymise(@Param('id') id: string, @Req() req: RequestContext) {
+    return this.applications.anonymise(id, req);
   }
 }

@@ -77,7 +77,7 @@ export class ApplicationsService {
       const settings = await manager.findOne(SiteSettings, { where: { id: '1' } });
       const prefix = settings?.applicationRefPrefix ?? DEFAULT_REF_PREFIX;
 
-      const year = new Date().getFullYear();
+      const year = new Date().getUTCFullYear(); // C9: the reference year is the UTC year
       const counterKey = `application:${year}`;
 
       let counter = await manager

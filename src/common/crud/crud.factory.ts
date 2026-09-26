@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Type } from '@nestjs/common';
 import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, QueryFailedError, Repository } from 'typeorm';
+import { DataSource, QueryFailedError, Repository, type EntityManager } from 'typeorm';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { CacheService } from '../../cache/cache.service.js';
@@ -129,8 +129,21 @@ export interface CrudFactoryOptions<E extends { id: string }> {
   deleteRoles?: UserRole[];
   /** Human label for the audit row. */
   label: (e: E) => string;
-  /** Throws a PUBLISH_BLOCKED ProblemException when `e` isn't ready to publish. */
+  /** Throws a PUBLISH_BLOCKED ProblemException when `e` isn't ready to publish. Runs on create, update and publish (C13). */
   publishRules?: (e: E) => void;
+  /**
+   * C13: called whenever a row *becomes* published — created published,
+   * updated from unpublished to published, or `PATCH /:id/publish` — to
+   * fill publish-time defaults (e.g. `publishedOn` = today).
+   */
+  onPublish?: (e: E) => void;
+  /**
+   * C13: soft rules — returned as `warnings: string[]` on the create /
+   * update / publish response (never blocking) for a published row that
+   * falls short, e.g. `['COVER_MISSING']`. Set only on collections whose
+   * responses should carry the `warnings` array.
+   */
+  publishWarnings?: (e: E) => string[];
   /**
    * I-7: this entity's own public path (e.g. `/news/${e.slug}`), given
    * either its pre- or post-update state. When set, `update()` inserts a
@@ -178,6 +191,10 @@ export interface CrudFactoryOptions<E extends { id: string }> {
  * safe as writing `@Patch(...)` inline. `reorder` is `POST`, not `PATCH` —
  * see the comment above the decorator applications, below, for why.
  */
+function isPublishedRow(e: unknown): boolean {
+  return (e as { isPublished?: boolean }).isPublished === true;
+}
+
 export function CrudController<E extends { id: string }>(opts: CrudFactoryOptions<E>): Type<CrudControllerBase<E>> {
   // Every call defines classes literally named CreateDto/UpdateDto/etc — a
   // distinct class object each time (closed over this call's schema), but
@@ -224,7 +241,7 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
       // tag for 13 of 14 collections — keeping the declaration honest about
       // what purge() actually calls is the point; the assertion only ever
       // fails in the other direction. See cache-tag-registry.ts.
-      declarePurger(this.entityType, ...(opts.extraPurgeTags ?? []));
+      declarePurger(this.entityType, ...(opts.extraPurgeTags ?? []), ...(opts.redirectFrom ? ['redirects'] : []));
     }
 
     async list(@Query() query: Record<string, unknown>): Promise<PagedResult<E>> {
@@ -294,7 +311,15 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
     async create(@Body() dto: CreateDto, @Req() req: RequestContext): Promise<E> {
       await assertAltTextReady(this.dataSource, dto as object as Record<string, unknown>);
       const entity = this.repo.create(dto as object as E);
+      // C13: creating a row already published goes through the same rules as publishing it.
+      if (isPublishedRow(entity)) this.applyPublishRules(entity);
       const saved = await this.repo.save(entity);
+      const livePath = opts.redirectFrom?.(saved);
+      if (livePath) {
+        // C14: a new row's path takes over from any redirect that led away from it.
+        await this.clearRedirectsInto(this.dataSource.manager, livePath);
+        this.cache.purgeTag('redirects');
+      }
       this.purge();
       req.auditContext = {
         action: 'create',
@@ -303,7 +328,7 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
         entityLabel: opts.label(saved),
         after: saved,
       };
-      return saved;
+      return this.withWarnings(saved);
     }
 
     async reorder(@Body() dto: ReorderDto, @Req() req: RequestContext): Promise<{ reordered: number }> {
@@ -327,31 +352,37 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
       const entity = await this.findOrNotFound(id);
       const before = { ...entity };
       Object.assign(entity, dto);
+      const wasPublished = isPublishedRow(before as E);
+      const nowPublished = isPublishedRow(entity);
       // I-4: an edit must not leave a published row in a state that would have
       // failed its own publish check — mirrors the same guard in `publish()`.
-      if ((entity as unknown as { isPublished?: boolean }).isPublished && opts.publishRules) {
-        opts.publishRules(entity);
+      if (nowPublished) {
+        if (!wasPublished) opts.onPublish?.(entity);
+        opts.publishRules?.(entity);
       }
       const saved = await this.saveWithRedirect(entity, before as E);
       this.purge();
       req.auditContext = {
-        action: 'update',
+        // C13: flipping the flag through a plain update is still a publish/unpublish in the log.
+        action: wasPublished === nowPublished ? 'update' : nowPublished ? 'publish' : 'unpublish',
         entityType: this.entityType,
         entityId: id,
         entityLabel: opts.label(saved),
         before,
         after: saved,
       };
-      return saved;
+      return this.withWarnings(saved);
     }
 
     async publish(@Param('id') id: string, @Body() dto: PublishDto, @Req() req: RequestContext): Promise<E> {
       const entity = await this.findOrNotFound(id);
       const nextState = dto.isPublished ?? true;
-      if (nextState && opts.publishRules) {
-        opts.publishRules(entity);
-      }
+      const wasPublished = isPublishedRow(entity);
       (entity as unknown as { isPublished: boolean }).isPublished = nextState;
+      if (nextState) {
+        if (!wasPublished) opts.onPublish?.(entity);
+        opts.publishRules?.(entity);
+      }
       const saved = await this.repo.save(entity);
       this.purge();
       req.auditContext = {
@@ -360,7 +391,7 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
         entityId: id,
         entityLabel: opts.label(saved),
       };
-      return saved;
+      return this.withWarnings(saved);
     }
 
     async remove(@Param('id') id: string, @Req() req: RequestContext): Promise<{ deleted: true }> {
@@ -396,6 +427,19 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
       return entity;
     }
 
+    /** C13: onPublish defaults, then the blocking rules — for a row being created as published. */
+    protected applyPublishRules(entity: E): void {
+      opts.onPublish?.(entity);
+      opts.publishRules?.(entity);
+    }
+
+    /** C13: `{ ...row, warnings }` when the collection declares publishWarnings; the row as is otherwise. */
+    protected withWarnings(saved: E): E {
+      if (!opts.publishWarnings) return saved;
+      const warnings = isPublishedRow(saved) ? opts.publishWarnings(saved) : [];
+      return Object.assign(saved, { warnings });
+    }
+
     protected purge(): void {
       this.cache.purgeTag(this.entityType);
       for (const tag of opts.extraPurgeTags ?? []) {
@@ -410,7 +454,7 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
      * per-module service that doesn't exist. Only fires for a row that was
      * already published (an unpublished row's URL was never live) whose
      * slug is actually changing; the insert and the save happen in one
-     * transaction, and `ON DUPLICATE KEY UPDATE` handles a `from_path` that
+     * transaction, and the delete-then-insert below handles a `from_path` that
      * collides with an existing redirect (e.g. the slug flip-flopping).
      */
     protected async saveWithRedirect(entity: E, before: E): Promise<E> {
@@ -419,32 +463,44 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
       const wasPublished = (before as unknown as { isPublished?: boolean }).isPublished;
       const beforeSlug = (before as unknown as { slug?: string }).slug;
       const afterSlug = (entity as unknown as { slug?: string }).slug;
-      if (!wasPublished || !beforeSlug || !afterSlug || beforeSlug === afterSlug) {
+      if (!beforeSlug || !afterSlug || beforeSlug === afterSlug) {
         return this.repo.save(entity);
       }
 
       const fromPath = opts.redirectFrom(before);
       const toPath = opts.redirectFrom(entity);
-      if (!fromPath || !toPath || fromPath === toPath) {
-        return this.repo.save(entity);
-      }
+      if (!toPath) return this.repo.save(entity);
 
-      return this.dataSource.transaction(async (manager) => {
-        const saved = await manager.save(opts.entity, entity as object as E);
-        // Collapse redirect chains: a row renamed A→B earlier, then B→C now,
-        // would otherwise leave both `A→B` and `B→C` — a visitor to A takes
-        // two hops, the first of which lands on a path that's itself moved.
-        // Repointing any existing row whose to_path was the old path makes
-        // A→C direct the moment B→C is created.
-        await manager.query('UPDATE redirects SET to_path = ? WHERE to_path = ?', [toPath, fromPath]);
-        // `VALUES()` in ON DUPLICATE KEY UPDATE is deprecated as of MySQL
-        // 8.0.20; this is the row-alias form it was replaced with.
-        await manager.query(
-          'INSERT INTO redirects (from_path, to_path) VALUES (?, ?) AS new ON DUPLICATE KEY UPDATE to_path = new.to_path',
-          [fromPath, toPath],
-        );
-        return saved;
+      const saved = await this.dataSource.transaction(async (manager) => {
+        const savedRow = await manager.save(opts.entity, entity as object as E);
+        if (wasPublished && fromPath && fromPath !== toPath) {
+          // Collapse redirect chains: a row renamed A→B earlier, then B→C now,
+          // would otherwise leave both `A→B` and `B→C` — a visitor to A takes
+          // two hops, the first of which lands on a path that's itself moved.
+          // Repointing any existing row whose to_path was the old path makes
+          // A→C direct the moment B→C is created.
+          await manager.query('UPDATE redirects SET to_path = ? WHERE to_path = ?', [toPath, fromPath]);
+          // Replace any row for from_path. Not `ON DUPLICATE KEY UPDATE`: the
+          // row-alias form (`AS new`) is MySQL 8.0.19+ only and a syntax
+          // error on MariaDB (Hostinger), and `VALUES()` is deprecated on
+          // MySQL. Delete + insert inside this transaction works on both.
+          await manager.query('DELETE FROM redirects WHERE from_path = ?', [fromPath]);
+          await manager.query('INSERT INTO redirects (from_path, to_path) VALUES (?, ?)', [fromPath, toPath]);
+        }
+        await this.clearRedirectsInto(manager, toPath);
+        return savedRow;
       });
+      this.cache.purgeTag('redirects');
+      return saved;
+    }
+
+    /**
+     * C14: `path` is now a live page, so no redirect may lead *away* from it
+     * (renaming A→B and back B→A used to leave a permanent A→A self-redirect),
+     * and no rule may point at itself.
+     */
+    protected async clearRedirectsInto(manager: EntityManager, path: string): Promise<void> {
+      await manager.query('DELETE FROM redirects WHERE from_path = ? OR from_path = to_path', [path]);
     }
   }
 

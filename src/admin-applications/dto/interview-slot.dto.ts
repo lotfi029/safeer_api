@@ -18,5 +18,16 @@ const interviewSlotShape = {
   locationEn: z.string().max(255).nullable().optional(),
 };
 
-export const createInterviewSlotSchema = z.object(interviewSlotShape).strict();
-export const updateInterviewSlotSchema = z.object(interviewSlotShape).partial().strict();
+/** C17: a slot ends after it starts (the update path re-checks against the stored values too). */
+const endsAfterStart = (v: { startsAt?: string; endsAt?: string }) =>
+  v.startsAt === undefined || v.endsAt === undefined || new Date(v.endsAt) > new Date(v.startsAt);
+
+export const createInterviewSlotSchema = z
+  .object(interviewSlotShape)
+  .strict()
+  .refine(endsAfterStart, { message: 'endsAt must be after startsAt', path: ['endsAt'] });
+export const updateInterviewSlotSchema = z
+  .object(interviewSlotShape)
+  .partial()
+  .strict()
+  .refine(endsAfterStart, { message: 'endsAt must be after startsAt', path: ['endsAt'] });

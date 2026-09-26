@@ -17,6 +17,8 @@ import type { UpdateApplicationDto } from './dto/update-application.dto.js';
 import type { SubmitApplicationDto } from './dto/submit-application.dto.js';
 import { portalLoginUrl } from '../common/links/frontend-url.js';
 import type { ApplicationCorrectionsDto } from './dto/corrections.dto.js';
+import { InterviewSlot } from '../database/entities/interview-slot.entity.js';
+import { toPublicSlot, type PublicInterviewSlot } from './portal-interview.service.js';
 
 /** `status` values a PATCH or a submit may still act on — everything past this point is staff-owned (phase 7's review flow). */
 /**
@@ -39,6 +41,8 @@ export interface PortalMeResult {
   reference: string;
   status: ApplicationStatus;
   currentStep: number;
+  /** C17: the booked interview slot, or null. */
+  interview: PublicInterviewSlot | null;
   personal: {
     firstName: string | null;
     middleName: string | null;
@@ -250,6 +254,8 @@ export class PortalApplicationService {
     }
 
     const hadInterview = (await this.eventRepo.count({ where: { applicationId, type: 'INTERVIEW_BOOKED' } })) > 0;
+    // C17: the booked slot itself, so the portal can show when and where.
+    const bookedSlot = await this.applicationRepo.manager.findOne(InterviewSlot, { where: { applicationId } });
     const timeline = deriveTimeline(application.status, hadInterview);
     const actionNeeded = await this.computeActionNeeded(applicationId);
     const recentEvents = await this.eventRepo.find({
@@ -262,6 +268,7 @@ export class PortalApplicationService {
       reference: application.reference,
       status: application.status,
       currentStep: application.currentStep,
+      interview: bookedSlot ? toPublicSlot(bookedSlot) : null,
       personal: {
         firstName: application.firstName,
         middleName: application.middleName,

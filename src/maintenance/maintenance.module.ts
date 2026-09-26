@@ -7,6 +7,7 @@ import { ApplicantSession } from '../database/entities/applicant-session.entity.
 import { ApplicantOtp } from '../database/entities/applicant-otp.entity.js';
 import { MaintenanceService } from './maintenance.service.js';
 import { CacheModule } from '../cache/cache.module.js';
+import { StorageModule } from '../storage/storage.module.js';
 
 /**
  * The nightly retention sweep. No controller — @Cron is picked up by the
@@ -21,7 +22,8 @@ import { CacheModule } from '../cache/cache.module.js';
  * that check itself is not being ported.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Session, AuthToken, MailLog, ApplicantSession, ApplicantOtp]), CacheModule],
+  imports: [TypeOrmModule.forFeature([Session, AuthToken, MailLog, ApplicantSession, ApplicantOtp]), CacheModule, StorageModule],
   providers: [MaintenanceService],
+  exports: [MaintenanceService],
 })
 export class MaintenanceModule {}

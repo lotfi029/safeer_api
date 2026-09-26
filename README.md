@@ -48,7 +48,7 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `SESSION_IDLE_HOURS`, `SESSION_ABSOLUTE_DAYS` | Staff session lifetime (default 8h idle / 30d absolute). |
 | `APPLICANT_SESSION_COOKIE_NAME` | Student-portal session cookie name (default `sf_app_sid`) — see [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md). |
 | `APPLICANT_SESSION_IDLE_HOURS`, `APPLICANT_SESSION_ABSOLUTE_DAYS` | Applicant session lifetime (default 12h idle / 7d absolute). |
-| `APP_ENCRYPTION_KEY` | 32 random bytes, base64-encoded. Encrypts the stored SMTP password and the SMS provider token (AES-256-GCM). **Permanent once real settings exist** — rotating it makes the stored secrets unreadable. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
+| `APP_ENCRYPTION_KEY` | 32 random bytes, base64-encoded. Encrypts the stored SMTP password, the SMS provider token and applicants' ID numbers (AES-256-GCM); also keys the signed newsletter links. **Permanent once real settings exist** — rotating it makes the stored secrets unreadable. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
 | `STORAGE_ROOT` | Local disk path for uploaded files (both the public media pipeline and applicants' private documents). Must be an absolute path outside the deployed build directory in production. Only used when `STORAGE_DRIVER=local`. |
 | `STORAGE_DRIVER` | `local` (default) or `s3`. See `S3_*` below. |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_PUBLIC`, `S3_BUCKET_PRIVATE`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Required only when `STORAGE_DRIVER=s3` — any S3-compatible endpoint, two buckets (public assets, private applicant documents). |
@@ -86,6 +86,7 @@ Project documentation lives in [`docs/`](docs/):
 - [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md) — roles and the permission matrix, the two cookie-session systems, UTC.
 - [`docs/backend/DEPLOYMENT-HOSTINGER.md`](docs/backend/DEPLOYMENT-HOSTINGER.md) — production deployment, env checklist, SMS/S3 setup, migrations, backups.
 - [`docs/backend/KNOWN-ISSUES.md`](docs/backend/KNOWN-ISSUES.md) — out-of-scope items and gotchas.
+- [`docs/backend/API-CHANGES.md`](docs/backend/API-CHANGES.md) — contract changes the frontend has to follow (fix plan).
 - [`docs/safeer-design-spec.md`](docs/safeer-design-spec.md), [`docs/safeer-implementation-prompt.md`](docs/safeer-implementation-prompt.md) — the product spec and build brief.
 - [`docs/safeer-backend-fr-review.md`](docs/safeer-backend-fr-review.md), [`docs/safeer-backend-fix-prompt.md`](docs/safeer-backend-fix-prompt.md) — the review and the current fix plan.
 - [`docs/prototype/safeer-prototype.html`](docs/prototype/safeer-prototype.html) — the clickable prototype `npm run seed` reads.

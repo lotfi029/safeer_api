@@ -37,7 +37,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import 'dotenv/config';
 import { DEV_ENVS, requireNodeEnv } from './lib/node-env.mjs';
 import { openMigrationConnection } from './lib/db-connection.mjs';
@@ -70,7 +70,11 @@ async function resolveMigrationFiles(nodeEnv) {
   const includeDev = DEV_ENVS.includes(nodeEnv);
 
   const rootEntries = await readdir(migrationsDir, { withFileTypes: true });
-  const rootNames = rootEntries.filter((d) => d.isFile() && d.name.endsWith('.sql')).map((d) => d.name);
+  // C28: a numbered `.mjs` migration exports `up(connection, { env })` for a
+  // data change SQL alone can't make (e.g. encrypting a column with
+  // APP_ENCRYPTION_KEY). It is checksummed and run in a transaction exactly
+  // like a `.sql` file. migrations/dev/ stays SQL-only.
+  const rootNames = rootEntries.filter((d) => d.isFile() && /\.(sql|mjs)$/.test(d.name)).map((d) => d.name);
 
   let devNames = [];
   if (includeDev) {
@@ -222,7 +226,13 @@ async function applyPending(connection, files, applied) {
     // can work around. The failure message points at the recovery steps.
     await connection.beginTransaction();
     try {
-      await connection.query(file.sql);
+      if (file.version.endsWith('.mjs')) {
+        const migration = await import(pathToFileURL(file.fullPath).href);
+        if (typeof migration.up !== 'function') throw new Error('a .mjs migration must export async function up(connection, { env })');
+        await migration.up(connection, { env: process.env, log: (msg) => console.log(`  ${msg}`) });
+      } else {
+        await connection.query(file.sql);
+      }
       await connection.query('INSERT INTO schema_migrations (version, checksum) VALUES (?, ?)', [file.version, file.checksum]);
       await connection.commit();
       console.log('  done');

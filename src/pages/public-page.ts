@@ -21,7 +21,14 @@ export interface PublicPageSection {
   sortOrder: number;
 }
 
-export function toPublicPageSection(section: PageSection): PublicPageSection {
+/** Markdown → sanitized HTML (MarkdownService.render). */
+export type RenderMarkdown = (markdown: string) => string;
+
+/**
+ * C26: `bodyAr`/`bodyEn` go out as sanitized HTML, rendered on read by
+ * MarkdownService exactly like news bodies — never the raw Markdown source.
+ */
+export function toPublicPageSection(section: PageSection, render: RenderMarkdown): PublicPageSection {
   return {
     id: section.id,
     sectionKey: section.sectionKey,
@@ -29,8 +36,8 @@ export function toPublicPageSection(section: PageSection): PublicPageSection {
     labelEn: section.labelEn,
     headingAr: section.headingAr,
     headingEn: section.headingEn,
-    bodyAr: section.bodyAr,
-    bodyEn: section.bodyEn,
+    bodyAr: section.bodyAr ? render(section.bodyAr) : null,
+    bodyEn: section.bodyEn ? render(section.bodyEn) : null,
     primaryButtonLabelAr: section.primaryButtonLabelAr,
     primaryButtonLabelEn: section.primaryButtonLabelEn,
     primaryButtonUrl: section.primaryButtonUrl,
@@ -54,7 +61,7 @@ export interface PublicPage {
   sections: PublicPageSection[];
 }
 
-export function toPublicPage(page: Page, sections: PageSection[]): PublicPage {
+export function toPublicPage(page: Page, sections: PageSection[], render: RenderMarkdown): PublicPage {
   return {
     id: page.id,
     slug: page.slug,
@@ -64,6 +71,6 @@ export function toPublicPage(page: Page, sections: PageSection[]): PublicPage {
     metaTitleEn: page.metaTitleEn,
     metaDescriptionAr: page.metaDescriptionAr,
     metaDescriptionEn: page.metaDescriptionEn,
-    sections: sections.map(toPublicPageSection),
+    sections: sections.map((s) => toPublicPageSection(s, render)),
   };
 }
