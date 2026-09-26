@@ -8,7 +8,7 @@ You are finishing the **Safeer API** (NestJS 11 + TypeORM + MySQL/MariaDB, zod D
 
 ## Inputs (read fully before touching code)
 
-- `docs/safeer-backend-fr-review.md` — the review. Every item ID below (B1…B15, D-items) refers to it.
+- `docs/safeer-backend-fr-review.md` — the review. Every item ID below (B1…B15, D-items; B16–B19 are defined in this prompt) refers to it.
 - `docs/safeer-design-spec.md` and `docs/safeer-implementation-prompt.md` — the source requirements.
 - `README.md` and `KNOWN-ISSUES.md` in the repo, which describe the architecture conventions. Follow them: the zod DTO style, `ProblemException` + `ErrorCode`, the audit interceptor, cache tags / `extraPurgeTags`, numbered SQL migrations with entities kept in sync, and `z.iso.datetime()` instead of `z.date()`.
 
@@ -82,6 +82,14 @@ You are finishing the **Safeer API** (NestJS 11 + TypeORM + MySQL/MariaDB, zod D
 - **B15** — add public `GET /sitemap-index`, returning `{ pages: [{slug, updatedAt}], posts: [{slug, updatedAt}], categories: [...] }` for published content only, cached with tags that are purged when any of those collections change. The frontend builds `sitemap.xml` and `hreflang` from it.
 - **Settings/social** — add `youtube_url`, `linkedin_url`, `whatsapp_url`, `tiktok_url` (nullable) to `site_settings`, and expose them in `GET /site`.
 
+## Phase 4b — Gaps found during frontend planning (B17–B19)
+
+- **B17 — `GET /admin/roles` does not exist.** The README documents it, but no controller implements it. Add it for any staff session. It returns `{ roles: ['admin','reviewer','editor','support'], matrix: { [area]: Role[] } }`, built from the same constants the `@Roles()` decorators use, so the two can't drift. Add a unit test that compares the matrix with the decorators on every `admin/*` controller.
+- **B18 — no public source for about-items outside the home page.** `vision`, `mission`, `scholarship_step` and `requirement` are seeded, but only `goal` and `care_pillar` are exposed (inside `GET /home`). The `about` and `scholarships` pages also have no seeded sections.
+  - Add public `GET /about-items?kind=vision,mission,goal,care_pillar,scholarship_step,requirement`, returning published rows grouped by kind and sorted by `sortOrder`. Cache it with the `about-items` tag.
+  - In a new migration, seed page sections for `about` (vision, mission, goals, governance) and `scholarships` (pillars, steps, requirements, cta) from the prototype. No invented content.
+- **B19 — `GET /portal/documents` returns raw `ApplicationDocument` entities**, including `storageKey` and `checksum`. Map them to a public shape: `id, docType, originalName, mime, sizeBytes, status, rejectionReason, createdAt`. The same applies to any admin response that returns the entity; admins don't need `storageKey` either.
+
 ## Phase 5 — Storage abstraction (decision 3)
 
 - Add a `StorageDriver` interface: `put`, `getStream`, `remove`, `signedUrl?`. Build a `LocalStorageDriver` from the current code and an `S3StorageDriver` using `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`, configurable for any S3-compatible endpoint.
@@ -104,7 +112,7 @@ You are finishing the **Safeer API** (NestJS 11 + TypeORM + MySQL/MariaDB, zod D
 
 ## Definition of done
 
-- Every item B1–B16 and every ⚠️/❌ row in the review's FR matrix is resolved. Give me a final table: item → fix → commit hash → test that covers it.
+- Every item B1–B19 and every ⚠️/❌ row in the review's FR matrix is resolved. Give me a final table: item → fix → commit hash → test that covers it.
 - `npm run build`, `npm run lint`, `npm test`, `npm run openapi:check` all pass, and CI is green.
 - `npm run migrate` works on a fresh DB, and on a DB already at `003`.
 - Project docs stay in `docs/`, and the repo root holds only `README.md` plus config files.
