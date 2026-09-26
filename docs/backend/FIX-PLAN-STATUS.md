@@ -130,3 +130,20 @@ Verification for red-before-green: the new tests were run against a `main`
 build first — A1 counted 10 blind verifies, A2's unknown-email path ran at
 0.14× an active account, A3 locked for 57 599 s, A4 answered in 5.2 s with
 a hanging SMS provider.
+
+### Low items (A5–A12)
+
+On branch `fix/delivery-followups-2`. A7, A8, A11 and A12 share one commit (one new
+spec file and the settings entity). Each test was run against a `main`
+build (`a8a8454`) first and failed for the reason the review gives.
+
+| Item | Fix | Commit | Test |
+|---|---|---|---|
+| A5 | Overview message figures gated on `AREA_ROLES.inbox` (applications on `AREA_ROLES.applications`) | `925db55` | `privacy.spec` (A5: editor/reviewer/support) |
+| A6 | Duplicate check uses plain `=` on email (the collation is case-insensitive) | `4e5d3a1` | `apply-flow.spec` (A6: the app's own statement from the general log, EXPLAINed; case-insensitive 409) |
+| A7 | `site_settings.encryption_key_check` (018); migrate and the app refuse a wrong key, probing encrypted data before 018 | `7027646` | `delivery-followups.spec` (A7 ×3) |
+| A8 | `DevModule` only in development/test; `DisabledDevModule` provides a no-op `OtpPeekService` elsewhere | `7027646` | `delivery-followups.spec` (A8: staging and production boots, routes unmapped) |
+| A9 | `@Throttle` 5/h per IP on interview book and cancel | `a9cf4e4` | `interviews.spec` (A9) |
+| A10 | Idle-draft purge re-checks and deletes the row under a lock, then removes files | `84d697d` | `privacy.spec` (A10: a submit holding the lock mid-purge) |
+| A11 | 019 masks OTP codes in old `sms_log`/`mail_log` rows and re-enables one admin if none is active; `downloadPath` null and 410 `DOCUMENT_SUPERSEDED` for superseded documents | `7027646` | `delivery-followups.spec` (A11 ×2) |
+| A12 | `map_embed_url` (https Google Maps embed / OpenStreetMap only), `map_lat`, `map_lng` (020) in admin settings and `GET /site` | `7027646` | `delivery-followups.spec` (A12), unit `safe-url.spec` (mapEmbedUrl) |

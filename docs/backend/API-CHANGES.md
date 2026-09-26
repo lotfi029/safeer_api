@@ -66,6 +66,8 @@ application's locale.
   - `GET portal/me` gains `interview: {id, startsAt, endsAt, location} | null`.
   - Booking, cancelling and a staff change to a booked slot each send a
     mail and SMS.
+  - A9: `POST portal/interview` and `DELETE portal/interview` are each
+    limited to 5 an hour per IP (429 `RATE_LIMITED` past that).
 
 ## Staff
 
@@ -83,6 +85,8 @@ application's locale.
 - **Overview (C20).**
   - `statCards.newApplications|underReview|acceptedThisMonth`, `series` and
     `latestApplications` are present only for admin and reviewer.
+  - A5: `statCards.unreadMessages` and `badges.unreadMessages` are present
+    only for admin and support (the inbox roles). Editors no longer get them.
   - `recentAuditLog` is admin-only (an empty array for other roles). Each
     entry is `{id, action, entityType, entityId, entityLabel, actorId, actorName, createdAt}`,
     with no diff and no IP hash. The full log stays in `GET admin/audit`.
@@ -121,6 +125,16 @@ application's locale.
 - **Newsletter admin (C27).** The subscriber list shows a `pending` status
   (not yet confirmed), and the CSV has a "Confirmed at" column.
 
+- **Application documents (A11).**
+  - Each document in `GET admin/applications/:id` (and the
+    `PATCH …/documents/:docId` response) gains `downloadPath`: the file
+    route relative to the API base
+    (`admin/applications/{id}/documents/{docId}/file`), or `null` for a
+    superseded document. Show a download link only when it is set.
+  - `GET admin/applications/:id/documents/:docId/file` for a superseded
+    document now answers 410 `DOCUMENT_SUPERSEDED` (its file was deleted
+    when it was replaced), not a bare 404.
+
 ## Public site
 
 - **Markdown (C26).** Page-section bodies (`GET pages/:slug`) and about-item
@@ -136,6 +150,13 @@ application's locale.
   - Public originals and PDFs are cached for 5 minutes (variants stay
     immutable).
   - A document is public only while its category is published.
+- **Contact-page map (A12).** `GET /site` → `settings` gains
+  `mapEmbedUrl: string | null`, `mapLat: number | null`, `mapLng: number | null`.
+  `mapEmbedUrl` is meant as an iframe `src`; the API accepts only https
+  Google Maps embeds (`https://www.google.com/maps/embed…`) or OpenStreetMap
+  (`https://www.openstreetmap.org/…`). Allow those two origins in the
+  frontend's `frame-src`. `GET/PUT admin/settings` take and return the same
+  three fields (latitude −90…90, longitude −180…180; anything else is 400).
 
 ## Phase 5 additions
 

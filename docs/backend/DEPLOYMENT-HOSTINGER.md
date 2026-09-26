@@ -194,6 +194,27 @@ Rows written before this change, by an app process whose own `TZ` wasn't
 UTC, hold local times. Hostinger's Node.js processes run in UTC, so a
 production database is unaffected; a dev database can simply be reset.
 
+## APP_ENCRYPTION_KEY
+
+The key encrypts the SMTP password, the SMS provider token and every
+applicant ID number. Data encrypted under one key can't be read with
+another, so the database remembers which key it belongs to (A7):
+`site_settings.encryption_key_check` holds an HMAC of a fixed label under the
+key. It identifies the key without revealing it.
+
+- The first `npm run migrate` or app start with a key stores the value.
+  Before that (a database from before migration 018), an already-encrypted
+  value is test-decrypted instead.
+- From then on, **`npm run migrate` and the app refuse to run with any other
+  key**, before changing anything:
+  "APP_ENCRYPTION_KEY does not match the key this database was encrypted with".
+- If you see that message: the environment has the wrong key. Put back the
+  original (from the copy kept outside the server, see *Backups*). Don't
+  clear the column to get past it: that only lets the wrong key write data
+  nobody can read.
+- A genuine key change isn't supported: everything encrypted would have to
+  be re-encrypted first (see *Rollback*).
+
 ## Migrations
 
 `npm run migrate` applies `migrations/*.sql` in order and records each file,
