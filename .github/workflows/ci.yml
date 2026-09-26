@@ -28,6 +28,11 @@ jobs:
         env:
           MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
           MYSQL_DATABASE: safeer
+          # C9: the server's own clock runs off-UTC (UTC+3, POSIX form so it
+          # needs no zoneinfo files), like a MariaDB set to the association's
+          # local time would. The app, migrate.mjs and the tests must pin
+          # every connection to UTC regardless; test/utc.spec.ts fails if not.
+          TZ: '<+03>-3'
         ports:
           - 3306:3306
         options: >-
@@ -137,7 +142,8 @@ jobs:
       # A clean build is not a working app (this project's own recorded
       # lesson, three times over) — boot the process and hit the endpoint,
       # via the extended smoke suite, rather than trusting the build alone.
-      - run: npm run smoke
+      # C8: smoke refuses to touch a database it wasn't explicitly pointed at.
+      - run: npm run smoke -- --confirm=safeer
 
       - name: API logs (always, for debugging)
         if: always()

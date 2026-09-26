@@ -6,35 +6,55 @@
 // TypeORM's generator — the schema is hand-reviewed SQL, transcribed
 // verbatim from 12-database.md.
 //
-// B0-5: migrations/dev/ holds dev-and-staging-only fixtures
-// (003_dev_sample.sql — fake content plus two dev user accounts) and is
-// included only when NODE_ENV !== 'production'. Previously this glob had no
-// environment check at all, so a production `npm run migrate` silently
-// loaded the fake data (20-production-deploy-checklist.md's named blocker).
+// C11: migrations/dev/ holds dev/test-only fixtures (003_dev_sample.sql —
+// fake content, sample applications) and is included only when NODE_ENV is
+// development or test. staging and production never get them. NODE_ENV
+// must be one of the values src/config/env.ts accepts (scripts/lib/node-env.mjs).
+//
+// C29:
+// - Every applied file's sha256 is stored in schema_migrations.checksum
+//   (CRLF normalised to LF first, so a Windows checkout hashes the same).
+//   Rows applied by the older runner have no checksum; the first run of this
+//   runner backfills it from the file on disk. From then on, an applied file
+//   whose content changed fails the run before anything is applied —
+//   applied migrations are immutable; changes go in a new numbered file.
+// - GET_LOCK('safeer_migrate') makes two concurrent runs (two deploy hooks,
+//   a deploy plus someone in SSH) wait for each other instead of both
+//   applying the same file.
+// - Connects as MIGRATION_DB_USER (scripts/lib/db-connection.mjs), falling
+//   back to DB_USER only in development/test.
+//
+// C9: the connection is UTC (timezone 'Z' + SET time_zone), like the app.
 //
 // Usage:
 //   node scripts/migrate.mjs            apply every pending migration
-//   node scripts/migrate.mjs --status   list applied / pending, apply nothing
+//   node scripts/migrate.mjs --status   list applied / pending / changed, write nothing
+//
+// MIGRATIONS_DIR overrides the migrations directory (test/migrate.spec.ts
+// only; its dev fixtures are read from <MIGRATIONS_DIR>/dev).
+// MIGRATE_LOCK_TIMEOUT_SECONDS (default 30) bounds the wait for the lock.
 
 import { readdir, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
-import mysql from 'mysql2/promise';
+import { DEV_ENVS, requireNodeEnv } from './lib/node-env.mjs';
+import { openMigrationConnection } from './lib/db-connection.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const migrationsDir = path.join(__dirname, '..', 'migrations');
+const migrationsDir = process.env.MIGRATIONS_DIR
+  ? path.resolve(process.env.MIGRATIONS_DIR)
+  : path.join(__dirname, '..', 'migrations');
 const devMigrationsDir = path.join(migrationsDir, 'dev');
 
+const LOCK_NAME = 'safeer_migrate';
 const statusOnly = process.argv.includes('--status');
 
-function env(name, fallback) {
-  const value = process.env[name] ?? fallback;
-  if (value === undefined) {
-    console.error(`Missing required env var: ${name}`);
-    process.exit(1);
-  }
-  return value;
+class MigrateError extends Error {}
+
+function checksumOf(sql) {
+  return createHash('sha256').update(sql.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
 }
 
 /**
@@ -46,9 +66,8 @@ function env(name, fallback) {
  * a populated schema. The duplicate-name guard below is what buys back the
  * safety a path prefix would otherwise have given.
  */
-async function resolveMigrationFiles() {
-  const nodeEnv = env('NODE_ENV'); // no fallback: refuse to guess the environment
-  const includeDev = nodeEnv !== 'production';
+async function resolveMigrationFiles(nodeEnv) {
+  const includeDev = DEV_ENVS.includes(nodeEnv);
 
   const rootEntries = await readdir(migrationsDir, { withFileTypes: true });
   const rootNames = rootEntries.filter((d) => d.isFile() && d.name.endsWith('.sql')).map((d) => d.name);
@@ -70,41 +89,38 @@ async function resolveMigrationFiles() {
   const seen = new Set();
   for (const file of files) {
     if (seen.has(file.version)) {
-      console.error(`Duplicate migration name in migrations/ and migrations/dev/: ${file.version}`);
-      process.exit(1);
+      throw new MigrateError(`Duplicate migration name in migrations/ and migrations/dev/: ${file.version}`);
     }
     seen.add(file.version);
   }
 
+  for (const file of files) {
+    file.sql = await readFile(file.fullPath, 'utf8');
+    file.checksum = checksumOf(file.sql);
+  }
   return files;
 }
 
-async function main() {
-  // Resolved before touching the database — a missing NODE_ENV, or a
-  // duplicate migration name, should fail fast without needing a live
-  // connection (and is what lets this be checked with `--status` alone).
-  const files = await resolveMigrationFiles();
-
-  const connection = await mysql.createConnection({
-    host: env('DB_HOST'),
-    port: Number(env('DB_PORT', '3306')),
-    user: env('DB_USER'),
-    password: env('DB_PASSWORD'),
-    database: env('DB_NAME'),
-    // Full collation, not just the charset name (see database.module.ts) —
-    // mysql2 otherwise negotiates utf8mb4_general_ci, not the
-    // utf8mb4_unicode_ci every table in migrations/001_schema.sql uses.
-    charset: 'utf8mb4_unicode_ci',
-    multipleStatements: true,
-  });
-
+async function ensureTrackingTables(connection) {
   await connection.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version    VARCHAR(255) NOT NULL,
       applied_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      checksum   CHAR(64)     NULL,
       PRIMARY KEY (version)
     ) ENGINE=InnoDB;
   `);
+
+  // Databases migrated by the older runner have the table without the
+  // checksum column. information_schema rather than ADD COLUMN IF NOT
+  // EXISTS, which MariaDB has and MySQL 8 does not.
+  const [cols] = await connection.query(
+    `SELECT 1 FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_migrations' AND COLUMN_NAME = 'checksum'`,
+  );
+  if (cols.length === 0) {
+    await connection.query('ALTER TABLE schema_migrations ADD COLUMN checksum CHAR(64) NULL');
+  }
 
   // TypeORM's own bookkeeping table (not one of our domain tables, and not
   // created by us via a numbered migration for that reason). Its schema
@@ -113,13 +129,6 @@ async function main() {
   // TypeORM would normally create it the first time `synchronize` runs,
   // which never happens here (synchronize is always off), so it's created
   // once, idempotently, alongside our own tooling table.
-  //
-  // Safeer has no GENERATED columns today (unlike african_api's
-  // meetings.meeting_year), so unlike that reference this runner does not
-  // insert any typeorm_metadata rows — this table creation stays generic
-  // and reusable if a future migration adds one. See
-  // src/database/entities/*.entity.ts for `asExpression` usage if that
-  // ever changes.
   await connection.query(`
     CREATE TABLE IF NOT EXISTS typeorm_metadata (
       \`type\`     VARCHAR(255) NOT NULL,
@@ -130,47 +139,136 @@ async function main() {
       \`value\`    TEXT NULL
     ) ENGINE=InnoDB;
   `);
+}
 
-  const [appliedRows] = await connection.query('SELECT version FROM schema_migrations');
-  const applied = new Set(appliedRows.map((r) => r.version));
+async function readApplied(connection) {
+  const [tables] = await connection.query(
+    "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_migrations'",
+  );
+  if (tables.length === 0) return new Map();
+  const [cols] = await connection.query(
+    `SELECT 1 FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_migrations' AND COLUMN_NAME = 'checksum'`,
+  );
+  const [rows] = await connection.query(
+    cols.length ? 'SELECT version, checksum FROM schema_migrations' : 'SELECT version, NULL AS checksum FROM schema_migrations',
+  );
+  return new Map(rows.map((r) => [r.version, r.checksum]));
+}
 
-  if (statusOnly) {
-    for (const file of files) {
-      console.log(`${applied.has(file.version) ? '[applied]' : '[pending]'} ${file.version}`);
+async function printStatus(connection, files) {
+  const applied = await readApplied(connection);
+  for (const file of files) {
+    if (!applied.has(file.version)) {
+      console.log(`[pending] ${file.version}`);
+    } else {
+      const stored = applied.get(file.version);
+      if (stored === null) console.log(`[applied] ${file.version} (no checksum yet — backfilled on the next migrate)`);
+      else if (stored !== file.checksum) console.log(`[CHANGED] ${file.version} (file differs from what was applied)`);
+      else console.log(`[applied] ${file.version}`);
     }
-    await connection.end();
-    return;
   }
+}
 
+async function acquireLock(connection) {
+  const timeout = Number(process.env.MIGRATE_LOCK_TIMEOUT_SECONDS ?? 30);
+  const [[row]] = await connection.query('SELECT GET_LOCK(?, ?) AS acquired', [LOCK_NAME, timeout]);
+  if (Number(row.acquired) !== 1) {
+    throw new MigrateError(
+      `Could not acquire the '${LOCK_NAME}' lock within ${timeout}s — another migrate run is in progress. ` +
+        'Wait for it to finish and re-run.',
+    );
+  }
+}
+
+/** Backfills missing checksums; fails if any applied file changed. */
+async function verifyChecksums(connection, files, applied) {
+  const changed = [];
+  for (const file of files) {
+    if (!applied.has(file.version)) continue;
+    const stored = applied.get(file.version);
+    if (stored === null) {
+      await connection.query('UPDATE schema_migrations SET checksum = ? WHERE version = ? AND checksum IS NULL', [
+        file.checksum,
+        file.version,
+      ]);
+      console.log(`Recorded checksum for already-applied ${file.version}`);
+    } else if (stored !== file.checksum) {
+      changed.push(file);
+    }
+  }
+  if (changed.length) {
+    const lines = changed.map((f) => `  ${f.version}: applied ${applied.get(f.version)}, on disk ${f.checksum}`);
+    throw new MigrateError(
+      'Checksum mismatch — these already-applied migrations were edited after they ran:\n' +
+        lines.join('\n') +
+        '\nApplied migrations are immutable: revert the edit and put the change in a new numbered file.\n' +
+        'If the edit really is harmless (a comment, whitespace), accept it explicitly with\n' +
+        "  UPDATE schema_migrations SET checksum = '<on-disk checksum>' WHERE version = '<file>';\n" +
+        'See docs/backend/DEPLOYMENT-HOSTINGER.md, "Migrations".',
+    );
+  }
+}
+
+async function applyPending(connection, files, applied) {
+  let count = 0;
   for (const file of files) {
     if (applied.has(file.version)) continue;
-
-    const sql = await readFile(file.fullPath, 'utf8');
     console.log(`Applying ${file.version} ...`);
 
-    // Note: MySQL DDL statements implicitly commit, so for a pure-DDL file
-    // (001_schema.sql) this transaction cannot fully roll back a partial
-    // failure the way it can for the pure-DML seed files (002/003) — that
-    // is an InnoDB limitation, not something this runner can work around.
+    // MySQL/MariaDB DDL commits implicitly, so for a DDL file this
+    // transaction cannot roll back a partial failure the way it can for a
+    // pure-DML seed file — an InnoDB limitation, not something the runner
+    // can work around. The failure message points at the recovery steps.
     await connection.beginTransaction();
     try {
-      await connection.query(sql);
-      await connection.query('INSERT INTO schema_migrations (version) VALUES (?)', [file.version]);
+      await connection.query(file.sql);
+      await connection.query('INSERT INTO schema_migrations (version, checksum) VALUES (?, ?)', [file.version, file.checksum]);
       await connection.commit();
-      console.log(`  done`);
+      console.log('  done');
+      count++;
     } catch (err) {
       await connection.rollback();
-      console.error(`  failed: ${err.message}`);
-      await connection.end();
-      process.exit(1);
+      throw new MigrateError(
+        `${file.version} failed: ${err.message}\n` +
+          'It is NOT recorded in schema_migrations. If the file contains DDL (CREATE/ALTER/DROP), the statements\n' +
+          'before the failing one were committed anyway. Recover by hand before re-running — see\n' +
+          'docs/backend/DEPLOYMENT-HOSTINGER.md, "Recovering from a half-applied migration".',
+      );
     }
   }
+  return count;
+}
 
-  await connection.end();
-  console.log('All migrations applied.');
+async function main() {
+  const nodeEnv = requireNodeEnv('migrate');
+  // Resolved before touching the database — a bad NODE_ENV or a duplicate
+  // migration name fails fast without needing a live connection.
+  const files = await resolveMigrationFiles(nodeEnv);
+
+  const connection = await openMigrationConnection('migrate', nodeEnv);
+  try {
+    if (statusOnly) {
+      await printStatus(connection, files);
+      return;
+    }
+
+    await acquireLock(connection);
+    try {
+      await ensureTrackingTables(connection);
+      const applied = await readApplied(connection);
+      await verifyChecksums(connection, files, applied);
+      const count = await applyPending(connection, files, applied);
+      console.log(count ? `All migrations applied (${count} new).` : 'Nothing to migrate — already up to date.');
+    } finally {
+      await connection.query('SELECT RELEASE_LOCK(?)', [LOCK_NAME]).catch(() => {});
+    }
+  } finally {
+    await connection.end();
+  }
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error(err instanceof MigrateError ? err.message : err);
   process.exit(1);
 });

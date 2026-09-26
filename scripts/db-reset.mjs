@@ -2,7 +2,7 @@
 // scripts/db-reset.mjs — drop and recreate DB_NAME, then re-apply every
 // migration from disk (18-completion-plan.md C7.4). Gets anyone back to a
 // known, seeded state in one command:
-//   npm run db:reset
+//   npm run db:reset -- --confirm=<DB_NAME>
 //
 // This does NOT re-run `npm run seed` (tools/seed-from-prototype.mjs) — that
 // script regenerates migrations/002_seed.sql and migrations/dev/003_dev_sample.sql
@@ -13,43 +13,34 @@
 // Re-run `npm run seed` yourself first if you've changed the prototype seed
 // content and want that reflected before resetting.
 //
-// Refuses to run against anything but a local database, as a guardrail
-// against fat-fingering this at a staging/production DB_HOST.
+// Guardrails against wiping the wrong database:
+// - C8: refuses unless NODE_ENV is development/test and the database is
+//   named explicitly: `npm run db:reset -- --confirm=<DB_NAME>`.
+// - Refuses anything but a local DB_HOST.
+// Connects with the migration credentials, in UTC, like migrate.mjs
+// (scripts/lib/db-connection.mjs).
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import 'dotenv/config';
-import mysql from 'mysql2/promise';
+import { requireDevDbConfirmation } from './lib/dev-db-guard.mjs';
+import { openMigrationConnection } from './lib/db-connection.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-function env(name, fallback) {
-  const value = process.env[name] ?? fallback;
-  if (value === undefined) {
-    console.error(`Missing required env var: ${name}`);
-    process.exit(1);
-  }
-  return value;
-}
 
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 
 async function main() {
-  const host = env('DB_HOST');
+  requireDevDbConfirmation('db:reset');
+  const host = process.env.DB_HOST;
   if (!LOCAL_HOSTS.has(host)) {
     console.error(`Refusing to reset a non-local DB_HOST (${host}). db:reset is a dev-only convenience.`);
     process.exit(1);
   }
-  const dbName = env('DB_NAME');
+  const dbName = process.env.DB_NAME;
 
-  const connection = await mysql.createConnection({
-    host,
-    port: Number(env('DB_PORT', '3306')),
-    user: env('DB_USER'),
-    password: env('DB_PASSWORD'),
-    multipleStatements: true,
-  });
+  const connection = await openMigrationConnection('db:reset', process.env.NODE_ENV, { database: null });
 
   console.log(`Dropping and recreating \`${dbName}\` on ${host} ...`);
   await connection.query(`DROP DATABASE IF EXISTS \`${dbName}\`;`);

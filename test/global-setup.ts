@@ -72,8 +72,13 @@ module.exports = async function globalSetup() {
   runNode('scripts/migrate.mjs', migrateEnv);
 
   // 3. Boot the real (compiled) app against that database, on its own port.
+  // C9: deliberately NOT in UTC (Asia/Riyadh, UTC+3, by default) — every
+  // spec then runs against an app whose process clock disagrees with UTC,
+  // which is what proves the database layer pins everything to UTC
+  // (src/database/utc.ts, test/utc.spec.ts).
   const appEnv = {
     ...migrateEnv,
+    TZ: process.env.TEST_APP_TZ ?? 'Asia/Riyadh',
     PORT: TEST_PORT,
     STORAGE_ROOT: process.env.TEST_STORAGE_ROOT ?? './var/assets-test',
     BOOTSTRAP_ADMIN_EMAIL: process.env.BOOTSTRAP_ADMIN_EMAIL ?? 'admin@safeer-sa.org',
@@ -97,6 +102,7 @@ module.exports = async function globalSetup() {
 
   process.env.TEST_BASE_URL = `http://localhost:${TEST_PORT}/api/v1`;
   process.env.TEST_HEALTH_URL = `http://localhost:${TEST_PORT}/health`;
+  process.env.TEST_APP_TZ = appEnv.TZ;
   process.env.TEST_DB_NAME = TEST_DB_NAME;
   process.env.TEST_DB_HOST = rootDbEnv.DB_HOST;
   process.env.TEST_DB_PORT = rootDbEnv.DB_PORT;

@@ -17,17 +17,24 @@
 // sms_log/mail_log, seeding a role-specific user, counting rows before/after).
 //
 // Usage:
-//   npm run build && npm start   (or start:dev) in one terminal
-//   node scripts/smoke.mjs       in another   (or: npm run smoke)
+//   npm run build && npm start                       (or start:dev) in one terminal
+//   npm run smoke -- --confirm=<DB_NAME>             in another
+//
+// C8: it inserts and deletes rows directly in DB_NAME, so it refuses to run
+// unless NODE_ENV is development/test and --confirm names that database
+// (scripts/lib/dev-db-guard.mjs).
 //
 // Requires BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD in .env and a
-// freshly migrated + seeded database (`npm run db:reset`) — several cases
+// freshly migrated + seeded database (`npm run db:reset -- --confirm=<DB_NAME>`) — several cases
 // (legacy-news bulk-delete, the permission matrix) assume the dev sample
 // fixtures are exactly as `migrations/dev/003_dev_sample.sql` left them.
 
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import * as argon2 from 'argon2';
+import { requireDevDbConfirmation } from './lib/dev-db-guard.mjs';
+
+requireDevDbConfirmation('smoke');
 
 const PORT = process.env.PORT ?? '3900';
 const BASE = `http://localhost:${PORT}/api/v1`;
@@ -98,7 +105,9 @@ async function withDb(fn) {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     charset: 'utf8mb4_unicode_ci',
+    timezone: 'Z', // C9: same clock as the app (src/database/utc.ts)
   });
+  await conn.query("SET time_zone = '+00:00'");
   try {
     return await fn(conn);
   } finally {
@@ -768,6 +777,8 @@ test('full review loop: apply → 3 docs → submit → reject/re-upload/accept 
     assert(rejected.status === 200, `document rejection failed: ${rejected.status}: ${JSON.stringify(rejected.body)}`);
 
     const meAfterReject = await api('GET', '/portal/me', { session: applicant });
+    // B16: portal/me hands back this session's CSRF token (for a page reload).
+    assert(meAfterReject.body.csrfToken === applicant.csrfToken, 'GET portal/me must return the session\'s csrfToken');
     assert(meAfterReject.body.actionNeeded?.type === 'document_rejected', `expected actionNeeded.type 'document_rejected', got ${JSON.stringify(meAfterReject.body.actionNeeded)}`);
     assert(meAfterReject.body.actionNeeded.docType === 'id_copy', `expected the rejected docType to be id_copy, got ${meAfterReject.body.actionNeeded.docType}`);
 

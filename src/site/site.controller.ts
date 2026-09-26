@@ -54,7 +54,9 @@ export class SiteController {
   @Public()
   @Get()
   @UseInterceptors(CacheInterceptor)
-  @CacheTags('site_settings')
+  // 'pages' too: the nav is built from published pages, so publishing or
+  // unpublishing one must purge this response, not only a settings edit.
+  @CacheTags('site_settings', 'pages')
   @CacheKeyParams()
   async get(): Promise<PublicSite> {
     const [settings, pages] = await Promise.all([

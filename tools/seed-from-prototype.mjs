@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // Generates migrations/002_seed.sql and migrations/dev/003_dev_sample.sql
-// from the prototype's own copy. The prototype lives outside this repo;
-// its path comes from PROTOTYPE_PATH (default ../../docs/safeer-prototype.html,
-// resolved against the repo root).
+// from the prototype's own copy (docs/prototype/safeer-prototype.html, or
+// PROTOTYPE_PATH — absolute, or relative to the repo root).
 //
 // The prototype's <script> block has a clean run of top-level `const`
 // declarations with no function calls inside the object literals — from
@@ -53,7 +52,7 @@ import { storeAsset, makePlaceholderImage, makePlaceholderPdf } from './lib/asse
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const PROTOTYPE_PATH = path.resolve(ROOT, process.env.PROTOTYPE_PATH || '../../docs/safeer-prototype.html');
+const PROTOTYPE_PATH = path.resolve(ROOT, process.env.PROTOTYPE_PATH || 'docs/prototype/safeer-prototype.html');
 const MIGRATIONS_DIR = path.join(ROOT, 'migrations');
 const DEV_MIGRATIONS_DIR = path.join(MIGRATIONS_DIR, 'dev');
 const STORAGE_ROOT = path.resolve(ROOT, process.env.STORAGE_ROOT || './var/assets');
@@ -106,8 +105,8 @@ function loadPrototype() {
   if (!existsSync(PROTOTYPE_PATH)) {
     console.error(
       `Prototype HTML not found at ${PROTOTYPE_PATH}.\n` +
-        'It is kept outside the repo. Set PROTOTYPE_PATH to its location (absolute, or relative to the repo root), e.g.\n' +
-        '  PROTOTYPE_PATH=../../docs/safeer-prototype.html npm run seed',
+        'Restore docs/prototype/safeer-prototype.html, or set PROTOTYPE_PATH to its location (absolute, or relative to the repo root), e.g.\n' +
+        '  PROTOTYPE_PATH=/path/to/safeer-prototype.html npm run seed',
     );
     process.exit(1);
   }

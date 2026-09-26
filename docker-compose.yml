@@ -8,11 +8,12 @@ services:
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     # 3308, not african_api's 3307 — the two sibling repos' docker-compose
     # stacks can then run at the same time on one machine without a port
-    # clash.
-    ports: ["3308:3306"]
+    # clash. Bound to 127.0.0.1 only (C47): the root password below is a
+    # well-known dev value, so the port must not be reachable from the LAN.
+    ports: ["127.0.0.1:3308:3306"]
     volumes: ["dbdata:/var/lib/mysql"]
   mail:
     image: mailhog/mailhog
     container_name: safeer-mailhog
-    ports: ["9026:8025", "1026:1025"]
+    ports: ["127.0.0.1:9026:8025", "127.0.0.1:1026:1025"]
 volumes: { dbdata: }
