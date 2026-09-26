@@ -10,12 +10,19 @@ async function categoryId(): Promise<string> {
   return withDb((conn) => conn.execute('SELECT id FROM news_categories ORDER BY id LIMIT 1').then(([rows]: any) => String(rows[0].id)));
 }
 
-async function lastAudit(entityId: string): Promise<string> {
-  return withDb((conn) =>
-    conn
-      .execute("SELECT action FROM audit_log WHERE entity_type = 'posts' AND entity_id = ? ORDER BY id DESC LIMIT 1", [entityId])
-      .then(([rows]: any) => rows[0]?.action),
-  );
+/** The audit row is inserted just after the response, so poll until the expected action shows up (or give up and return the last one). */
+async function lastAudit(entityId: string, expected?: string): Promise<string> {
+  let action: string | undefined;
+  for (let i = 0; i < 50; i++) {
+    action = await withDb((conn) =>
+      conn
+        .execute("SELECT action FROM audit_log WHERE entity_type = 'posts' AND entity_id = ? ORDER BY id DESC LIMIT 1", [entityId])
+        .then(([rows]: any) => rows[0]?.action),
+    );
+    if (expected === undefined || action === expected) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return action as string;
 }
 
 async function redirectsFrom(path: string): Promise<any[]> {
@@ -50,10 +57,10 @@ describe('content publishing', () => {
       const published = await adminApi('PATCH', `/admin/news/${draft.body.id}`, { body: { isPublished: true } });
       expect(published.status).toBe(200);
       expect(published.body.publishedOn).toBe(new Date().toISOString().slice(0, 10));
-      expect(await lastAudit(draft.body.id)).toBe('publish');
+      expect(await lastAudit(draft.body.id, 'publish')).toBe('publish');
 
       await adminApi('PATCH', `/admin/news/${draft.body.id}/publish`, { body: { isPublished: false } });
-      expect(await lastAudit(draft.body.id)).toBe('unpublish');
+      expect(await lastAudit(draft.body.id, 'unpublish')).toBe('unpublish');
     });
   });
 

@@ -228,7 +228,13 @@ describe('C27: DELETE admin/applications/:id anonymises', () => {
       expect(await scalar('SELECT COUNT(*) FROM application_notes WHERE application_id = ?', [applicant.id])).toBe(0);
       expect(await scalar("SELECT COUNT(*) FROM mail_log WHERE entity_type = 'applications' AND entity_id = ?", [applicant.id])).toBe(0);
       expect(existsSync(path.join(STORAGE_ROOT, key))).toBe(false);
-      expect(await scalar("SELECT action FROM audit_log WHERE entity_type = 'applications' AND entity_id = ? ORDER BY id DESC LIMIT 1", [applicant.id])).toBe('delete');
+      // The audit row lands just after the response.
+      let action: string | undefined;
+      for (let i = 0; i < 50 && action !== 'delete'; i++) {
+        action = await scalar("SELECT action FROM audit_log WHERE entity_type = 'applications' AND entity_id = ? ORDER BY id DESC LIMIT 1", [applicant.id]);
+        if (action !== 'delete') await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(action).toBe('delete');
     } finally {
       await deleteTempUser(reviewer.id);
       await deleteApplication(applicant.id);

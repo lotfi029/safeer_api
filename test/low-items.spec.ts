@@ -200,9 +200,14 @@ describe('C36: CSV export', () => {
     const res = await fetch(`${BASE}/admin/applications/export.csv?status=accepted`, { headers: { Cookie: admin.cookie } });
     expect(res.status).toBe(200);
     expect(res.headers.get('x-truncated')).toBe('false');
-    const [row]: any = await withDb((conn) =>
-      conn.execute("SELECT entity_type, diff FROM audit_log WHERE action = 'export' AND id > ? ORDER BY id DESC LIMIT 1", [before]).then(([r]: any) => r),
-    );
+    // The audit row is written just after the response (AuditInterceptor never delays it), so wait for it.
+    let row: any;
+    for (let i = 0; i < 50 && !row; i++) {
+      [row] = await withDb((conn) =>
+        conn.execute("SELECT entity_type, diff FROM audit_log WHERE action = 'export' AND id > ? ORDER BY id DESC LIMIT 1", [before]).then(([r]: any) => r),
+      );
+      if (!row) await new Promise((r) => setTimeout(r, 50));
+    }
     expect(row.entity_type).toBe('applications');
     const diff = typeof row.diff === 'string' ? JSON.parse(row.diff) : row.diff;
     expect(diff.after.filters).toEqual({ status: 'accepted', q: null, reviewerId: null });
