@@ -1,6 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import { Application, type ApplicationStatus } from '../database/entities/application.entity.js';
 import { ApplicationDocument, type ApplicationDocType } from '../database/entities/application-document.entity.js';
 import { ApplicationNote } from '../database/entities/application-note.entity.js';
@@ -22,6 +22,10 @@ import type { UpdateApplicationAdminDto } from './dto/update-application.dto.js'
 import type { BulkActionDto } from './dto/bulk-action.dto.js';
 import type { ReviewDocumentDto } from './dto/review-document.dto.js';
 import { portalLoginUrl } from '../common/links/frontend-url.js';
+import { toAdminDocument, type AdminApplicationDocument } from '../portal/public-document.js';
+
+/** C34: a document can only be reviewed while its application is in the review pipeline. */
+const UNREVIEWABLE_STATUSES: ApplicationStatus[] = ['draft', 'accepted', 'rejected'];
 
 const STATUS_VALUES: ApplicationStatus[] = ['draft', 'new', 'under_review', 'docs_missing', 'interview', 'accepted', 'rejected'];
 
@@ -81,6 +85,8 @@ function fullName(a: Pick<Application, 'firstName' | 'middleName' | 'lastName'>)
  */
 @Injectable()
 export class AdminApplicationsService {
+  private readonly logger = new Logger(AdminApplicationsService.name);
+
   constructor(
     @InjectRepository(Application) private readonly applicationRepo: Repository<Application>,
     @InjectRepository(ApplicationDocument) private readonly documentRepo: Repository<ApplicationDocument>,
@@ -270,7 +276,7 @@ export class AdminApplicationsService {
       assignedReviewer: application.assignedReviewer
         ? { id: application.assignedReviewer.id, name: application.assignedReviewer.name, email: application.assignedReviewer.email }
         : null,
-      documents,
+      documents: documents.map(toAdminDocument),
       notes: notes.map((n) => ({ id: n.id, body: n.body, authorId: n.authorId, authorName: n.author?.name ?? null, createdAt: n.createdAt })),
       events: events.map((e) => ({
         id: e.id,
@@ -298,14 +304,15 @@ export class AdminApplicationsService {
     const application = await this.findOrNotFound(id);
     const before = { status: application.status, assignedReviewerId: application.assignedReviewerId };
 
+    let current: Application = application;
     if (dto.status !== undefined) {
-      await this.applyStatusChange(application, dto.status, req.user!.id);
+      current = await this.applyStatusChange(id, dto.status, req.user!.id);
     }
     if (dto.assignedReviewerId !== undefined) {
-      await this.applyAssignReviewer(application, dto.assignedReviewerId, req.user!.id);
+      current = await this.applyAssignReviewer(id, dto.assignedReviewerId, req.user!.id);
     }
 
-    const after = { status: application.status, assignedReviewerId: application.assignedReviewerId };
+    const after = { status: current.status, assignedReviewerId: current.assignedReviewerId };
     // Privacy-conscious diff (messages.service.ts / submissions.controller.ts's own pattern): before/after
     // are limited to exactly {status, assignedReviewerId} — never the applicant's name/email/phone, even
     // though this write touches the `applications` row that holds them.
@@ -326,27 +333,63 @@ export class AdminApplicationsService {
    * place `STATUS_CHANGED` is written and `application_status_changed`
    * mail/SMS is sent, so the two call sites can never drift on what a
    * "status change" means.
+   *
+   * C6: the transition is checked against the row as locked
+   * (`pessimistic_write`) inside the transaction, so of two conflicting
+   * changes racing each other the second sees the first's committed status
+   * and fails the transition check — the applicant can never be told both
+   * "accepted" and "rejected". Notifications go out only after commit.
    */
-  private async applyStatusChange(application: Application, target: ApplicationStatus, actorId: string): Promise<void> {
-    assertStatusTransition(application.status, target);
-    const from = application.status;
-    application.status = target;
-    if (target === 'accepted' || target === 'rejected') {
-      application.decidedAt = new Date();
+  private async applyStatusChange(applicationId: string, target: ApplicationStatus, actorId: string): Promise<Application> {
+    const application = await this.applicationRepo.manager.transaction(async (manager) => {
+      const locked = await this.lockApplication(manager, applicationId);
+      assertStatusTransition(locked.status, target);
+      const from = locked.status;
+      locked.status = target;
+      if (target === 'accepted' || target === 'rejected') {
+        locked.decidedAt = new Date();
+      }
+      await manager.save(locked);
+      await manager.save(
+        manager.create(ApplicationEvent, {
+          applicationId,
+          type: 'STATUS_CHANGED',
+          actorId,
+          visibleToApplicant: true,
+          data: { from, to: target },
+        }),
+      );
+      return locked;
+    });
+
+    await this.afterCommit(() => this.notifyStatusChange(application, target));
+    return application;
+  }
+
+  /** C6: the application row under `pessimistic_write`, or 404. */
+  private async lockApplication(manager: EntityManager, applicationId: string): Promise<Application> {
+    const application = await manager
+      .createQueryBuilder(Application, 'a')
+      .setLock('pessimistic_write')
+      .where('a.id = :id', { id: applicationId })
+      .getOne();
+    if (!application) {
+      throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Application not found');
     }
-    await this.applicationRepo.save(application);
+    return application;
+  }
 
-    await this.eventRepo.save(
-      this.eventRepo.create({
-        applicationId: application.id,
-        type: 'STATUS_CHANGED',
-        actorId,
-        visibleToApplicant: true,
-        data: { from, to: target },
-      }),
-    );
-
-    await this.notifyStatusChange(application, target);
+  /**
+   * C6: a notification failure after commit is logged, never turned into a
+   * 500 (the change it reports has already happened) and never marks a
+   * bulk item as failed.
+   */
+  private async afterCommit(notify: () => Promise<void>): Promise<void> {
+    try {
+      await notify();
+    } catch (err) {
+      this.logger.error('Post-commit notification failed', err instanceof Error ? err.stack : String(err));
+    }
   }
 
   /** `site_settings.notify_email_on_status_change` / `notify_sms_on_status_change` gate this — unlike request-documents/document-reject, a generic status change is opt-out-able. */
@@ -391,7 +434,7 @@ export class AdminApplicationsService {
     return users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role as 'admin' | 'reviewer' }));
   }
 
-  private async applyAssignReviewer(application: Application, reviewerId: string | null, actorId: string): Promise<void> {
+  private async applyAssignReviewer(applicationId: string, reviewerId: string | null, actorId: string): Promise<Application> {
     if (reviewerId !== null) {
       const reviewer = await this.userRepo.findOne({ where: { id: reviewerId } });
       if (!reviewer) {
@@ -405,19 +448,22 @@ export class AdminApplicationsService {
         );
       }
     }
-    application.assignedReviewerId = reviewerId;
-    await this.applicationRepo.save(application);
-
-    await this.eventRepo.save(
-      this.eventRepo.create({
-        applicationId: application.id,
-        type: 'REVIEWER_ASSIGNED',
-        actorId,
-        // Internal bookkeeping, not something the applicant reads about.
-        visibleToApplicant: false,
-        data: { reviewerId },
-      }),
-    );
+    return this.applicationRepo.manager.transaction(async (manager) => {
+      const locked = await this.lockApplication(manager, applicationId);
+      locked.assignedReviewerId = reviewerId;
+      await manager.save(locked);
+      await manager.save(
+        manager.create(ApplicationEvent, {
+          applicationId,
+          type: 'REVIEWER_ASSIGNED',
+          actorId,
+          // Internal bookkeeping, not something the applicant reads about.
+          visibleToApplicant: false,
+          data: { reviewerId },
+        }),
+      );
+      return locked;
+    });
   }
 
   // -------------------------------------------------------------------
@@ -435,18 +481,14 @@ export class AdminApplicationsService {
 
     for (const id of dto.ids) {
       try {
-        const application = await this.applicationRepo.findOne({ where: { id } });
-        if (!application) {
-          throw new ProblemException(404, ErrorCode.NOT_FOUND, `Application ${id} not found`);
-        }
-
+        // Each id is its own transaction (C6) — one failing never rolls back another.
         if (dto.action === 'assign') {
           // `bulkActionSchema`'s `superRefine` already guarantees this is present for `action: 'assign'`.
-          await this.applyAssignReviewer(application, dto.reviewerId ?? null, req.user!.id);
+          await this.applyAssignReviewer(id, dto.reviewerId ?? null, req.user!.id);
         } else if (dto.action === 'status') {
-          await this.applyStatusChange(application, dto.status!, req.user!.id);
+          await this.applyStatusChange(id, dto.status!, req.user!.id);
         } else {
-          await this.requestDocuments(application, dto.docTypes! as ApplicationDocType[], dto.message ?? null, req.user!.id);
+          await this.requestDocuments(id, dto.docTypes! as ApplicationDocType[], dto.message ?? null, req.user!.id);
         }
         results.push({ id, ok: true });
       } catch (err) {
@@ -477,42 +519,49 @@ export class AdminApplicationsService {
    * for missing documents must reach the applicant regardless of the
    * association's general status-change notification preference.
    */
-  async requestDocuments(application: Application, docTypes: ApplicationDocType[], message: string | null, actorId: string): Promise<void> {
-    assertRequestDocumentsAllowed(application.status);
-    application.status = 'docs_missing';
-    await this.applicationRepo.save(application);
-
-    await this.eventRepo.save(
-      this.eventRepo.create({
-        applicationId: application.id,
-        type: 'DOCS_REQUESTED',
-        actorId,
-        visibleToApplicant: true,
-        data: { docTypes, message },
-      }),
-    );
-
-    const link = portalLoginUrl(this.env, application.locale);
-    await this.mailService.send({
-      key: 'documents_requested',
-      to: application.email ?? '',
-      vars: { name: fullName(application), reference: application.reference, docTypes: docTypes.join(', '), message: message ?? '', link },
-      locale: application.locale,
-      entity: { type: 'applications', id: application.id },
+  async requestDocuments(applicationId: string, docTypes: ApplicationDocType[], message: string | null, actorId: string): Promise<Application> {
+    // C6: same locking discipline as applyStatusChange.
+    const application = await this.applicationRepo.manager.transaction(async (manager) => {
+      const locked = await this.lockApplication(manager, applicationId);
+      assertRequestDocumentsAllowed(locked.status);
+      locked.status = 'docs_missing';
+      await manager.save(locked);
+      await manager.save(
+        manager.create(ApplicationEvent, {
+          applicationId,
+          type: 'DOCS_REQUESTED',
+          actorId,
+          visibleToApplicant: true,
+          data: { docTypes, message },
+        }),
+      );
+      return locked;
     });
-    await this.smsService.send({
-      key: 'documents_requested',
-      to: application.phoneE164 ?? application.phone ?? '',
-      vars: { reference: application.reference },
-      locale: application.locale,
-      entity: { type: 'applications', id: application.id },
+
+    await this.afterCommit(async () => {
+      const link = portalLoginUrl(this.env, application.locale);
+      await this.mailService.send({
+        key: 'documents_requested',
+        to: application.email ?? '',
+        vars: { name: fullName(application), reference: application.reference, docTypes: docTypes.join(', '), message: message ?? '', link },
+        locale: application.locale,
+        entity: { type: 'applications', id: application.id },
+      });
+      await this.smsService.send({
+        key: 'documents_requested',
+        to: application.phoneE164 ?? application.phone ?? '',
+        vars: { reference: application.reference },
+        locale: application.locale,
+        entity: { type: 'applications', id: application.id },
+      });
     });
+    return application;
   }
 
   async requestDocumentsForOne(id: string, docTypes: ApplicationDocType[], message: string | null, req: RequestContext) {
     const application = await this.findOrNotFound(id);
     const before = { status: application.status };
-    await this.requestDocuments(application, docTypes, message, req.user!.id);
+    const updated = await this.requestDocuments(id, docTypes, message, req.user!.id);
 
     req.auditContext = {
       action: 'update',
@@ -520,7 +569,7 @@ export class AdminApplicationsService {
       entityId: id,
       entityLabel: `application ${application.reference}`,
       before,
-      after: { status: application.status },
+      after: { status: updated.status },
     };
 
     return this.getDetail(id);
@@ -534,41 +583,68 @@ export class AdminApplicationsService {
    * template is seeded, unlike `application_status_changed`/
    * `documents_requested` which have both) is sent only on rejection.
    */
-  async reviewDocument(applicationId: string, docId: string, dto: ReviewDocumentDto, req: RequestContext): Promise<ApplicationDocument> {
+  async reviewDocument(applicationId: string, docId: string, dto: ReviewDocumentDto, req: RequestContext): Promise<AdminApplicationDocument> {
     if (dto.status === 'rejected' && !dto.reason) {
       throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, 'reason is required when rejecting a document');
     }
 
-    const doc = await this.findDocumentOrNotFound(applicationId, docId);
-    const application = await this.findOrNotFound(applicationId);
-    const before = { status: doc.status, rejectionReason: doc.rejectionReason };
+    // C6: the application and the document are locked together, so a review
+    // can't interleave with the applicant replacing the same document or a
+    // status change. C34: a replaced (superseded) document, or one on an
+    // application that is still a draft or already decided, isn't reviewable.
+    const { application, doc, before, saved } = await this.applicationRepo.manager.transaction(async (manager) => {
+      const lockedApplication = await this.lockApplication(manager, applicationId);
+      const lockedDoc = await manager
+        .createQueryBuilder(ApplicationDocument, 'd')
+        .setLock('pessimistic_write')
+        .where('d.id = :docId', { docId })
+        .andWhere('d.application_id = :applicationId', { applicationId })
+        .getOne();
+      if (!lockedDoc) {
+        throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Document not found');
+      }
+      if (lockedDoc.supersededAt) {
+        throw new ProblemException(409, ErrorCode.DOCUMENT_NOT_REVIEWABLE, 'This document has been replaced by a newer upload');
+      }
+      if (UNREVIEWABLE_STATUSES.includes(lockedApplication.status)) {
+        throw new ProblemException(
+          409,
+          ErrorCode.DOCUMENT_NOT_REVIEWABLE,
+          `Documents can't be reviewed while the application is ${lockedApplication.status}`,
+        );
+      }
 
-    doc.status = dto.status;
-    doc.rejectionReason = dto.status === 'rejected' ? (dto.reason ?? null) : null;
-    doc.reviewedBy = req.user!.id;
-    doc.reviewedAt = new Date();
-    const saved = await this.documentRepo.save(doc);
+      const beforeReview = { status: lockedDoc.status, rejectionReason: lockedDoc.rejectionReason };
+      lockedDoc.status = dto.status;
+      lockedDoc.rejectionReason = dto.status === 'rejected' ? (dto.reason ?? null) : null;
+      lockedDoc.reviewedBy = req.user!.id;
+      lockedDoc.reviewedAt = new Date();
+      const savedDoc = await manager.save(lockedDoc);
 
-    await this.eventRepo.save(
-      this.eventRepo.create({
-        applicationId,
-        type: dto.status === 'rejected' ? 'DOCUMENT_REJECTED' : 'DOCUMENT_ACCEPTED',
-        actorId: req.user!.id,
-        // Only a rejection is actionable enough to surface on the applicant's own timeline/notifications feed
-        // (they also get the document_rejected mail below); an acceptance is a quiet, internal-only milestone.
-        visibleToApplicant: dto.status === 'rejected',
-        data: { docType: doc.docType, reason: saved.rejectionReason },
-      }),
-    );
+      await manager.save(
+        manager.create(ApplicationEvent, {
+          applicationId,
+          type: dto.status === 'rejected' ? 'DOCUMENT_REJECTED' : 'DOCUMENT_ACCEPTED',
+          actorId: req.user!.id,
+          // Only a rejection is actionable enough to surface on the applicant's own timeline/notifications feed
+          // (they also get the document_rejected mail below); an acceptance is a quiet, internal-only milestone.
+          visibleToApplicant: dto.status === 'rejected',
+          data: { docType: lockedDoc.docType, reason: savedDoc.rejectionReason },
+        }),
+      );
+      return { application: lockedApplication, doc: lockedDoc, before: beforeReview, saved: savedDoc };
+    });
 
     if (dto.status === 'rejected') {
-      const link = portalLoginUrl(this.env, application.locale);
-      await this.mailService.send({
-        key: 'document_rejected',
-        to: application.email ?? '',
-        vars: { name: fullName(application), reference: application.reference, docType: doc.docType, reason: saved.rejectionReason ?? '', link },
-        locale: application.locale,
-        entity: { type: 'applications', id: applicationId },
+      await this.afterCommit(async () => {
+        const link = portalLoginUrl(this.env, application.locale);
+        await this.mailService.send({
+          key: 'document_rejected',
+          to: application.email ?? '',
+          vars: { name: fullName(application), reference: application.reference, docType: doc.docType, reason: saved.rejectionReason ?? '', link },
+          locale: application.locale,
+          entity: { type: 'applications', id: applicationId },
+        });
       });
     }
 
@@ -581,7 +657,7 @@ export class AdminApplicationsService {
       after: { status: saved.status, rejectionReason: saved.rejectionReason },
     };
 
-    return saved;
+    return toAdminDocument(saved);
   }
 
   async getDocumentForStream(applicationId: string, docId: string): Promise<ApplicationDocument> {

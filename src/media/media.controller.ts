@@ -11,6 +11,7 @@ import type { RequestContext } from '../common/request-context.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
+import { decodeUploadName } from '../common/http/filenames.js';
 
 // 20 MB outer guard (P7 step 1); MediaService enforces the real per-kind
 // caps (images 5 MB, PDFs 10 MB) after magic-byte detection.
@@ -74,7 +75,7 @@ export class MediaController {
     if (!file?.buffer?.length) {
       throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, 'A file is required — send it as the multipart field "file"');
     }
-    const { asset, wasExisting } = await this.mediaService.upload(file.buffer, file.originalname, req.user!.id);
+    const { asset, wasExisting } = await this.mediaService.upload(file.buffer, decodeUploadName(file.originalname), req.user!.id);
     if (wasExisting) {
       // A checksum collision returns the existing asset, not an error
       // (trap 4) — 200, not the default 201, since nothing was created.

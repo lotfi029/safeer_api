@@ -70,6 +70,30 @@ export const partialApplicationSchema = z
   .strict();
 
 /**
+ * C15: `PATCH portal/application/corrections` — while `docs_missing`, the
+ * applicant may correct only these fields (identity details and study
+ * details a reviewer might query). Contact details (email, phone) are not
+ * correctable here: they are where every later notification and OTP goes.
+ */
+export const CORRECTABLE_FIELDS = ['firstName', 'middleName', 'lastName', 'birthDate', 'nationality', 'idNumber', 'university', 'major', 'degreeLevel'] as const;
+
+export const correctionsSchema = z
+  .object({
+    firstName: step1Shape.firstName,
+    middleName: step1Shape.middleName,
+    lastName: step1Shape.lastName,
+    birthDate: step1Shape.birthDate,
+    nationality: step1Shape.nationality,
+    idNumber: step1Shape.idNumber,
+    university: step2Shape.university,
+    major: step2Shape.major,
+    degreeLevel: step2Shape.degreeLevel,
+  })
+  .partial()
+  .strict()
+  .refine((v) => Object.values(v).some((x) => x !== undefined), 'At least one field to correct is required');
+
+/**
  * Which of the 3 form steps a PATCH payload touches, used to compute how
  * far `current_step` should advance (applications.service.ts and
  * portal-application.service.ts share this so "progress" means the same

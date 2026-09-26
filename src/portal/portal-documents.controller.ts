@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { PortalDocumentsService } from './portal-documents.service.js';
 import { PrivateFileStore, MAX_PRIVATE_FILE_BYTES } from '../storage/private-file-store.service.js';
@@ -20,6 +21,8 @@ export class PortalDocumentsController {
     return { documents, completeness };
   }
 
+  // C18: 20 uploads per hour per client, on top of the per-application quota.
+  @Throttle({ default: { limit: 20, ttl: 3_600_000 } })
   @Post()
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_PRIVATE_FILE_BYTES } }))
   upload(@UploadedFile() file: Express.Multer.File, @Body('docType') docType: string, @Req() req: RequestContext) {

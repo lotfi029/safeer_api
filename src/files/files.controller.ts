@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { MediaService } from '../media/media.service.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
+import { contentDisposition } from '../common/http/filenames.js';
 
 /**
  * Nothing is ever served from a public bucket URL (D-07): these two routes
@@ -52,7 +53,7 @@ export class FilesController {
       void this.mediaService.incrementDownloadCount(publicId);
     }
 
-    await this.sendFile(res, asset.storageKey, asset.mimeType, asset.kind === 'pdf', isPrivate === 'allow-private');
+    await this.sendFile(res, asset.storageKey, asset.mimeType, asset.kind === 'pdf' ? asset.originalName : null, isPrivate === 'allow-private');
   }
 
   @Public()
@@ -72,7 +73,7 @@ export class FilesController {
     const found = await this.mediaService.findVariant(asset.id, variant);
     if (!found) throw new NotFoundException();
 
-    await this.sendFile(res, found.storageKey, 'image/webp', false, isPrivate === 'allow-private');
+    await this.sendFile(res, found.storageKey, 'image/webp', null, isPrivate === 'allow-private');
   }
 
   /**
@@ -95,12 +96,19 @@ export class FilesController {
    * caching, content-type or the download-count side effect above depends
    * on where the bytes actually live.
    */
-  private async sendFile(res: Response, storageKey: string, mimeType: string, asAttachment: boolean, isPrivate: boolean): Promise<void> {
+  private async sendFile(
+    res: Response,
+    storageKey: string,
+    mimeType: string,
+    attachmentName: string | null,
+    isPrivate: boolean,
+  ): Promise<void> {
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Cache-Control', isPrivate ? 'private, no-store' : 'public, max-age=31536000, immutable');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    if (asAttachment) {
-      res.setHeader('Content-Disposition', 'attachment');
+    if (attachmentName !== null) {
+      // C19: RFC 5987 filename (Arabic document titles) with an ASCII fallback.
+      res.setHeader('Content-Disposition', contentDisposition('attachment', attachmentName));
     }
     const stream = await this.mediaService.getStream(storageKey);
     stream.on('error', () => {

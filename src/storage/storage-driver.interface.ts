@@ -1,5 +1,13 @@
 import type { Readable } from 'node:stream';
 
+export interface SignedUrlOptions {
+  ttlSeconds?: number;
+  /** Returned as the response's Content-Type (S3 `ResponseContentType`). */
+  contentType?: string;
+  /** Returned as the response's Content-Disposition (S3 `ResponseContentDisposition`) — C19's RFC 5987 form. */
+  contentDisposition?: string;
+}
+
 /** `MediaService`'s driver — the public asset bucket in S3 mode. */
 export const PUBLIC_STORAGE_DRIVER = Symbol('PUBLIC_STORAGE_DRIVER');
 /** `PrivateFileStore`'s driver — the private document bucket in S3 mode. */
@@ -31,8 +39,8 @@ export interface StorageDriver {
    * A short-lived, GET-only signed URL for `key` — S3 mode only (`local`
    * doesn't implement it; callers check `driver.signedUrl` before using it,
    * per decision 3: private documents in S3 mode get a signed URL instead
-   * of being streamed through this API). `ttlSeconds` defaults to
+   * of being streamed through this API). `options.ttlSeconds` defaults to
    * `env.S3_SIGNED_URL_TTL_SECONDS`.
    */
-  signedUrl?(key: string, ttlSeconds?: number): Promise<string>;
+  signedUrl?(key: string, options?: SignedUrlOptions): Promise<string>;
 }

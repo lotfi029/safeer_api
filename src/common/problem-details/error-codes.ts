@@ -44,6 +44,10 @@ export const ErrorCode = {
   APPLICATION_EXISTS: 'APPLICATION_EXISTS',
   /** B7 (safeer-backend-fr-review.md): an application was assigned to a user who isn't `admin`/`reviewer`, or whose account is locked. */
   INVALID_ASSIGNEE: 'INVALID_ASSIGNEE',
+  /** C18: `POST portal/documents` — the application has used up its upload quota (file count or total bytes). */
+  QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+  /** C34: `PATCH admin/applications/:id/documents/:docId` — the document was superseded, or the application is draft/accepted/rejected. */
+  DOCUMENT_NOT_REVIEWABLE: 'DOCUMENT_NOT_REVIEWABLE',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

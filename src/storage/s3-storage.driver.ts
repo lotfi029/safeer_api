@@ -4,7 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Readable } from 'node:stream';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
-import type { StorageDriver } from './storage-driver.interface.js';
+import type { SignedUrlOptions, StorageDriver } from './storage-driver.interface.js';
 
 /** Which S3 bucket a given `S3StorageDriver` instance writes to — see storage.module.ts's two provider bindings. */
 export type S3Bucket = 'public' | 'private';
@@ -60,8 +60,15 @@ export class S3StorageDriver implements StorageDriver {
     }
   }
 
-  async signedUrl(key: string, ttlSeconds = this.env.S3_SIGNED_URL_TTL_SECONDS): Promise<string> {
-    const command = new GetObjectCommand({ Bucket: this.bucketName, Key: key });
-    return getSignedUrl(this.client, command, { expiresIn: ttlSeconds });
+  async signedUrl(key: string, options: SignedUrlOptions = {}): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      // C19: the signed download carries the same type and RFC 5987 filename
+      // a streamed one would.
+      ResponseContentType: options.contentType,
+      ResponseContentDisposition: options.contentDisposition,
+    });
+    return getSignedUrl(this.client, command, { expiresIn: options.ttlSeconds ?? this.env.S3_SIGNED_URL_TTL_SECONDS });
   }
 }

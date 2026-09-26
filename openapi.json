@@ -5402,6 +5402,30 @@
         ]
       }
     },
+    "/portal/application/corrections": {
+      "patch": {
+        "operationId": "PortalApplicationController_correct",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicationCorrectionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PortalApplication"
+        ]
+      }
+    },
     "/portal/application/submit": {
       "post": {
         "operationId": "PortalApplicationController_submit",
@@ -8896,6 +8920,65 @@
           },
           "consent": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ApplicationCorrectionsDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
+          },
+          "middleName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
+          },
+          "birthDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "nationality": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "pattern": "^[A-Za-z]{2}$"
+          },
+          "idNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "nullable": true
+          },
+          "university": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 191
+          },
+          "major": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 191
+          },
+          "degreeLevel": {
+            "type": "string",
+            "enum": [
+              "bachelor",
+              "master",
+              "phd"
+            ]
           }
         },
         "additionalProperties": false
