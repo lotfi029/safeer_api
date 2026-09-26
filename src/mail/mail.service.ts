@@ -9,6 +9,7 @@ import { ErrorCode } from '../common/problem-details/error-codes.js';
 import type { MailServiceInterface, SendMailParams } from './mail.service.interface.js';
 import { MailTemplatesService, type RenderedMail } from './mail-templates.service.js';
 import { MailTransportService } from './mail-transport.service.js';
+import { maskVars } from '../common/sensitive-vars.js';
 
 // FR-E-09: "retried three times with increasing delay" — read as 3 retries
 // after the first try, i.e. 4 attempts total, with the gap before each of
@@ -75,6 +76,10 @@ export class MailService implements MailServiceInterface {
     try {
       const settings = await this.settingsRepo.findOne({ where: { id: '1' } });
       const rendered = await this.templates.render(params.key, params.vars, params.locale);
+      const sensitive = Boolean(params.sensitiveVars?.length);
+      const loggable = sensitive
+        ? await this.templates.render(params.key, maskVars(params.vars, params.sensitiveVars), params.locale)
+        : rendered;
       const missingRecipient = !params.to;
       const status: MailLogStatus = missingRecipient || !settings?.isEnabled || !rendered ? 'skipped' : 'queued';
 
@@ -83,14 +88,15 @@ export class MailService implements MailServiceInterface {
           templateKey: params.key,
           locale: params.locale,
           toEmail: params.to,
-          subject: rendered?.subject ?? params.key,
+          subject: loggable?.subject ?? params.key,
           status,
           error: missingRecipient
             ? 'No recipient email address was configured (e.g. mail_settings.notify_email is unset for contact_notify)'
             : null,
           entityType: params.entity?.type ?? null,
           entityId: params.entity?.id ?? null,
-          payload: status === 'queued' && rendered ? rendered : null,
+          // C1: never persist a rendering that carries a sensitive value.
+          payload: status === 'queued' && rendered && !sensitive ? rendered : null,
         }),
       );
 
@@ -128,7 +134,16 @@ export class MailService implements MailServiceInterface {
       const rendered: RenderedMail | null = this.pending.get(logId)?.rendered ?? row.payload;
       if (!rendered) {
         // Nothing left to send with: already terminal and payload cleared,
-        // or never queued in the first place. Nothing more to do here.
+        // never queued in the first place, or (C1) a sensitive mail whose
+        // content was only ever held in a previous process's memory. Make a
+        // non-terminal row terminal so the retry sweep stops picking it up.
+        if (row.status === 'queued' || (row.status === 'failed' && row.nextRetryAt)) {
+          await this.logRepo.update(logId, {
+            status: 'failed',
+            nextRetryAt: null,
+            error: 'Content no longer available to retry (not stored for sensitive mail); re-trigger the original action',
+          });
+        }
         return;
       }
       if (!this.pending.has(logId)) {

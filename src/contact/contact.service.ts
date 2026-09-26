@@ -9,6 +9,7 @@ import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
 import type { Locale } from '../common/request-context.js';
 import type { ContactDto, NewsletterDto } from './dto/contact.dto.js';
+import { frontendUrl } from '../common/links/frontend-url.js';
 
 const MIN_FORM_SECONDS = 3;
 
@@ -62,7 +63,8 @@ export class ContactService {
     await this.mailService.send({
       key: 'contact_ack',
       to: dto.email,
-      vars: { name: dto.name },
+      // C16: nothing the sender typed is echoed back to the (unverified) address.
+      vars: {},
       locale,
       entity,
     });
@@ -81,7 +83,7 @@ export class ContactService {
         phone: dto.phone ?? '',
         subject: dto.subject,
         message: dto.body,
-        link: `${this.env.PUBLIC_BASE_URL}/admin/messages`,
+        link: frontendUrl(this.env, 'ar', `admin/messages/${saved.id}`),
       },
       locale: 'ar',
       entity,

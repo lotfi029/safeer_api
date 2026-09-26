@@ -18,6 +18,7 @@ import { toPublicUser, type PublicUser } from '../users/public-user.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import type { RequestContext } from '../common/request-context.js';
+import { frontendUrl } from '../common/links/frontend-url.js';
 
 const LOGIN_ATTEMPT_LIMIT = 5;
 const LOGIN_ATTEMPT_WINDOW_MS = 60_000;
@@ -226,7 +227,7 @@ export class AuthService {
       }),
     );
 
-    const link = `${this.env.PUBLIC_BASE_URL}/admin/accept/${rawToken}`;
+    const link = frontendUrl(this.env, 'ar', `admin/accept/${rawToken}`);
     await this.mailService.send({
       key: 'user_invite',
       to: user.email,
@@ -265,7 +266,7 @@ export class AuthService {
       }),
     );
 
-    const link = `${this.env.PUBLIC_BASE_URL}/admin/reset/${rawToken}`;
+    const link = frontendUrl(this.env, 'ar', `admin/reset/${rawToken}`);
     await this.mailService.send({
       key: 'password_reset',
       to: user.email,

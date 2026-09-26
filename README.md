@@ -56,7 +56,7 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | The first admin account. `002_seed.sql` deliberately seeds no users — `BootstrapService` creates this account (or, if it already exists, leaves it alone) on every boot. Password needs at least 8 characters. |
 | `IP_HASH_SALT` | Salt for hashing visitor IPs before they're stored (contact messages, newsletter signups, sessions) — never store a raw IP. |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins for the (future) frontend. |
-| `PUBLIC_BASE_URL` | Base URL used to build links inside emails/SMS (invite, password reset, portal links). |
+| `FRONTEND_BASE_URL` | The public frontend's origin. Every link sent by mail or SMS points at a locale-prefixed page there: `/{locale}/admin/accept/{token}`, `/{locale}/admin/reset/{token}`, `/{locale}/admin/messages/{id}`, `/{locale}/portal/login`. Required when `NODE_ENV` is `staging`/`production`; defaults to `http://localhost:4200` otherwise. (Replaces `PUBLIC_BASE_URL`.) |
 | `CACHE_TTL_SECONDS`, `CACHE_MAX_ENTRIES` | The in-process response cache's TTL and entry ceiling. |
 | `ALLOW_DEV_PASSWORD_FIXUP` | Dev/staging only — **refused at boot when `NODE_ENV=production`**. Lets a seeded user still holding the unusable placeholder password hash be given `BOOTSTRAP_ADMIN_PASSWORD` instead, so a fresh dev database doesn't need a real invite/accept round-trip just to sign in as a second account. |
 | `PROTOTYPE_PATH` | `npm run seed` only — optional override for the prototype HTML. Default `docs/prototype/safeer-prototype.html`; relative paths resolve against the repo root. |

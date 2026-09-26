@@ -8602,7 +8602,8 @@
           "name": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 191
+            "maxLength": 191,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
           },
           "email": {
             "type": "string",
@@ -8739,18 +8740,21 @@
           "firstName": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
           },
           "middleName": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$",
             "nullable": true
           },
           "lastName": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
           },
           "birthDate": {
             "type": "string",
@@ -8810,18 +8814,21 @@
           "firstName": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
           },
           "middleName": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$",
             "nullable": true
           },
           "lastName": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
           },
           "birthDate": {
             "type": "string",
@@ -8899,18 +8906,21 @@
           "firstName": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
           },
           "middleName": {
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$",
             "nullable": true
           },
           "lastName": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
           },
           "birthDate": {
             "type": "string",

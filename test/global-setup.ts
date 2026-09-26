@@ -86,7 +86,7 @@ module.exports = async function globalSetup() {
     APP_ENCRYPTION_KEY: process.env.APP_ENCRYPTION_KEY ?? 'ukhiU9W4qpmJr9pwnzL01FaECwZTTOF3Y2vPKga7xrk=',
     IP_HASH_SALT: process.env.IP_HASH_SALT ?? 'test-only-salt',
     CORS_ORIGINS: process.env.CORS_ORIGINS ?? 'http://localhost:4200',
-    PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL ?? `http://localhost:${TEST_PORT}`,
+    FRONTEND_BASE_URL: process.env.FRONTEND_BASE_URL ?? 'http://localhost:4200',
     ALLOW_DEV_PASSWORD_FIXUP: 'true',
   };
 

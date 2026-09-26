@@ -21,6 +21,7 @@ import { assertRequestDocumentsAllowed, assertStatusTransition } from './transit
 import type { UpdateApplicationAdminDto } from './dto/update-application.dto.js';
 import type { BulkActionDto } from './dto/bulk-action.dto.js';
 import type { ReviewDocumentDto } from './dto/review-document.dto.js';
+import { portalLoginUrl } from '../common/links/frontend-url.js';
 
 const STATUS_VALUES: ApplicationStatus[] = ['draft', 'new', 'under_review', 'docs_missing', 'interview', 'accepted', 'rejected'];
 
@@ -351,7 +352,7 @@ export class AdminApplicationsService {
   /** `site_settings.notify_email_on_status_change` / `notify_sms_on_status_change` gate this — unlike request-documents/document-reject, a generic status change is opt-out-able. */
   private async notifyStatusChange(application: Application, status: ApplicationStatus): Promise<void> {
     const settings = await this.settingsRepo.findOne({ where: { id: '1' } });
-    const link = `${this.env.PUBLIC_BASE_URL}/portal`;
+    const link = portalLoginUrl(this.env, application.locale);
     const name = fullName(application);
 
     if (settings?.notifyEmailOnStatusChange) {
@@ -366,7 +367,7 @@ export class AdminApplicationsService {
     if (settings?.notifySmsOnStatusChange) {
       await this.smsService.send({
         key: 'application_status_changed',
-        to: application.phone ?? '',
+        to: application.phoneE164 ?? application.phone ?? '',
         vars: { reference: application.reference, status },
         locale: application.locale,
         entity: { type: 'applications', id: application.id },
@@ -491,7 +492,7 @@ export class AdminApplicationsService {
       }),
     );
 
-    const link = `${this.env.PUBLIC_BASE_URL}/portal`;
+    const link = portalLoginUrl(this.env, application.locale);
     await this.mailService.send({
       key: 'documents_requested',
       to: application.email ?? '',
@@ -501,7 +502,7 @@ export class AdminApplicationsService {
     });
     await this.smsService.send({
       key: 'documents_requested',
-      to: application.phone ?? '',
+      to: application.phoneE164 ?? application.phone ?? '',
       vars: { reference: application.reference },
       locale: application.locale,
       entity: { type: 'applications', id: application.id },
@@ -561,7 +562,7 @@ export class AdminApplicationsService {
     );
 
     if (dto.status === 'rejected') {
-      const link = `${this.env.PUBLIC_BASE_URL}/portal`;
+      const link = portalLoginUrl(this.env, application.locale);
       await this.mailService.send({
         key: 'document_rejected',
         to: application.email ?? '',

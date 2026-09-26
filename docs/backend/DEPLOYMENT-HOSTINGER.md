@@ -87,7 +87,7 @@ one means; this is the production-specific subset to double-check:
 - [ ] `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` — the real first admin's credentials, not a placeholder; change the password immediately after first login if you ever need to hand this value to someone else during setup.
 - [ ] `IP_HASH_SALT` — a real random value (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`), not the CI placeholder.
 - [ ] `CORS_ORIGINS` — the real frontend origin(s), comma-separated.
-- [ ] `PUBLIC_BASE_URL` — the API's own public URL (used to build links inside invite/reset/portal emails).
+- [ ] `FRONTEND_BASE_URL` — the public frontend's origin (e.g. `https://<your-domain>`). Every invite, password-reset, portal and inbox link in mail/SMS is built as `${FRONTEND_BASE_URL}/{locale}/…`; the API refuses to boot without it in production/staging. It replaces the old `PUBLIC_BASE_URL`, which can be removed.
 - [ ] `CACHE_TTL_SECONDS` / `CACHE_MAX_ENTRIES` — the defaults (60 / 500) are reasonable; only change them with the in-process-cache caveat below in mind.
 - [ ] `ALLOW_DEV_PASSWORD_FIXUP` — **must be `false` (or unset)**. The env schema refuses to boot at all if this is `true` while `NODE_ENV=production`, as a hard backstop, but don't rely on that — it should never be set here in the first place.
 
@@ -235,6 +235,14 @@ in `admin/sms/settings` (`PUT /api/v1/admin/sms/settings`, admin only):
 - The seeded default is `driver: 'log'`, which writes `sms_log` and sends
   nothing. With `log` in production, OTP requests fall back to email.
 - `driver: 'http'` remains for a generic JSON gateway (URL + bearer token).
+- Every provider call has a 5-second timeout. Notification SMS are queued
+  and sent in the background (`sms_log` shows `queued` → `sent`/`failed`);
+  only the OTP request waits for the result, and falls back to email if the
+  SMS isn't sent. SMS always go to the applicant's E.164 number.
+- OTP codes are never stored: `sms_log.message` and `mail_log.subject`
+  hold `••••••` in their place, and no OTP mail payload is kept for retries.
+  (In development/test only, `GET /api/v1/__dev/otp/:applicationId` returns
+  the last code for the smoke and Jest suites; the route is a 404 elsewhere.)
 
 ## S3 storage mode
 

@@ -15,6 +15,7 @@ import { deriveTimeline } from './portal-timeline.js';
 import { computeCompleteness } from './portal-documents.util.js';
 import type { UpdateApplicationDto } from './dto/update-application.dto.js';
 import type { SubmitApplicationDto } from './dto/submit-application.dto.js';
+import { portalLoginUrl } from '../common/links/frontend-url.js';
 
 /** `status` values a PATCH or a submit may still act on — everything past this point is staff-owned (phase 7's review flow). */
 const EDITABLE_STATUSES: ApplicationStatus[] = ['draft', 'docs_missing'];
@@ -172,7 +173,7 @@ export class PortalApplicationService {
     // ApplicationsService.create()'s own comment on why (a slow/broken send
     // must never hold the row lock open, and a rolled-back submit must
     // never have already notified anyone).
-    const link = `${this.env.PUBLIC_BASE_URL}/portal`;
+    const link = portalLoginUrl(this.env, application.locale);
     const name = `${application.firstName ?? ''} ${application.lastName ?? ''}`.trim();
     await this.mailService.send({
       key: 'application_submitted',
@@ -183,7 +184,7 @@ export class PortalApplicationService {
     });
     await this.smsService.send({
       key: 'application_submitted',
-      to: application.phone ?? '',
+      to: application.phoneE164 ?? application.phone ?? '',
       vars: { reference: application.reference },
       locale: application.locale,
       entity: { type: 'applications', id: applicationId },

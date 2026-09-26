@@ -112,6 +112,7 @@ export interface TestApplicant extends Session {
   id: string;
   reference: string;
   email: string;
+  phone: string;
 }
 
 /** `POST applications` — mirrors scripts/smoke.mjs's own createApplication(). */
@@ -146,7 +147,7 @@ export async function createApplication(overrides: Record<string, unknown> = {})
       .then(([rows]: any) => rows[0]?.id && String(rows[0].id)),
   );
   if (!id) throw new Error(`could not resolve the numeric id for reference ${json.reference}`);
-  return { id, reference: json.reference, cookie, csrfToken: json.csrfToken, email };
+  return { id, reference: json.reference, cookie, csrfToken: json.csrfToken, email, phone: String(body.phone) };
 }
 
 export async function deleteApplication(applicationId: string): Promise<void> {
@@ -156,33 +157,29 @@ export async function deleteApplication(applicationId: string): Promise<void> {
   });
 }
 
-export async function readSmsOtpCode(applicationId: string): Promise<string> {
-  const message = await withDb((conn) =>
-    conn
-      .execute(
-        "SELECT message FROM sms_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'otp_code' ORDER BY id DESC LIMIT 1",
-        [applicationId],
-      )
-      .then(([rows]: any) => rows[0]?.message),
-  );
-  const match = typeof message === 'string' ? message.match(/\d{6}/) : null;
-  if (!match) throw new Error(`no 6-digit OTP found in sms_log.message for application ${applicationId}: ${JSON.stringify(message)}`);
-  return match[0];
+/**
+ * C1: OTP codes are no longer readable from sms_log / mail_log (masked), so
+ * specs read the last code issued for an application from the dev/test-only
+ * hook (src/dev/dev-otp.controller.ts), along with the channel it went out on.
+ */
+export async function readOtp(applicationId: string): Promise<{ code: string; channel: 'sms' | 'email' }> {
+  const res = await fetch(`${BASE}/__dev/otp/${applicationId}`);
+  if (!res.ok) throw new Error(`no OTP issued for application ${applicationId} (dev hook answered ${res.status})`);
+  return res.json();
 }
 
+/** The last code for `applicationId`, which must have gone out by SMS. */
+export async function readSmsOtpCode(applicationId: string): Promise<string> {
+  const otp = await readOtp(applicationId);
+  if (otp.channel !== 'sms') throw new Error(`expected the OTP to go out by sms, it went by ${otp.channel}`);
+  return otp.code;
+}
+
+/** The last code for `applicationId`, which must have gone out by email. */
 export async function readMailOtpCode(applicationId: string): Promise<string> {
-  const row = await withDb((conn) =>
-    conn
-      .execute(
-        "SELECT subject, payload FROM mail_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'otp_code' ORDER BY id DESC LIMIT 1",
-        [applicationId],
-      )
-      .then(([rows]: any) => rows[0]),
-  );
-  const haystack = `${row?.subject ?? ''} ${JSON.stringify(row?.payload ?? '')}`;
-  const match = haystack.match(/\d{6}/);
-  if (!match) throw new Error(`no 6-digit OTP found in mail_log for application ${applicationId}: ${JSON.stringify(row)}`);
-  return match[0];
+  const otp = await readOtp(applicationId);
+  if (otp.channel !== 'email') throw new Error(`expected the OTP to go out by email, it went by ${otp.channel}`);
+  return otp.code;
 }
 
 export async function withSmsEnabled<T>(fn: () => Promise<T>): Promise<T> {

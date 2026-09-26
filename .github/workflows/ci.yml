@@ -66,7 +66,7 @@ jobs:
       BOOTSTRAP_ADMIN_PASSWORD: ci-only-password-not-a-secret
       IP_HASH_SALT: ci-only-salt-not-a-secret
       CORS_ORIGINS: http://localhost:4200
-      PUBLIC_BASE_URL: http://localhost:3900
+      FRONTEND_BASE_URL: http://localhost:4200
       CACHE_TTL_SECONDS: '60'
       CACHE_MAX_ENTRIES: '500'
       # B0-5: refused outright if NODE_ENV=production — safe here since

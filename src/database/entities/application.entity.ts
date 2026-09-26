@@ -117,6 +117,17 @@ export class Application {
   @Column({ name: 'consent_at', type: 'datetime', precision: 3, nullable: true })
   consentAt: Date | null;
 
+  /**
+   * C22: the daily (UTC) count of wrong OTP codes, written only by
+   * PortalOtpService with atomic UPDATEs. `select: false` — internal
+   * bookkeeping, never part of any response.
+   */
+  @Column({ name: 'otp_fail_date', type: 'date', nullable: true, select: false })
+  otpFailDate?: string | null;
+
+  @Column({ name: 'otp_fail_count', type: 'smallint', unsigned: true, default: 0, select: false })
+  otpFailCount?: number;
+
   @Column({ name: 'submitted_at', type: 'datetime', precision: 3, nullable: true })
   submittedAt: Date | null;
 

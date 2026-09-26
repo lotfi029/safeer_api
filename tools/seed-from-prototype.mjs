@@ -464,9 +464,10 @@ function buildMailTemplates() {
     {
       key: 'contact_ack', name_ar: 'تأكيد استلام رسالة التواصل', name_en: 'Contact acknowledgement',
       subject_ar: 'شكرًا لتواصلك مع جمعية سفير الدعوية', subject_en: 'Thank you for contacting Safeer Association',
-      body_ar: 'مرحبًا {{name}}،\n\nشكرًا لتواصلك مع جمعية سفير الدعوية. وصلتنا رسالتك وسيتواصل معك أحد أعضاء الفريق في أقرب وقت ممكن.\n\nمع تحياتنا،\nفريق جمعية سفير',
-      body_en: "Hello {{name}},\n\nThank you for contacting Safeer Da'wah Association. We have received your message, and a member of our team will get back to you as soon as possible.\n\nWith appreciation,\nThe Safeer Association Team",
-      variables: ['name'],
+      // C16 (migration 007): no {{name}} — this goes to an unverified address.
+      body_ar: 'مرحبًا،\n\nشكرًا لتواصلك مع جمعية سفير الدعوية. وصلتنا رسالتك وسيتواصل معك أحد أعضاء الفريق في أقرب وقت ممكن.\n\nمع تحياتنا،\nفريق جمعية سفير',
+      body_en: "Hello,\n\nThank you for contacting Safeer Da'wah Association. We have received your message, and a member of our team will get back to you as soon as possible.\n\nWith appreciation,\nThe Safeer Association Team",
+      variables: [],
     },
     {
       key: 'contact_notify', name_ar: 'إشعار رسالة تواصل جديدة', name_en: 'New contact message notification',
@@ -533,7 +534,8 @@ function buildMailTemplates() {
     },
     {
       key: 'otp_code', name_ar: 'رمز التحقق لمرة واحدة', name_en: 'One-time verification code',
-      subject_ar: 'رمز الدخول إلى بوابة الطالب: {{code}}', subject_en: 'Your student portal sign-in code: {{code}}',
+      // C1 (migration 007): the code never goes in the subject.
+      subject_ar: 'رمز الدخول إلى بوابة الطالب', subject_en: 'Your student portal sign-in code',
       body_ar: 'رمز الدخول إلى بوابة الطالب هو: **{{code}}**\n\nصالح لمدة {{minutes}} دقائق. لا تشارك هذا الرمز مع أحد.\n\nإذا لم تطلب هذا الرمز، تجاهل هذه الرسالة.',
       body_en: 'Your student portal sign-in code is: **{{code}}**\n\nIt is valid for {{minutes}} minutes. Do not share this code with anyone.\n\nIf you did not request it, you can ignore this message.',
       variables: ['code', 'minutes'],
