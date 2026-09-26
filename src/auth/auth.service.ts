@@ -13,7 +13,7 @@ import { PasswordService } from './password.service.js';
 import { generateSessionToken, hashToken } from './session-token.util.js';
 import { computeCsrfToken } from './csrf.util.js';
 import { MAIL_SERVICE, type MailServiceInterface } from '../mail/mail.service.interface.js';
-import { UsersService, UNUSABLE_PASSWORD_HASH } from '../users/users.service.js';
+import { UsersService } from '../users/users.service.js';
 import { isBruteForceLocked, toPublicUser, type PublicUser } from '../users/public-user.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
@@ -102,12 +102,12 @@ export class AuthService {
     // can sign in. Every refusal below looks the same from outside.
     const usable = user !== null && user.status === 'active' && !isBruteForceLocked(user);
 
-    // B1 (timing oracle): verify against a real hash unconditionally,
-    // before either branch below can return early. UNUSABLE_PASSWORD_HASH
-    // is guaranteed to fail verification (users.service.ts) but has the
-    // same Argon2id shape and cost as a real one, so every path takes the
-    // same time regardless of which branch is about to be taken.
-    const ok = await this.passwordService.verify(usable ? user.passwordHash : UNUSABLE_PASSWORD_HASH, password);
+    // B1 + A2 (timing oracle): run one Argon2 verify on every path, before
+    // either branch below can return early. An account that can't sign in
+    // (unknown, disabled, invited, locked) is checked against
+    // PasswordService's dummy hash, built at boot with the same parameters
+    // as a real one, so every path takes the same time.
+    const ok = usable ? await this.passwordService.verify(user.passwordHash, password) : await this.passwordService.verifyDummy(password);
 
     if (!user || !usable) {
       await this.writeAudit(user?.id ?? null, 'login_failed', user?.id ?? null, user?.name ?? null, req.ipHash);
