@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomInt } from 'node:crypto';
 import { LRUCache } from 'lru-cache';
-import { Application } from '../database/entities/application.entity.js';
-import { ApplicantOtp } from '../database/entities/applicant-otp.entity.js';
+import { Application, NON_TERMINAL_APPLICATION_STATUSES } from '../database/entities/application.entity.js';
+import { ApplicantOtp, type ApplicantOtpChannel } from '../database/entities/applicant-otp.entity.js';
 import { MAIL_SERVICE, type MailServiceInterface } from '../mail/mail.service.interface.js';
 import { SMS_SERVICE, type SmsServiceInterface } from '../sms/sms.service.interface.js';
 import { hashToken } from '../auth/session-token.util.js';
@@ -12,10 +12,16 @@ import { ApplicantSessionService, type MintedApplicantSession } from '../auth/ap
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import type { RequestContext } from '../common/request-context.js';
+import { normalizePhone } from '../common/phone.js';
+import { ENV } from '../config/env.tokens.js';
+import type { Env } from '../config/env.js';
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
+
+/** `applications.reference` shape, e.g. `SA-2026-00185` (ApplicationsService.create). */
+const REFERENCE_RE = /^[A-Z]{1,10}-\d{4}-\d{5}$/i;
 
 /**
  * Tighter than AuthService's login limiter (5/60s): a hit here triggers a
@@ -30,6 +36,7 @@ const OTP_REQUEST_WINDOW_MS = 15 * 60 * 1000;
 const OTP_REQUEST_MAX_TRACKED = 10_000;
 
 export type VerifyOtpResult = MintedApplicantSession;
+export type RequestedOtpChannel = 'sms' | 'email' | undefined;
 
 function genericOtpError(): ProblemException {
   // FR-A-10-style non-enumeration (mirrors AuthService.login's B1 fix):
@@ -51,48 +58,100 @@ export class PortalOtpService {
     @Inject(MAIL_SERVICE) private readonly mailService: MailServiceInterface,
     @Inject(SMS_SERVICE) private readonly smsService: SmsServiceInterface,
     private readonly applicantSessions: ApplicantSessionService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   /**
-   * `POST portal/auth/request-otp` — always resolves `{ ok: true }`
-   * (mirrors `AuthService.forgotPassword`'s non-enumeration pattern
-   * exactly: the identifier's existence is never revealed). The
-   * per-identifier rate limit is checked and incremented regardless of
-   * whether the identifier matches anything — a bogus reference is just as
-   * capable of triggering a 429 as a real one, which is itself
-   * non-enumerating (both a hit and a miss consume the same counter the
-   * same way).
+   * `POST portal/auth/request-otp` — always resolves `{ ok: true }` (mirrors
+   * `AuthService.forgotPassword`'s non-enumeration pattern exactly: the
+   * identifier's existence is never revealed). The per-identifier rate
+   * limit is checked and incremented regardless of whether the identifier
+   * matches anything — a bogus reference is just as capable of triggering a
+   * 429 as a real one, which is itself non-enumerating (both a hit and a
+   * miss consume the same counter the same way).
+   *
+   * B1 (safeer-backend-fr-review.md): `channelHint` in the response names
+   * the channel the request *would* use — the caller's own `channel` if
+   * given, otherwise the association-wide default — computed the same way
+   * whether or not `identifier` matches an application, so it never
+   * enumerates. It is not a guarantee: SMS silently falls back to email
+   * per-application when the phone is missing or the send fails (see
+   * `resolveChannel`/`deliver` below).
    */
-  async requestOtp(identifier: string): Promise<{ ok: true }> {
+  async requestOtp(identifier: string, channel?: RequestedOtpChannel): Promise<{ ok: true; channelHint: 'sms' | 'email' }> {
     this.checkRequestRateLimit(identifier);
+
+    const channelHint = channel ?? (await this.defaultChannelHint());
 
     const application = await this.findApplication(identifier);
     if (!application) {
-      return { ok: true };
+      return { ok: true, channelHint };
     }
 
     const code = String(randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, '0');
-    const channel = application.phone ? 'sms' : 'email';
+    const vars = { code, minutes: String(OTP_EXPIRY_MINUTES) };
+    const entity = { type: 'applications', id: application.id };
+    const usedChannel = await this.deliver(application, channel, vars, entity);
 
     await this.otpRepo.save(
       this.otpRepo.create({
         applicationId: application.id,
         codeHash: hashToken(code),
-        channel,
+        channel: usedChannel,
         expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
         attempts: 0,
       }),
     );
 
-    const vars = { code, minutes: String(OTP_EXPIRY_MINUTES) };
-    const entity = { type: 'applications', id: application.id };
-    if (channel === 'sms') {
-      await this.smsService.send({ key: 'otp_code', to: application.phone ?? '', vars, locale: application.locale, entity });
-    } else {
-      await this.mailService.send({ key: 'otp_code', to: application.email ?? '', vars, locale: application.locale, entity });
+    return { ok: true, channelHint };
+  }
+
+  /**
+   * Sends the code and returns the channel actually used, stored on the
+   * `applicant_otps` row. SMS is only attempted when it's "usable" — a real
+   * driver is configured, or the `log` driver outside production (so local
+   * development/CI, which seed the `log` driver, still exercise the SMS
+   * path) — and the application has a phone. Every other case, and any SMS
+   * send that doesn't come back `sent`, falls back to email.
+   */
+  private async deliver(
+    application: Application,
+    requestedChannel: RequestedOtpChannel,
+    vars: Record<string, string>,
+    entity: { type: string; id: string },
+  ): Promise<ApplicantOtpChannel> {
+    if (requestedChannel !== 'email') {
+      const smsUsable = (await this.smsUsable()) && Boolean(application.phone);
+      if (smsUsable) {
+        const result = await this.smsService.send({
+          key: 'otp_code',
+          to: application.phone ?? '',
+          vars,
+          locale: application.locale,
+          entity,
+        });
+        if (result.status === 'sent') {
+          return 'sms';
+        }
+        // Fall through to email — a chosen-but-failed SMS must still reach the applicant.
+      }
     }
 
-    return { ok: true };
+    await this.mailService.send({ key: 'otp_code', to: application.email ?? '', vars, locale: application.locale, entity });
+    return 'email';
+  }
+
+  /** SMS is worth attempting: a real driver, or `log` outside production. */
+  private async smsUsable(): Promise<boolean> {
+    const availability = await this.smsService.availability();
+    if (availability === 'real') return true;
+    if (availability === 'log') return this.env.NODE_ENV !== 'production';
+    return false;
+  }
+
+  /** The channel `channelHint` reports when the caller doesn't pick one — depends only on settings, never on the identifier. */
+  private async defaultChannelHint(): Promise<'sms' | 'email'> {
+    return (await this.smsService.availability()) === 'real' ? 'sms' : 'email';
   }
 
   /**
@@ -153,22 +212,58 @@ export class PortalOtpService {
     return outcome.minted;
   }
 
-  /** A reference (`SA-2026-00185`) or an email — either resolves to at most one application. */
+  /**
+   * B2 (safeer-backend-fr-review.md): a reference (`SA-2026-00185`), an
+   * email, or a phone number (normalised to E.164, `+966` default country
+   * code) — each resolves to *at most one* application. For email/phone,
+   * several applications can share the same contact detail (nothing
+   * prevents that beyond B2's own new-application check), so this always
+   * prefers the most recent non-terminal one, falling back to the most
+   * recent application overall when none is non-terminal — never an
+   * arbitrary row.
+   */
   private findApplication(identifier: string): Promise<Application | null> {
     const trimmed = identifier.trim();
-    return this.applicationRepo
-      .createQueryBuilder('a')
-      .where('UPPER(a.reference) = UPPER(:identifier)', { identifier: trimmed })
-      .orWhere('LOWER(a.email) = LOWER(:identifier)', { identifier: trimmed })
+    const qb = this.applicationRepo.createQueryBuilder('a');
+
+    if (REFERENCE_RE.test(trimmed)) {
+      qb.where('UPPER(a.reference) = UPPER(:identifier)', { identifier: trimmed });
+    } else if (trimmed.includes('@')) {
+      qb.where('LOWER(a.email) = LOWER(:identifier)', { identifier: trimmed });
+    } else {
+      const phone = normalizePhone(trimmed);
+      if (!phone) {
+        return Promise.resolve(null);
+      }
+      qb.where('a.phone_e164 = :phone', { phone });
+    }
+
+    return qb
+      .addSelect(
+        `CASE WHEN a.status IN (:...nonTerminal) THEN 0 ELSE 1 END`,
+        'is_terminal',
+      )
+      .setParameter('nonTerminal', NON_TERMINAL_APPLICATION_STATUSES)
+      .orderBy('is_terminal', 'ASC')
+      .addOrderBy('a.created_at', 'DESC')
+      .addOrderBy('a.id', 'DESC')
       .getOne();
   }
 
+  /**
+   * The rate-limit key is normalised the same way `findApplication` resolves
+   * an identifier, so `05XXXXXXXX` and `+9665XXXXXXXX` (the same phone,
+   * differently formatted) share one counter instead of doubling the
+   * effective limit.
+   */
   private checkRequestRateLimit(identifier: string): void {
-    const key = identifier.trim().toLowerCase();
-    const attempts = this.requestAttempts.get(key) ?? 0;
+    const trimmed = identifier.trim();
+    const key = (REFERENCE_RE.test(trimmed) || trimmed.includes('@') ? trimmed : normalizePhone(trimmed)) ?? trimmed;
+    const normalizedKey = key.toLowerCase();
+    const attempts = this.requestAttempts.get(normalizedKey) ?? 0;
     if (attempts >= OTP_REQUEST_LIMIT) {
       throw new ProblemException(429, ErrorCode.RATE_LIMITED, 'Too many verification code requests — try again shortly');
     }
-    this.requestAttempts.set(key, attempts + 1);
+    this.requestAttempts.set(normalizedKey, attempts + 1);
   }
 }

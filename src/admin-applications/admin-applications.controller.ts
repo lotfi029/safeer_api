@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { createReadStream } from 'node:fs';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
 import { PrivateFileStore } from '../storage/private-file-store.service.js';
@@ -47,6 +46,12 @@ export class AdminApplicationsController {
     return this.applications.counts();
   }
 
+  /** B7 (safeer-backend-fr-review.md): the users PATCH/bulk-assign may legally pick from — admin/reviewer, not locked. Registered before `:id` for the same reason `counts`/`export.csv` are. */
+  @Get('assignees')
+  async assignees() {
+    return this.applications.listAssignees();
+  }
+
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'q', required: false, type: String })
   @ApiQuery({ name: 'reviewerId', required: false, type: String })
@@ -87,18 +92,7 @@ export class AdminApplicationsController {
   @Get(':id/documents/:docId/file')
   async streamDocument(@Param('id') id: string, @Param('docId') docId: string, @Res() res: Response): Promise<void> {
     const doc = await this.applications.getDocumentForStream(id, docId);
-
-    res.setHeader('Content-Type', doc.mime);
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Disposition', `inline; filename="${doc.originalName.replace(/"/g, '')}"`);
-
-    const stream = createReadStream(this.fileStore.resolvePath(doc.storageKey));
-    stream.on('error', () => {
-      if (!res.headersSent) res.status(404);
-      res.end();
-    });
-    stream.pipe(res);
+    await this.fileStore.serve(res, doc);
   }
 
   @Post(':id/notes')

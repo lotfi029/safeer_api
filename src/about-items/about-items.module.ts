@@ -11,6 +11,7 @@ import { createAboutItemSchema, updateAboutItemSchema } from './dto/about-item.d
 @Roles('admin', 'editor')
 class AdminAboutItemsController extends CrudController<AboutItem>({
   path: 'admin/about-items',
+  deleteRoles: ['admin', 'editor'],
   entity: AboutItem,
   createDto: createAboutItemSchema,
   updateDto: updateAboutItemSchema,

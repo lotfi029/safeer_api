@@ -23,6 +23,10 @@ export class WorkAreaItem {
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
 
+  /** B11 (safeer-backend-fr-review.md) — filters the public `/work-areas` list; the admin list/detail always show every item. */
+  @Column({ name: 'is_published', type: 'boolean', default: true })
+  isPublished: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'datetime', precision: 3, default: () => 'CURRENT_TIMESTAMP(3)' })
   createdAt: Date;
 

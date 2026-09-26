@@ -8,6 +8,7 @@ import { createNewsCategorySchema, updateNewsCategorySchema } from './dto/news-c
 @Roles('admin', 'editor')
 export class AdminNewsCategoriesController extends CrudController<NewsCategory>({
   path: 'admin/news-categories',
+  deleteRoles: ['admin', 'editor'],
   entity: NewsCategory,
   createDto: createNewsCategorySchema,
   updateDto: updateNewsCategorySchema,

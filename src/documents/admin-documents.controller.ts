@@ -9,6 +9,7 @@ import { createDocumentSchema, updateDocumentSchema } from './dto/document.dto.j
 @Roles('admin', 'editor')
 export class AdminDocumentsController extends CrudController<SafeerDocument>({
   path: 'admin/documents',
+  deleteRoles: ['admin', 'editor'],
   entity: SafeerDocument,
   createDto: createDocumentSchema,
   updateDto: updateDocumentSchema,

@@ -28,6 +28,18 @@ export class BoardMember {
   @Column({ name: 'is_lead', type: 'boolean', default: false })
   isLead: boolean;
 
+  /**
+   * B12 (safeer-backend-fr-review.md). Named `bioAr`/`bioEn` on purpose —
+   * `LocaleInterceptor` collapses any `xxxAr`/`xxxEn` pair to `xxx` for the
+   * requested locale (falling back to Arabic when English is null) with no
+   * extra wiring here.
+   */
+  @Column({ name: 'bio_ar', type: 'text', nullable: true })
+  bioAr: string | null;
+
+  @Column({ name: 'bio_en', type: 'text', nullable: true })
+  bioEn: string | null;
+
   @Column({ name: 'photo_asset_id', type: 'bigint', unsigned: true, nullable: true })
   photoAssetId: string | null;
 

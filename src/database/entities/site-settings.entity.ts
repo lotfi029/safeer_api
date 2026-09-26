@@ -52,6 +52,19 @@ export class SiteSettings {
   @Column({ name: 'x_url', type: 'varchar', length: 255, nullable: true })
   xUrl: string | null;
 
+  /** Settings/social (safeer-backend-fix-prompt.md) */
+  @Column({ name: 'youtube_url', type: 'varchar', length: 255, nullable: true })
+  youtubeUrl: string | null;
+
+  @Column({ name: 'linkedin_url', type: 'varchar', length: 255, nullable: true })
+  linkedinUrl: string | null;
+
+  @Column({ name: 'whatsapp_url', type: 'varchar', length: 255, nullable: true })
+  whatsappUrl: string | null;
+
+  @Column({ name: 'tiktok_url', type: 'varchar', length: 255, nullable: true })
+  tiktokUrl: string | null;
+
   @Column({ name: 'en_enabled', type: 'boolean', default: true })
   enEnabled: boolean;
 

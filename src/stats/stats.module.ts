@@ -10,6 +10,7 @@ import { createStatSchema, updateStatSchema } from './dto/stat.dto.js';
 @Roles('admin', 'editor')
 class AdminStatsController extends CrudController<Stat>({
   path: 'admin/stats',
+  deleteRoles: ['admin', 'editor'],
   entity: Stat,
   createDto: createStatSchema,
   updateDto: updateStatSchema,

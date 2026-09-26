@@ -1,13 +1,9 @@
-import { Controller, Get, Inject, NotFoundException, Param, Req, Res } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Req, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
-import { createReadStream } from 'node:fs';
-import path from 'node:path';
 import { MediaService } from '../media/media.service.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
-import { ENV } from '../config/env.tokens.js';
-import type { Env } from '../config/env.js';
 
 /**
  * Nothing is ever served from a public bucket URL (D-07): these two routes
@@ -36,10 +32,7 @@ import type { Env } from '../config/env.js';
 @Controller('files')
 @SkipThrottle()
 export class FilesController {
-  constructor(
-    private readonly mediaService: MediaService,
-    @Inject(ENV) private readonly env: Env,
-  ) {}
+  constructor(private readonly mediaService: MediaService) {}
 
   @Public()
   @Get(':publicId')
@@ -59,7 +52,7 @@ export class FilesController {
       void this.mediaService.incrementDownloadCount(publicId);
     }
 
-    this.sendFile(res, asset.storageKey, asset.mimeType, asset.kind === 'pdf', isPrivate === 'allow-private');
+    await this.sendFile(res, asset.storageKey, asset.mimeType, asset.kind === 'pdf', isPrivate === 'allow-private');
   }
 
   @Public()
@@ -79,7 +72,7 @@ export class FilesController {
     const found = await this.mediaService.findVariant(asset.id, variant);
     if (!found) throw new NotFoundException();
 
-    this.sendFile(res, found.storageKey, 'image/webp', false, isPrivate === 'allow-private');
+    await this.sendFile(res, found.storageKey, 'image/webp', false, isPrivate === 'allow-private');
   }
 
   /**
@@ -96,14 +89,20 @@ export class FilesController {
     return 'deny';
   }
 
-  private sendFile(res: Response, storageKey: string, mimeType: string, asAttachment: boolean, isPrivate: boolean): void {
+  /**
+   * Public assets are always streamed through this API — local disk or the
+   * S3 public bucket alike (decision 3) — never a redirect: nothing about
+   * caching, content-type or the download-count side effect above depends
+   * on where the bytes actually live.
+   */
+  private async sendFile(res: Response, storageKey: string, mimeType: string, asAttachment: boolean, isPrivate: boolean): Promise<void> {
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Cache-Control', isPrivate ? 'private, no-store' : 'public, max-age=31536000, immutable');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     if (asAttachment) {
       res.setHeader('Content-Disposition', 'attachment');
     }
-    const stream = createReadStream(path.join(this.env.STORAGE_ROOT, storageKey));
+    const stream = await this.mediaService.getStream(storageKey);
     stream.on('error', () => {
       if (!res.headersSent) res.status(404);
       res.end();

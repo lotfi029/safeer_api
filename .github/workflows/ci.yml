@@ -104,11 +104,23 @@ jobs:
 
       - run: npm run migrate
 
+      # Phase 6 (safeer-backend-fix-prompt.md): Jest + supertest-style HTTP
+      # tests against a real, dedicated MySQL database and a real running
+      # instance of the app — both created and booted in
+      # test/global-setup.ts, entirely separately from the CI-wide
+      # database/API below. No ORM mock.
+      - run: npm test
+
       # openapi.json must reflect what's actually implemented in source at
       # HEAD, every time — a stale contract is exactly what
       # export-openapi.mjs's own header warns about, and any generated
       # frontend API client depends on it.
       - run: npm run openapi:check
+
+      # B4/B5 sweep (safeer-backend-fr-review.md phase 2): every admin/*
+      # route must be role-gated or on the explicit allow-list — see
+      # scripts/lib/check-admin-roles.mjs.
+      - run: npm run check:admin-roles
 
       - name: Boot the API
         run: |

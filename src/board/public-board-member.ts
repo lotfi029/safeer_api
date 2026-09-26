@@ -9,6 +9,8 @@ export interface PublicBoardMember {
   roleEn: string | null;
   grp: BoardMemberGroup;
   isLead: boolean;
+  bioAr: string | null;
+  bioEn: string | null;
   photoAsset: PublicMediaAsset | null;
   sortOrder: number;
 }
@@ -22,6 +24,8 @@ export function toPublicBoardMember(member: BoardMember): PublicBoardMember {
     roleEn: member.roleEn,
     grp: member.grp,
     isLead: member.isLead,
+    bioAr: member.bioAr,
+    bioEn: member.bioEn,
     photoAsset: toPublicAsset(member.photoAsset),
     sortOrder: member.sortOrder,
   };

@@ -25,6 +25,10 @@ export interface PublicSiteSettings {
   facebookUrl: string | null;
   instagramUrl: string | null;
   xUrl: string | null;
+  youtubeUrl: string | null;
+  linkedinUrl: string | null;
+  whatsappUrl: string | null;
+  tiktokUrl: string | null;
   enEnabled: boolean;
   seoTitleAr: string | null;
   seoTitleEn: string | null;
@@ -50,6 +54,10 @@ export function toPublicSiteSettings(settings: SiteSettings): PublicSiteSettings
     facebookUrl: settings.facebookUrl,
     instagramUrl: settings.instagramUrl,
     xUrl: settings.xUrl,
+    youtubeUrl: settings.youtubeUrl,
+    linkedinUrl: settings.linkedinUrl,
+    whatsappUrl: settings.whatsappUrl,
+    tiktokUrl: settings.tiktokUrl,
     enEnabled: settings.enEnabled,
     seoTitleAr: settings.seoTitleAr,
     seoTitleEn: settings.seoTitleEn,

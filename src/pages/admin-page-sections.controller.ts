@@ -15,6 +15,7 @@ import { createPageSectionSchema, updatePageSectionSchema } from './dto/page.dto
 @Roles('admin', 'editor')
 export class AdminPageSectionsController extends CrudController<PageSection>({
   path: 'admin/page-sections',
+  deleteRoles: ['admin', 'editor'],
   entity: PageSection,
   createDto: createPageSectionSchema,
   updateDto: updatePageSectionSchema,

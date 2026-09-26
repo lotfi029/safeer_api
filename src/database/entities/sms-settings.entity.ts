@@ -1,7 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 import { User } from './user.entity.js';
 
-export type SmsDriver = 'log' | 'http';
+export type SmsDriver = 'log' | 'http' | 'unifonic';
 
 /**
  * Singleton (CHECK id = 1), mirroring mail_settings — Safeer infra change §4.
@@ -17,10 +17,13 @@ export class SmsSettings {
   @Column({ name: 'is_enabled', type: 'boolean', default: false })
   isEnabled: boolean;
 
-  @Column({ type: 'enum', enum: ['log', 'http'] as SmsDriver[], default: 'log' })
+  @Column({ type: 'enum', enum: ['log', 'http', 'unifonic'] as SmsDriver[], default: 'log' })
   driver: SmsDriver;
 
-  /** 'http' driver only — a generic endpoint; no real vendor is wired up. */
+  /**
+   * 'http' driver: a generic endpoint, no real vendor. 'unifonic' driver:
+   * overrides Unifonic's default REST endpoint — leave NULL to use it.
+   */
   @Column({ name: 'provider_url', type: 'varchar', length: 500, nullable: true })
   providerUrl: string | null;
 

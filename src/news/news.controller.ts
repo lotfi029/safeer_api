@@ -12,7 +12,7 @@ import type { RequestContext } from '../common/request-context.js';
 import { MarkdownService } from '../common/markdown/markdown.service.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
-import { readPageLimit, readString } from '../common/query/list-params.js';
+import { escapeLikeValue, readPageLimit, readString } from '../common/query/list-params.js';
 import { Post } from '../database/entities/post.entity.js';
 import { NewsCategory } from '../database/entities/news-category.entity.js';
 import { ENV } from '../config/env.tokens.js';
@@ -70,7 +70,12 @@ export class NewsController {
       qb.andWhere('c.slug = :categorySlug', { categorySlug });
     }
     if (q) {
-      qb.andWhere('(p.titleAr LIKE :q OR p.titleEn LIKE :q OR p.excerptAr LIKE :q OR p.excerptEn LIKE :q)', { q: `%${q}%` });
+      // B13 (safeer-backend-fr-review.md): escape LIKE's own '%'/'_' wildcards in the search term itself.
+      const escaped = escapeLikeValue(q);
+      qb.andWhere(
+        "(p.titleAr LIKE :q ESCAPE '\\\\' OR p.titleEn LIKE :q ESCAPE '\\\\' OR p.excerptAr LIKE :q ESCAPE '\\\\' OR p.excerptEn LIKE :q ESCAPE '\\\\')",
+        { q: `%${escaped}%` },
+      );
       // A distinct search term is a cache miss every time regardless — not worth spending eviction budget on.
       req.skipCacheWrite = true;
     }

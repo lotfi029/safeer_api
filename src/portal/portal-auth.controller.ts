@@ -20,7 +20,7 @@ export class PortalAuthController {
   @Throttle({ default: { limit: 5, ttl: 3_600_000 } })
   @Post('request-otp')
   requestOtp(@Body() dto: RequestOtpDto) {
-    return this.otpService.requestOtp(dto.identifier);
+    return this.otpService.requestOtp(dto.identifier, dto.channel);
   }
 
   /** Public — the caller has no session yet; that's exactly what a successful verify mints. */

@@ -142,6 +142,26 @@ async function deleteTempUser(id) {
   await withDb((conn) => conn.execute('DELETE FROM users WHERE id = ?', [id]));
 }
 
+/**
+ * A DB row with no session — for cases (B7's locked-reviewer check) that
+ * only need the user's id/lock state, never a login. `POST admin/auth/login`
+ * is throttled 5/60s/IP, and this suite already spends nearly that whole
+ * budget on `createTempUser()` calls elsewhere; skipping the login here
+ * keeps this case from tipping it over.
+ */
+async function createTempUserNoLogin(role, overrides = {}) {
+  const passwordHash = await argon2.hash('Smoke-Test-P4ssword!', { type: argon2.argon2id });
+  const email = `smoke-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
+  const id = await withDb(async (conn) => {
+    const [result] = await conn.execute(
+      'INSERT INTO users (name, email, password_hash, role, is_locked, failed_logins) VALUES (?, ?, ?, ?, ?, 0)',
+      [`Smoke ${role}`, email, passwordHash, role, overrides.isLocked ? 1 : 0],
+    );
+    return String(result.insertId);
+  });
+  return { id, email };
+}
+
 /** `cookie` is `"name=value"` (as captured from a `Set-Cookie` header) — the bare token is everything after the first `=`. */
 function rawTokenFromCookie(cookie) {
   return cookie.slice(cookie.indexOf('=') + 1);
@@ -208,6 +228,43 @@ async function readSmsOtpCode(applicationId) {
   const match = typeof message === 'string' ? message.match(/\d{6}/) : null;
   if (!match) throw new Error(`no 6-digit OTP found in sms_log.message for application ${applicationId}: ${JSON.stringify(message)}`);
   return match[0];
+}
+
+/** B1's email-fallback path (portal-otp.service.ts) writes the code into mail_log's rendered payload/subject instead of sms_log. */
+async function readMailOtpCode(applicationId) {
+  const row = await withDb((conn) =>
+    conn
+      .execute(
+        "SELECT subject, payload FROM mail_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'otp_code' ORDER BY id DESC LIMIT 1",
+        [applicationId],
+      )
+      .then(([rows]) => rows[0]),
+  );
+  const haystack = `${row?.subject ?? ''} ${JSON.stringify(row?.payload ?? '')}`;
+  const match = haystack.match(/\d{6}/);
+  if (!match) throw new Error(`no 6-digit OTP found in mail_log for application ${applicationId}: ${JSON.stringify(row)}`);
+  return match[0];
+}
+
+/**
+ * B1: the seed default has SMS disabled (`sms_settings.is_enabled = 0`), so
+ * OTP requests fall back to email unless a case explicitly turns SMS on
+ * (with the harmless `log` driver) first. Returns a restore function that
+ * puts the previous settings back exactly.
+ */
+async function withSmsEnabled(fn) {
+  const before = await api('GET', '/admin/sms/settings');
+  assert(before.status === 200, `GET admin/sms/settings failed: ${before.status}`);
+  const enabled = await api('PUT', '/admin/sms/settings', { body: { isEnabled: true, driver: 'log' } });
+  assert(enabled.status === 200, `enabling SMS (log driver) failed: ${enabled.status}: ${JSON.stringify(enabled.body)}`);
+  try {
+    return await fn();
+  } finally {
+    const restored = await api('PUT', '/admin/sms/settings', {
+      body: { isEnabled: before.body.isEnabled, driver: before.body.driver },
+    });
+    assert(restored.status === 200, `restoring sms_settings failed: ${restored.status}`);
+  }
 }
 
 async function uploadApplicationDocument(session, docType, tag) {
@@ -280,12 +337,74 @@ test('permissions: editor is refused admin/applications, support is refused admi
     assert(reviewerOwn.status === 200, `reviewer should be allowed into admin/applications, got ${reviewerOwn.status}`);
     const supportOwn = await api('GET', '/admin/messages', { session: support });
     assert(supportOwn.status === 200, `support should be allowed into admin/messages, got ${supportOwn.status}`);
+
+    // B4/B5 (safeer-backend-fr-review.md): redirects and media are
+    // admin+editor only — a reviewer or support account gets refused, an
+    // editor gets through.
+    const supportRedirects = await api('GET', '/admin/redirects', { session: support });
+    assert(supportRedirects.status === 403, `support should be refused admin/redirects (B4), got ${supportRedirects.status}`);
+    const editorRedirects = await api('GET', '/admin/redirects', { session: editor });
+    assert(editorRedirects.status === 200, `editor should be allowed into admin/redirects (B4), got ${editorRedirects.status}`);
+
+    const reviewerMedia = await api('GET', '/admin/media', { session: reviewer });
+    assert(reviewerMedia.status === 403, `reviewer should be refused admin/media (B5), got ${reviewerMedia.status}`);
+    const editorMedia = await api('GET', '/admin/media', { session: editor });
+    assert(editorMedia.status === 200, `editor should be allowed into admin/media (B5), got ${editorMedia.status}`);
+
+    // B6: recentAuditLog is admin-only — folded in here (reusing this
+    // case's already-logged-in reviewer) rather than its own test case,
+    // since POST admin/auth/login is throttled 5/60s/IP and this suite's
+    // other login-heavy cases already spend most of that budget.
+    const overviewAsAdmin = await api('GET', '/admin/overview');
+    assert(
+      Array.isArray(overviewAsAdmin.body.recentAuditLog) && overviewAsAdmin.body.recentAuditLog.length > 0,
+      'admin should see a non-empty recentAuditLog',
+    );
+    const overviewAsReviewer = await api('GET', '/admin/overview', { session: reviewer });
+    assert(
+      Array.isArray(overviewAsReviewer.body.recentAuditLog) && overviewAsReviewer.body.recentAuditLog.length === 0,
+      'reviewer should see an empty recentAuditLog (B6)',
+    );
+
+    // B7: assignees is exactly the unlocked admin/reviewer accounts, and
+    // assigning anyone else is refused. `lockedReviewer` never logs in — it
+    // only needs to exist and be locked, so it costs no login-throttle budget.
+    const lockedReviewer = await createTempUserNoLogin('reviewer', { isLocked: true });
+    const { a: applicant } = await sharedApplicants();
+    try {
+      const assignees = await api('GET', '/admin/applications/assignees');
+      assert(assignees.status === 200, `assignees failed: ${assignees.status}`);
+      const assigneeIds = assignees.body.map((u) => u.id);
+      assert(assigneeIds.includes(reviewer.id), 'assignees should include the unlocked reviewer (B7)');
+      assert(!assigneeIds.includes(lockedReviewer.id), 'assignees should exclude the locked reviewer (B7)');
+      assert(!assigneeIds.includes(editor.id), 'assignees should exclude the editor — not admin/reviewer (B7)');
+
+      const assignToEditor = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: editor.id } });
+      assert(assignToEditor.status === 422, `assigning to an editor should be 422 (B7), got ${assignToEditor.status}`);
+      assert(assignToEditor.body?.code === 'INVALID_ASSIGNEE', `expected INVALID_ASSIGNEE, got ${assignToEditor.body?.code}`);
+
+      const assignToLocked = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: lockedReviewer.id } });
+      assert(assignToLocked.status === 422, `assigning to a locked reviewer should be 422 (B7), got ${assignToLocked.status}`);
+      assert(assignToLocked.body?.code === 'INVALID_ASSIGNEE', `expected INVALID_ASSIGNEE, got ${assignToLocked.body?.code}`);
+
+      const assignToReviewer = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: reviewer.id } });
+      assert(
+        assignToReviewer.status === 200,
+        `assigning to a valid reviewer should succeed (B7), got ${assignToReviewer.status}: ${JSON.stringify(assignToReviewer.body)}`,
+      );
+      // Leave the shared fixture unassigned for whatever runs next.
+      const unassign = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: null } });
+      assert(unassign.status === 200, `clearing the assignee failed: ${unassign.status}`);
+    } finally {
+      await deleteTempUser(lockedReviewer.id);
+    }
   } finally {
     await deleteTempUser(editor.id);
     await deleteTempUser(support.id);
     await deleteTempUser(reviewer.id);
   }
 });
+
 
 // ---------------------------------------------------------------------------
 // Locale collapse — the seed turned out fully bilingual (phase 4's report),
@@ -443,54 +562,137 @@ test('cleanup: remove the shared apply-flow/isolation/CSRF fixture applications'
 });
 
 // ---------------------------------------------------------------------------
-// OTP — request-otp for a real reference, read the code back from sms_log
-// (every application from POST applications has a phone, so the channel is
-// always 'sms' — portal-otp.service.ts), verify-otp succeeds; a wrong code
-// repeated past the attempt limit is rejected even with the right code
-// after; a bogus identifier gets the same {ok:true} non-response with no
-// row created.
+// OTP (B1/B2, safeer-backend-fr-review.md) — everything here shares one
+// applicant and stays within the 5/hour/IP throttle on both `POST
+// applications` and `POST portal/auth/request-otp` (scripts/smoke.mjs's own
+// long-standing convention — see `sharedApplicants()` above): request via
+// reference with SMS on (`log` driver) → verify; request again via the
+// *local* `05...` form of the same phone number (B2's phone identifier,
+// resolving to the same application as its E.164 form) → 5 wrong guesses
+// lock out even the right code; a bogus identifier is a silent {ok:true}
+// no-op; with SMS back off (the seed default), a request falls back to
+// email and channelHint still doesn't depend on whether the identifier
+// matches anything; finally, a second `POST applications` for this same
+// applicant's email is refused (B2's duplicate-application check) and
+// sends it an `application_resume` notice.
 
-test('OTP: request → verify succeeds; 5 wrong guesses lock out even the right code; a bogus identifier is a silent no-op', async () => {
-  const applicant = await createApplication({ firstName: 'Khalid', lastName: 'Alotaibi' });
+test('OTP (B1/B2): SMS + phone identifier + lockout + bogus no-op + email fallback + duplicate application', async () => {
+  const localPhone = `05${String(Date.now()).slice(-8)}`;
+  const applicant = await createApplication({ firstName: 'Khalid', lastName: 'Alotaibi', phone: localPhone });
   try {
     const otpCountBefore = await withDb((conn) =>
       conn.execute('SELECT COUNT(*) AS c FROM applicant_otps WHERE application_id = ?', [applicant.id]).then(([r]) => Number(r[0].c)),
     );
 
-    const req1 = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
-    assert(req1.status === 200 || req1.status === 201, `request-otp failed: ${req1.status}`);
-    assert(req1.body.ok === true, 'request-otp must always resolve {ok:true}');
+    await withSmsEnabled(async () => {
+      const req1 = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference, channel: 'sms' } });
+      assert(req1.status === 200 || req1.status === 201, `request-otp failed: ${req1.status}`);
+      assert(req1.body.ok === true, 'request-otp must always resolve {ok:true}');
+      assert(req1.body.channelHint === 'sms', `channel:'sms' should echo channelHint 'sms', got ${req1.body.channelHint}`);
 
-    const code1 = await readSmsOtpCode(applicant.id);
-    const verify1 = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: code1 } });
-    assert(verify1.status === 200 || verify1.status === 201, `verify-otp with the right code failed: ${verify1.status}: ${JSON.stringify(verify1.body)}`);
-    assert(typeof verify1.body.csrfToken === 'string' && verify1.body.csrfToken.length > 0, 'verify-otp must return a csrfToken');
+      const code1 = await readSmsOtpCode(applicant.id);
+      const verify1 = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: code1 } });
+      assert(verify1.status === 200 || verify1.status === 201, `verify-otp with the right code failed: ${verify1.status}: ${JSON.stringify(verify1.body)}`);
+      assert(typeof verify1.body.csrfToken === 'string' && verify1.body.csrfToken.length > 0, 'verify-otp must return a csrfToken');
 
-    // A second, independent code — used to exercise the attempt limit
-    // without touching the already-consumed first one.
-    const req2 = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
-    assert(req2.body.ok === true, 'second request-otp must also resolve {ok:true}');
-    const code2 = await readSmsOtpCode(applicant.id);
-    const wrongCode = code2 === '000000' ? '111111' : '000000';
+      // B2: the *local* form of the same phone (createApplication stored it
+      // as `05...`, normalized to `+9665...` on save) — a second,
+      // independent code, also used to exercise the attempt limit without
+      // touching the already-consumed first one.
+      const req2 = await api('POST', '/portal/auth/request-otp', { body: { identifier: localPhone, channel: 'sms' } });
+      assert(req2.body.ok === true, 'request-otp by the local phone form must also resolve {ok:true}');
+      const code2 = await readSmsOtpCode(applicant.id);
+      const wrongCode = code2 === '000000' ? '111111' : '000000';
 
-    for (let i = 1; i <= 5; i++) {
-      const wrong = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: wrongCode } });
-      assert(wrong.status === 401, `wrong-code attempt #${i} should be 401, got ${wrong.status}`);
-      assert(wrong.body?.code === 'OTP_INVALID', `expected OTP_INVALID, got ${wrong.body?.code}`);
-    }
-    // The 6th attempt, now with the CORRECT code, must still be rejected —
-    // the attempt cap is checked before the code comparison.
-    const lockedOut = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: code2 } });
-    assert(lockedOut.status === 401, `the right code after 5 wrong attempts should still be 401, got ${lockedOut.status}`);
-    assert(lockedOut.body?.code === 'OTP_INVALID', `expected OTP_INVALID, got ${lockedOut.body?.code}`);
+      for (let i = 1; i <= 5; i++) {
+        const wrong = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: wrongCode } });
+        assert(wrong.status === 401, `wrong-code attempt #${i} should be 401, got ${wrong.status}`);
+        assert(wrong.body?.code === 'OTP_INVALID', `expected OTP_INVALID, got ${wrong.body?.code}`);
+      }
+      // The 6th attempt, now with the CORRECT code, must still be rejected —
+      // the attempt cap is checked before the code comparison.
+      const lockedOut = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: code2 } });
+      assert(lockedOut.status === 401, `the right code after 5 wrong attempts should still be 401, got ${lockedOut.status}`);
+      assert(lockedOut.body?.code === 'OTP_INVALID', `expected OTP_INVALID, got ${lockedOut.body?.code}`);
 
-    // A bogus identifier: the same non-committal {ok:true}, and no row created for it.
-    const bogus = await api('POST', '/portal/auth/request-otp', { body: { identifier: `SA-2099-${Math.floor(Math.random() * 90000 + 10000)}` } });
-    assert(bogus.body.ok === true, 'a bogus identifier must resolve the same {ok:true} as a real one');
-    const otpCountAfter = await withDb((conn) =>
-      conn.execute('SELECT COUNT(*) AS c FROM applicant_otps WHERE application_id = ?', [applicant.id]).then(([r]) => Number(r[0].c)),
+      // A bogus identifier: the same non-committal {ok:true}, and no row created for it.
+      const bogus = await api('POST', '/portal/auth/request-otp', { body: { identifier: `SA-2099-${Math.floor(Math.random() * 90000 + 10000)}` } });
+      assert(bogus.body.ok === true, 'a bogus identifier must resolve the same {ok:true} as a real one');
+      const otpCountAfterSms = await withDb((conn) =>
+        conn.execute('SELECT COUNT(*) AS c FROM applicant_otps WHERE application_id = ?', [applicant.id]).then(([r]) => Number(r[0].c)),
+      );
+      assert(
+        otpCountAfterSms === otpCountBefore + 2,
+        `expected exactly 2 new applicant_otps rows for this application (one per real request-otp call), got ${otpCountAfterSms - otpCountBefore}`,
+      );
+    });
+
+    // B1: sms_settings is back to disabled (withSmsEnabled restores it) —
+    // the same identifier now falls back to email, and channelHint reflects
+    // that default whether or not the identifier resolves to anything.
+    const reqEmail = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
+    assert(reqEmail.status === 200 || reqEmail.status === 201, `request-otp (email fallback) failed: ${reqEmail.status}`);
+    assert(reqEmail.body.channelHint === 'email', `SMS disabled should default channelHint to 'email', got ${reqEmail.body.channelHint}`);
+
+    const channel = await withDb((conn) =>
+      conn
+        .execute('SELECT channel FROM applicant_otps WHERE application_id = ? ORDER BY id DESC LIMIT 1', [applicant.id])
+        .then(([rows]) => rows[0]?.channel),
     );
-    assert(otpCountAfter === otpCountBefore + 2, `expected exactly 2 new applicant_otps rows for this application (one per real request-otp call), got ${otpCountAfter - otpCountBefore}`);
+    assert(channel === 'email', `expected the applicant_otps row to record channel 'email' when SMS is disabled, got ${channel}`);
+
+    const emailCode = await readMailOtpCode(applicant.id);
+    const verifyEmail = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: emailCode } });
+    assert(
+      verifyEmail.status === 200 || verifyEmail.status === 201,
+      `verify-otp after email fallback failed: ${verifyEmail.status}: ${JSON.stringify(verifyEmail.body)}`,
+    );
+
+    const bogusHint = await api('POST', '/portal/auth/request-otp', { body: { identifier: `SA-2099-${Math.floor(Math.random() * 90000 + 10000)}` } });
+    assert(
+      bogusHint.body.channelHint === reqEmail.body.channelHint,
+      `channelHint for a bogus identifier (${bogusHint.body.channelHint}) must match a real one (${reqEmail.body.channelHint})`,
+    );
+
+    // B2: a second POST applications for this same applicant's email is
+    // refused, and sends *this* application an application_resume notice —
+    // never the newly submitted (fake) contact details.
+    const resumeMailBefore = await withDb((conn) =>
+      conn
+        .execute("SELECT COUNT(*) AS c FROM mail_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'application_resume'", [
+          applicant.id,
+        ])
+        .then(([r]) => Number(r[0].c)),
+    );
+
+    const dup = await fetch(`${BASE}/applications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: 'Someone',
+        lastName: 'Else',
+        birthDate: '2000-01-01',
+        phone: `+9665${String(Date.now()).slice(-8)}`,
+        nationality: 'SA',
+        email: applicant.email,
+        gender: 'male',
+      }),
+    });
+    const dupBody = await dup.json();
+    assert(dup.status === 409, `duplicate application should be refused with 409, got ${dup.status}: ${JSON.stringify(dupBody)}`);
+    assert(dupBody.code === 'APPLICATION_EXISTS', `expected APPLICATION_EXISTS, got ${dupBody.code}`);
+
+    const resumeMailAfter = await withDb((conn) =>
+      conn
+        .execute("SELECT COUNT(*) AS c FROM mail_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'application_resume'", [
+          applicant.id,
+        ])
+        .then(([r]) => Number(r[0].c)),
+    );
+    assert(
+      resumeMailAfter === resumeMailBefore + 1,
+      `expected one new application_resume mail_log row for the existing application, got ${resumeMailAfter - resumeMailBefore}`,
+    );
   } finally {
     await deleteApplication(applicant.id);
   }
@@ -569,19 +771,66 @@ test('full review loop: apply → 3 docs → submit → reject/re-upload/accept 
     assert(meAfterReject.body.actionNeeded?.type === 'document_rejected', `expected actionNeeded.type 'document_rejected', got ${JSON.stringify(meAfterReject.body.actionNeeded)}`);
     assert(meAfterReject.body.actionNeeded.docType === 'id_copy', `expected the rejected docType to be id_copy, got ${meAfterReject.body.actionNeeded.docType}`);
 
-    // --- Re-upload and accept ----------------------------------------------
+    // --- B3 (safeer-backend-fr-review.md): rejecting a document does NOT
+    // itself unlock re-upload — the application is still 'under_review',
+    // and upload() only allows 'draft' or 'docs_missing'. A re-upload
+    // attempt here must be refused.
+    const blockedReupload = await uploadApplicationDocument(applicant, 'id_copy', 'review-id-copy-blocked');
+    assert(blockedReupload.status === 409, `re-upload while still under_review should be 409 APPLICATION_LOCKED, got ${blockedReupload.status}`);
+    assert(blockedReupload.body?.code === 'APPLICATION_LOCKED', `expected APPLICATION_LOCKED, got ${blockedReupload.body?.code}`);
+
+    // Staff explicitly asks for the rejected document — this is what
+    // actually unlocks re-upload (docs_missing, id_copy requested/rejected).
+    const requestDocs = await api('POST', `/admin/applications/${applicant.id}/request-documents`, {
+      body: { docTypes: ['id_copy'], message: 'Please re-upload a clearer copy of your ID.' },
+    });
+    assert(requestDocs.status === 200 || requestDocs.status === 201, `request-documents failed: ${requestDocs.status}: ${JSON.stringify(requestDocs.body)}`);
+
+    // A type that was neither requested nor currently rejected is still refused.
+    const wrongTypeReupload = await uploadApplicationDocument(applicant, 'certificate', 'review-cert-blocked');
+    assert(wrongTypeReupload.status === 409, `re-uploading a type that wasn't requested/rejected should be 409, got ${wrongTypeReupload.status}`);
+    assert(wrongTypeReupload.body?.code === 'APPLICATION_LOCKED', `expected APPLICATION_LOCKED, got ${wrongTypeReupload.body?.code}`);
+
+    // --- Re-upload (now allowed) and accept ---------------------------------
     const reupload = await uploadApplicationDocument(applicant, 'id_copy', 'review-id-copy-2');
     assert(reupload.status === 201, `re-upload failed: ${reupload.status}: ${JSON.stringify(reupload.body)}`);
 
     const detail2 = await api('GET', `/admin/applications/${applicant.id}`);
     const newIdCopyDoc = detail2.body.documents.find((d) => d.docType === 'id_copy');
     assert(newIdCopyDoc && newIdCopyDoc.id !== idCopyDoc.id, 're-upload should supersede the rejected document with a new row');
+    assert(
+      detail2.body.events.some((e) => e.type === 'DOCS_RESUBMITTED'),
+      'expected a DOCS_RESUBMITTED event once the only requested/rejected type (id_copy) had a fresh replacement',
+    );
+    const listAfterResubmit = await api('GET', '/admin/applications?q=' + encodeURIComponent(applicant.reference));
+    const listItem = listAfterResubmit.body.data.find((r) => r.id === applicant.id);
+    assert(listItem?.hasUnreviewedResubmission === true, 'the admin list should badge this application as having an unreviewed resubmission');
 
     const accepted = await api('PATCH', `/admin/applications/${applicant.id}/documents/${newIdCopyDoc.id}`, { body: { status: 'accepted' } });
     assert(accepted.status === 200, `document acceptance failed: ${accepted.status}: ${JSON.stringify(accepted.body)}`);
 
     const meAfterAccept = await api('GET', '/portal/me', { session: applicant });
     assert(meAfterAccept.body.actionNeeded === null, `actionNeeded should clear once the rejected document is replaced and accepted, got ${JSON.stringify(meAfterAccept.body.actionNeeded)}`);
+
+    // Back to under_review (docs_missing's only outgoing edge) — request-documents
+    // itself only accepts 'new'/'under_review'/'interview' as a starting point.
+    const backToReview = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { status: 'under_review' } });
+    assert(backToReview.status === 200, `status docs_missing → under_review failed: ${backToReview.status}: ${JSON.stringify(backToReview.body)}`);
+
+    // B3: an accepted document can never be superseded, even by a caseworker
+    // re-requesting the same type — request-documents lets it through (a
+    // caseworker's own mistake), but upload() itself refuses it.
+    const requestAcceptedAgain = await api('POST', `/admin/applications/${applicant.id}/request-documents`, {
+      body: { docTypes: ['id_copy'] },
+    });
+    assert(requestAcceptedAgain.status === 200 || requestAcceptedAgain.status === 201, `request-documents (re-request) failed: ${requestAcceptedAgain.status}`);
+    const blockedAcceptedReupload = await uploadApplicationDocument(applicant, 'id_copy', 'review-id-copy-blocked-2');
+    assert(blockedAcceptedReupload.status === 409, `re-uploading an already-accepted document should be 409, got ${blockedAcceptedReupload.status}`);
+    assert(blockedAcceptedReupload.body?.code === 'APPLICATION_LOCKED', `expected APPLICATION_LOCKED, got ${blockedAcceptedReupload.body?.code}`);
+
+    // Back to under_review again before interview.
+    const backToReview2 = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { status: 'under_review' } });
+    assert(backToReview2.status === 200, `status docs_missing → under_review failed: ${backToReview2.status}: ${JSON.stringify(backToReview2.body)}`);
 
     // --- interview → book → accept ------------------------------------------
     const toInterview = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { status: 'interview' } });
@@ -705,6 +954,76 @@ test('messages: honeypot no-ops, a real submission creates a message, admin repl
 // the change — cache.service.ts/crud.factory.ts's purge() — so no delay is
 // needed). Also bulk-delete legacy news and confirm exactly the seeded
 // count is removed.
+
+test('B9: the seeded placeholder testimonial is pending/unfeatured; home section buttons use locale-agnostic paths, not #/ hash routes', async () => {
+  const home = await fetch(`${BASE}/home`).then((r) => r.json());
+  const buttonUrls = home.sections.flatMap((s) => [s.primaryButtonUrl, s.secondaryButtonUrl]).filter(Boolean);
+  assert(buttonUrls.length > 0, 'expected at least one home section with a button URL to check');
+  for (const url of buttonUrls) {
+    assert(!url.startsWith('#'), `home section button URL should be a locale-agnostic path, not a hash route: ${url}`);
+    assert(url.startsWith('/'), `home section button URL should start with '/': ${url}`);
+  }
+
+  const testimonials = await fetch(`${BASE}/testimonials`).then((r) => r.json());
+  const allPublic = [...testimonials.featured, ...testimonials.list];
+  assert(
+    !allPublic.some((t) => t.quote?.includes('يُستكمل')),
+    'the placeholder-text testimonial must not appear on the public site (should be status=pending)',
+  );
+});
+
+test('B10-B15: pages sectionsCount, work-area-item publish toggle, board bio, sitemap-index, escaped news search', async () => {
+  // B10: GET admin/pages returns sectionsCount (and updatedAt, already there).
+  const pagesRes = await api('GET', '/admin/pages?limit=50');
+  assert(pagesRes.status === 200, `admin/pages failed: ${pagesRes.status}`);
+  const homePage = pagesRes.body.data.find((p) => p.slug === 'home');
+  assert(homePage, 'could not find the "home" page via admin/pages');
+  assert(typeof homePage.sectionsCount === 'number' && homePage.sectionsCount > 0, `expected home.sectionsCount > 0, got ${homePage.sectionsCount}`);
+  assert(homePage.updatedAt, 'expected admin/pages rows to carry updatedAt');
+
+  // B11: unpublishing a work-area item removes it from the public /work-areas list; publish restores it.
+  const itemsRes = await api('GET', '/admin/work-area-items?limit=1');
+  const item = itemsRes.body.data[0];
+  assert(item, 'expected at least one seeded work-area item');
+  try {
+    const unpublish = await api('PATCH', `/admin/work-area-items/${item.id}/publish`, { body: { isPublished: false } });
+    assert(unpublish.status === 200, `unpublish failed: ${unpublish.status}: ${JSON.stringify(unpublish.body)}`);
+    const publicAfterUnpublish = await fetch(`${BASE}/work-areas`).then((r) => r.json());
+    const idsAfterUnpublish = publicAfterUnpublish.flatMap((a) => a.items.map((i) => i.id));
+    assert(!idsAfterUnpublish.includes(item.id), 'an unpublished work-area item (B11) should not appear on the public /work-areas list');
+  } finally {
+    const republish = await api('PATCH', `/admin/work-area-items/${item.id}/publish`, { body: { isPublished: true } });
+    assert(republish.status === 200, `republish failed: ${republish.status}`);
+  }
+
+  // B12: board_members.bioAr/bioEn round-trip through the admin API and collapse to `bio` publicly.
+  const boardRes = await api('GET', '/admin/board?limit=1');
+  const member = boardRes.body.data[0];
+  assert(member, 'expected at least one seeded board member');
+  const bioText = 'سيرة تجريبية للاختبار الآلي';
+  try {
+    const setBio = await api('PATCH', `/admin/board/${member.id}`, { body: { bioAr: bioText } });
+    assert(setBio.status === 200, `setting bioAr failed: ${setBio.status}: ${JSON.stringify(setBio.body)}`);
+    const publicBoard = await fetch(`${BASE}/board`).then((r) => r.json());
+    const publicMember = [...publicBoard.board, ...publicBoard.executive].find((m) => m.id === member.id);
+    assert(publicMember?.bio === bioText, `expected the public board endpoint to expose the new bio, got ${JSON.stringify(publicMember?.bio)}`);
+  } finally {
+    await api('PATCH', `/admin/board/${member.id}`, { body: { bioAr: member.bioAr ?? null } });
+  }
+
+  // B13: a '%'/'_' in a news search term is treated literally, not as a SQL wildcard (no 500, no over-broad match).
+  const wildcardSearch = await fetch(`${BASE}/news?q=${encodeURIComponent('%')}`).then((r) => r.json());
+  assert(Array.isArray(wildcardSearch.data) && wildcardSearch.data.length === 0, `searching news for a literal '%' should match nothing, got ${wildcardSearch.data?.length}`);
+
+  // B15: the sitemap index lists only published pages/posts, each with a slug and updatedAt.
+  const sitemap = await fetch(`${BASE}/sitemap-index`).then((r) => r.json());
+  assert(Array.isArray(sitemap.pages) && sitemap.pages.length > 0, 'expected at least one page in the sitemap index');
+  assert(Array.isArray(sitemap.posts), 'expected sitemap.posts to be an array');
+  assert(Array.isArray(sitemap.categories) && sitemap.categories.length > 0, 'expected at least one category in the sitemap index');
+  for (const entry of sitemap.pages) {
+    assert(typeof entry.slug === 'string' && entry.updatedAt, `malformed sitemap page entry: ${JSON.stringify(entry)}`);
+  }
+});
 
 test('content: hiding/reordering a home page_section is reflected on GET home with no delay', async () => {
   const pagesRes = await api('GET', '/admin/pages?q=home&limit=50');

@@ -8,6 +8,7 @@ import { createPartnerSchema, updatePartnerSchema } from './dto/partner.dto.js';
 @Roles('admin', 'editor')
 export class AdminPartnersController extends CrudController<Partner>({
   path: 'admin/partners',
+  deleteRoles: ['admin', 'editor'],
   entity: Partner,
   createDto: createPartnerSchema,
   updateDto: updatePartnerSchema,

@@ -39,8 +39,13 @@ function lastNMonths(n: number): MonthBucket[] {
  *   are omitted for `editor`.
  * - messages-related blocks (the unread-messages stat card and sidebar
  *   badge) are omitted for `reviewer`.
- * Every other role sees everything; content alerts and the audit feed are
- * never role-filtered.
+ * - B6 (safeer-backend-fr-review.md): `recentAuditLog` is admin-only —
+ *   every other role gets an empty array. The feed includes application
+ *   references, status changes, and reviewer/user actions across every
+ *   collection, which is more than editor/reviewer/support's own areas
+ *   should see, and `GET admin/audit` (the full log) is already
+ *   admin-only, so the overview's own summary matches that.
+ * Content alerts are never role-filtered.
  */
 @Injectable()
 export class AdminOverviewService {
@@ -61,7 +66,7 @@ export class AdminOverviewService {
       includeApplications ? this.applicationsBlock() : null,
       includeMessages ? this.messages.countUnread() : null,
       this.contentAlerts(),
-      this.recentAuditLog(),
+      role === 'admin' ? this.recentAuditLog() : Promise.resolve([]),
     ]);
 
     const statCards: Record<string, number> = {};

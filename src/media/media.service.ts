@@ -2,17 +2,15 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import type { Readable } from 'node:stream';
 import { fileTypeFromBuffer } from 'file-type';
 import { MediaAsset, type MediaAssetKind } from '../database/entities/media-asset.entity.js';
 import { MediaVariant } from '../database/entities/media-variant.entity.js';
 import { generateWebpVariants } from './image-pipeline.js';
-import { ENV } from '../config/env.tokens.js';
-import type { Env } from '../config/env.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { CacheService } from '../cache/cache.service.js';
+import { PUBLIC_STORAGE_DRIVER, type StorageDriver } from '../storage/storage-driver.interface.js';
 
 /**
  * The tags `isPubliclyReadable`'s memo is stored under — every collection
@@ -58,7 +56,7 @@ export class MediaService {
     @InjectRepository(MediaAsset) private readonly assetRepo: Repository<MediaAsset>,
     @InjectRepository(MediaVariant) private readonly variantRepo: Repository<MediaVariant>,
     @InjectDataSource() private readonly dataSource: DataSource,
-    @Inject(ENV) private readonly env: Env,
+    @Inject(PUBLIC_STORAGE_DRIVER) private readonly driver: StorageDriver,
     private readonly cache: CacheService,
   ) {}
 
@@ -98,11 +96,10 @@ export class MediaService {
     const publicId = randomUUID();
     const now = new Date();
     const dir = `assets/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
-    await mkdir(path.join(this.env.STORAGE_ROOT, dir), { recursive: true });
 
     const ext = detected!.ext;
     const storageKey = `${dir}/${publicId}.${ext}`;
-    await writeFile(path.join(this.env.STORAGE_ROOT, storageKey), buffer);
+    await this.driver.put(storageKey, buffer);
 
     let widthPx: number | null = null;
     let heightPx: number | null = null;
@@ -141,7 +138,7 @@ export class MediaService {
       heightPx = height || null;
       for (const v of variants) {
         const variantKey = `${dir}/${publicId}-${v.label}.webp`;
-        await writeFile(path.join(this.env.STORAGE_ROOT, variantKey), v.buffer);
+        await this.driver.put(variantKey, v.buffer);
         variantRows.push({ label: v.label, storageKey: variantKey, widthPx: v.width, sizeBytes: v.buffer.length });
       }
     }
@@ -343,10 +340,11 @@ export class MediaService {
   }
 
   private async deleteFile(storageKey: string): Promise<void> {
-    try {
-      await unlink(path.join(this.env.STORAGE_ROOT, storageKey));
-    } catch {
-      // Already gone, or never written — not fatal to the delete itself.
-    }
+    await this.driver.remove(storageKey);
+  }
+
+  /** `FilesController`'s two routes stream through this rather than reaching the driver directly. */
+  async getStream(storageKey: string): Promise<Readable> {
+    return this.driver.getStream(storageKey);
   }
 }

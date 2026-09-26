@@ -10,6 +10,7 @@ import { CreatePostDto, UpdatePostDto, createPostSchema, updatePostSchema } from
 
 const BaseAdminNewsController = CrudController<Post>({
   path: 'admin/news',
+  deleteRoles: ['admin', 'editor'],
   entity: Post,
   createDto: createPostSchema,
   updateDto: updatePostSchema,

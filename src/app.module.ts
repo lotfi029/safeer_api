@@ -38,6 +38,8 @@ import { MessagesModule } from './messages/messages.module.js';
 import { ApplicationsModule } from './applications/applications.module.js';
 import { PortalModule } from './portal/portal.module.js';
 import { AdminApplicationsModule } from './admin-applications/admin-applications.module.js';
+import { SitemapModule } from './sitemap/sitemap.module.js';
+import { TestAwareThrottlerGuard } from './common/guards/test-aware-throttler.guard.js';
 
 // Phase 2 (done): the full schema (001_schema.sql) and entities for every
 // table the project plan's "Data model" section lists, plus the infra
@@ -105,13 +107,19 @@ import { AdminApplicationsModule } from './admin-applications/admin-applications
     ApplicationsModule,
     PortalModule,
     AdminApplicationsModule,
+    SitemapModule,
   ],
   providers: [
     // Guards run before interceptors regardless of relative registration
     // order (Nest's fixed pipeline). SessionGuard, RolesGuard and CsrfGuard
     // are registered as APP_GUARD providers inside AuthModule instead of
     // here — see the comment there for why and for the ordering guarantee.
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Phase 6: TestAwareThrottlerGuard delegates to this same ThrottlerGuard
+    // everywhere except NODE_ENV=test (see its own comment) — kept as an
+    // ordinary provider (not APP_GUARD) so TestAwareThrottlerGuard can
+    // inject a normally-constructed instance of it.
+    ThrottlerGuard,
+    { provide: APP_GUARD, useClass: TestAwareThrottlerGuard },
     // Interceptors: Locale resolves first so every downstream piece —
     // including a per-route CacheInterceptor's key — can read req.locale.
     { provide: APP_INTERCEPTOR, useClass: LocaleInterceptor },

@@ -28,7 +28,7 @@ import type { UserRole } from '../../database/entities/user.entity.js';
 type AnyZodSchema = any;
 
 // B3-2: was `pageSize` — every public list endpoint already uses
-// `{data, total, page, limit}` (KNOWN-ISSUES.md #6); standardising the
+// `{data, total, page, limit}`; standardising the
 // admin kernel onto the same shape now, before Session B (the admin
 // dashboard) exists to generate against either one, is the version of this
 // fix that breaks nothing.
@@ -519,7 +519,11 @@ export class CrudControllerBase<E extends { id: string }> {
     throw new Error('CrudControllerBase.purge was not overridden');
   }
 
-  async list(_query: Record<string, string>): Promise<PagedResult<E>> {
+  // B10 (safeer-backend-fr-review.md): was `Record<string, string>`, which
+  // didn't match `GeneratedCrudController.list()`'s own real parameter type
+  // below — harmless as long as nothing called `super.list()`, but
+  // `AdminPagesController` now does (admin-pages.controller.ts).
+  async list(_query: Record<string, unknown>): Promise<PagedResult<E>> {
     throw new Error('CrudControllerBase.list was not overridden');
   }
 
