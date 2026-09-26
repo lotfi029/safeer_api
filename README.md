@@ -77,7 +77,8 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `npm test` | Jest + supertest HTTP tests (`test/*.spec.ts`) against a dedicated, real MySQL database (`<DB_NAME>_test`, recreated each run) and a real running instance of the app, started with `TZ=Asia/Riyadh` on purpose (`test/global-setup.ts`). Needs `npm run build` first and a DB user that can create databases. |
 | `npm run check:admin-roles` | Fails if any `admin/*` route has no `@Roles()` and isn't explicitly allow-listed (`scripts/lib/check-admin-roles.mjs`). Needs a migrated database, like `openapi:check`. |
 | `npm run backup:storage` | `STORAGE_DRIVER=local`: tars `STORAGE_ROOT`. `STORAGE_DRIVER=s3`: no-op (the provider's own job). |
-| `npm run schema:check` | `typeorm schema:log` against the compiled data source — a read-only diff between the entities and the live schema. |
+| `npm run schema:check` | Fails if the entities and the migrated database disagree (tables, columns, nullability, type, length, enum values, declared indexes, unmapped required columns) — `scripts/check-schema.mjs`, run in CI (C44). Needs `npm run build`. |
+| `npm run schema:log` | TypeORM's own `schema:log` diff. Informational only: on MariaDB it lists many no-op changes (FKs, JSON columns, indexes). |
 
 ## Docs
 

@@ -47,7 +47,7 @@ area, or whose roles differ from its area's.
 | `content` | ✅ | | ✅ | | pages/sections, news + categories, work areas, board, stats, about items, partners, documents + categories, media, redirects |
 | `redirects.delete` | ✅ | | | | deleting a redirect |
 | `inbox` | ✅ | | | ✅ | contact messages, testimonials + themes, newsletter subscribers |
-| `inbox.delete` | ✅ | | | | deleting a message or a subscriber |
+| `inbox.delete` | ✅ | | | | deleting a contact message |
 | `users` | ✅ | | | | staff accounts, invitations |
 | `settings` | ✅ | | | | site settings, mail and SMS settings/templates/logs, cache |
 | `audit` | ✅ | | | | the audit log |

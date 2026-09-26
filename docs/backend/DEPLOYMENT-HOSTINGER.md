@@ -76,6 +76,7 @@ reason). See the [README](../../README.md)'s environment table for what each
 one means; this is the production-specific subset to double-check:
 
 - [ ] `NODE_ENV=production`
+- [ ] HTTPS on both the API and the frontend. Outside development/test the session cookies are `Secure` (C32), so over plain HTTP (a staging site included) nobody can sign in.
 - [ ] `PORT` — whatever Hostinger's Node.js app config expects the process to listen on.
 - [ ] `DB_HOST=127.0.0.1`, `DB_PORT=3306`
 - [ ] `DB_USER` / `DB_PASSWORD` / `DB_NAME` — the *running* app's account: the least-privilege one `scripts/create-app-db-user.sql` creates (bound to `127.0.0.1`).
@@ -121,6 +122,9 @@ raising `instances`.
    `migrations/dev/003_dev_sample.sql` is **not** applied — no sample
    applications, no sample contact messages, no placeholder media. That's
    intentional; nothing in `002_seed.sql` depends on the dev sample existing.
+   Then run `npm run schema:check` (same env): it must print
+   `Schema matches the entities`. CI runs this same production path on a
+   fresh database on every push.
 5. Run `scripts/create-app-db-user.sql` against the database as a
    privileged user, change its placeholder password, and set
    `DB_USER`/`DB_PASSWORD` to that least-privilege account for the

@@ -27,7 +27,7 @@ export const AREA_ROLES = {
   'redirects.delete': ['admin'],
   /** Contact messages, testimonials and their themes, newsletter subscribers. */
   inbox: ['admin', 'support'],
-  /** Deleting a contact message or a newsletter subscriber. */
+  /** Deleting a contact message (audit_log outlives it; see AdminMessagesController.remove). */
   'inbox.delete': ['admin'],
   /** Staff accounts and invitations. */
   users: ['admin'],
