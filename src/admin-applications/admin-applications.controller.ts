@@ -47,6 +47,12 @@ export class AdminApplicationsController {
     return this.applications.counts();
   }
 
+  /** B7 (safeer-backend-fr-review.md): the users PATCH/bulk-assign may legally pick from — admin/reviewer, not locked. Registered before `:id` for the same reason `counts`/`export.csv` are. */
+  @Get('assignees')
+  async assignees() {
+    return this.applications.listAssignees();
+  }
+
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'q', required: false, type: String })
   @ApiQuery({ name: 'reviewerId', required: false, type: String })

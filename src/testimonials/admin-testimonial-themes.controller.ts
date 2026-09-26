@@ -9,6 +9,7 @@ import { createTestimonialThemeSchema, updateTestimonialThemeSchema } from './dt
 @Roles('admin', 'support')
 export class AdminTestimonialThemesController extends CrudController<TestimonialTheme>({
   path: 'admin/testimonial-themes',
+  deleteRoles: ['admin', 'support'],
   entity: TestimonialTheme,
   createDto: createTestimonialThemeSchema,
   updateDto: updateTestimonialThemeSchema,

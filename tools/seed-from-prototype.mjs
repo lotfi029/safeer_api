@@ -281,8 +281,8 @@ function buildHomeSections(seed) {
       heading_ar: 'نرعى طلاب المنح ونبني جسور المعرفة', heading_en: 'We care for scholarship students and build bridges',
       body_ar: 'دعم أكاديمي ونفسي وإرشاد ديني وتمكين مجتمعي لطلاب وطالبات المنح الدوليين الدارسين في الجامعات السعودية.',
       body_en: 'Academic and psychological support, religious guidance and community empowerment for international scholarship students at Saudi universities.',
-      primary_button_label_ar: 'قدّم طلب منحة', primary_button_label_en: 'Apply for a scholarship', primary_button_url: '#/apply',
-      secondary_button_label_ar: 'تعرّف على الجمعية', secondary_button_label_en: 'About the association', secondary_button_url: '#/about',
+      primary_button_label_ar: 'قدّم طلب منحة', primary_button_label_en: 'Apply for a scholarship', primary_button_url: '/apply',
+      secondary_button_label_ar: 'تعرّف على الجمعية', secondary_button_label_en: 'About the association', secondary_button_url: '/about',
       is_published: 1,
     },
     {
@@ -290,7 +290,7 @@ function buildHomeSections(seed) {
       label_ar: 'من نحن', label_en: 'About',
       heading_ar: 'الرؤية والرسالة والأهداف', heading_en: 'Vision, mission and goals',
       body_ar: null, body_en: null,
-      primary_button_label_ar: 'اقرأ المزيد عن الجمعية', primary_button_label_en: 'Read more about us', primary_button_url: '#/about',
+      primary_button_label_ar: 'اقرأ المزيد عن الجمعية', primary_button_label_en: 'Read more about us', primary_button_url: '/about',
       secondary_button_label_ar: null, secondary_button_label_en: null, secondary_button_url: null,
       is_published: 1,
     },
@@ -309,7 +309,7 @@ function buildHomeSections(seed) {
       heading_ar: 'أربعة مجالات، هدف واحد', heading_en: 'Four areas, one purpose',
       body_ar: null, body_en: null,
       primary_button_label_ar: null, primary_button_label_en: null, primary_button_url: null,
-      secondary_button_label_ar: 'كل المجالات', secondary_button_label_en: 'All areas', secondary_button_url: '#/work',
+      secondary_button_label_ar: 'كل المجالات', secondary_button_label_en: 'All areas', secondary_button_url: '/work-areas',
       is_published: 1,
     },
     {
@@ -318,7 +318,7 @@ function buildHomeSections(seed) {
       heading_ar: 'رعاية متكاملة لطالب المنحة', heading_en: 'Complete care for a scholarship student',
       body_ar: 'من لحظة الوصول إلى التخرج: دعم يسهّل التكيّف مع البيئة الجديدة ويعزّز التجربة الأكاديمية والثقافية.',
       body_en: 'From arrival to graduation: support that eases adaptation and strengthens the academic and cultural experience.',
-      primary_button_label_ar: 'تفاصيل برنامج المنح', primary_button_label_en: 'Scholarship programme details', primary_button_url: '#/scholarships',
+      primary_button_label_ar: 'تفاصيل برنامج المنح', primary_button_label_en: 'Scholarship programme details', primary_button_url: '/scholarships',
       secondary_button_label_ar: null, secondary_button_label_en: null, secondary_button_url: null,
       is_published: 1,
     },
@@ -328,7 +328,7 @@ function buildHomeSections(seed) {
       heading_ar: 'آخر الأنشطة', heading_en: 'Latest activity',
       body_ar: null, body_en: null,
       primary_button_label_ar: null, primary_button_label_en: null, primary_button_url: null,
-      secondary_button_label_ar: 'كل الأخبار', secondary_button_label_en: 'All news', secondary_button_url: '#/news',
+      secondary_button_label_ar: 'كل الأخبار', secondary_button_label_en: 'All news', secondary_button_url: '/news',
       is_published: 1,
     },
     {
@@ -346,7 +346,7 @@ function buildHomeSections(seed) {
       heading_ar: 'من نعمل معهم', heading_en: 'Who we work with',
       body_ar: null, body_en: null,
       primary_button_label_ar: null, primary_button_label_en: null, primary_button_url: null,
-      secondary_button_label_ar: 'مشاهدة كل الشركاء', secondary_button_label_en: 'See all partners', secondary_button_url: '#/partners',
+      secondary_button_label_ar: 'مشاهدة كل الشركاء', secondary_button_label_en: 'See all partners', secondary_button_url: '/partners',
       is_published: 0, // hidden — matches aPageEditor's toggle and the project plan
     },
     {
@@ -354,8 +354,8 @@ function buildHomeSections(seed) {
       label_ar: 'دعوة للتسجيل', label_en: 'Call to action',
       heading_ar: 'للتسجيل في جمعية سفير الدعوية', heading_en: 'Register with Safeer Association',
       body_ar: 'قدّم طلبك إلكترونياً وتابع حالته من بوابة الطالب دون مراجعة المقر.', body_en: 'Apply online and follow your application in the student portal — no office visit needed.',
-      primary_button_label_ar: 'تسجيل طلب منحة', primary_button_label_en: 'Apply now', primary_button_url: '#/apply',
-      secondary_button_label_ar: 'تواصل معنا', secondary_button_label_en: 'Contact us', secondary_button_url: '#/contact',
+      primary_button_label_ar: 'تسجيل طلب منحة', primary_button_label_en: 'Apply now', primary_button_url: '/apply',
+      secondary_button_label_ar: 'تواصل معنا', secondary_button_label_en: 'Contact us', secondary_button_url: '/contact',
       is_published: 1,
     },
   ];
@@ -445,7 +445,13 @@ function buildTestimonials() {
       quote_ar: FEATURED_TESTIMONIAL.quoteAr, quote_en: FEATURED_TESTIMONIAL.quoteEn,
       author_name: FEATURED_TESTIMONIAL.authorName,
       author_desc_ar: FEATURED_TESTIMONIAL.authorDescAr, author_desc_en: FEATURED_TESTIMONIAL.authorDescEn,
-      status: 'published', is_featured: 1, source: 'manual', source_message_id: null, sort_order: 0,
+      // B9 (safeer-backend-fr-review.md): this text still carries the
+      // "[يُستكمل النص الكامل...]" placeholder bracket (per the project
+      // plan, kept verbatim rather than inventing real content) — it must
+      // never be 'published'/featured on the live site. An editor
+      // publishes it for real once someone replaces the bracketed text
+      // from the dashboard.
+      status: 'pending', is_featured: 0, source: 'manual', source_message_id: null, sort_order: 0,
     },
   ];
 }

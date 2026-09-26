@@ -8,6 +8,7 @@ import { createBoardMemberSchema, updateBoardMemberSchema } from './dto/board-me
 @Roles('admin', 'editor')
 export class AdminBoardController extends CrudController<BoardMember>({
   path: 'admin/board',
+  deleteRoles: ['admin', 'editor'],
   entity: BoardMember,
   createDto: createBoardMemberSchema,
   updateDto: updateBoardMemberSchema,

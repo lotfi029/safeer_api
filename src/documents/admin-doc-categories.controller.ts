@@ -8,6 +8,7 @@ import { createDocCategorySchema, updateDocCategorySchema } from './dto/doc-cate
 @Roles('admin', 'editor')
 export class AdminDocCategoriesController extends CrudController<DocCategory>({
   path: 'admin/doc-categories',
+  deleteRoles: ['admin', 'editor'],
   entity: DocCategory,
   createDto: createDocCategorySchema,
   updateDto: updateDocCategorySchema,

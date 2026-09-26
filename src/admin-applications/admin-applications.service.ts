@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { Application, type ApplicationStatus } from '../database/entities/application.entity.js';
 import { ApplicationDocument, type ApplicationDocType } from '../database/entities/application-document.entity.js';
 import { ApplicationNote } from '../database/entities/application-note.entity.js';
@@ -374,11 +374,34 @@ export class AdminApplicationsService {
     }
   }
 
+  /**
+   * B7 (safeer-backend-fr-review.md): the assignee must be `admin`/`reviewer`
+   * and not locked — otherwise that person literally cannot open the
+   * applications area (`RolesGuard` on `AdminApplicationsController`) or is
+   * refused at login (`SessionGuard`/`AuthService`) despite the assignment
+   * having gone through.
+   */
+  /** `GET admin/applications/assignees` (B7) — every account `applyAssignReviewer` would actually accept, for the reviewer picker. */
+  async listAssignees(): Promise<{ id: string; name: string; email: string; role: 'admin' | 'reviewer' }[]> {
+    const users = await this.userRepo.find({
+      where: { role: In(['admin', 'reviewer']), isLocked: false },
+      order: { name: 'ASC' },
+    });
+    return users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role as 'admin' | 'reviewer' }));
+  }
+
   private async applyAssignReviewer(application: Application, reviewerId: string | null, actorId: string): Promise<void> {
     if (reviewerId !== null) {
       const reviewer = await this.userRepo.findOne({ where: { id: reviewerId } });
       if (!reviewer) {
         throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Reviewer not found');
+      }
+      if (!['admin', 'reviewer'].includes(reviewer.role) || reviewer.isLocked) {
+        throw new ProblemException(
+          422,
+          ErrorCode.INVALID_ASSIGNEE,
+          'Applications can only be assigned to an admin or reviewer account that is not locked',
+        );
       }
     }
     application.assignedReviewerId = reviewerId;

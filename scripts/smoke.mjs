@@ -142,6 +142,26 @@ async function deleteTempUser(id) {
   await withDb((conn) => conn.execute('DELETE FROM users WHERE id = ?', [id]));
 }
 
+/**
+ * A DB row with no session — for cases (B7's locked-reviewer check) that
+ * only need the user's id/lock state, never a login. `POST admin/auth/login`
+ * is throttled 5/60s/IP, and this suite already spends nearly that whole
+ * budget on `createTempUser()` calls elsewhere; skipping the login here
+ * keeps this case from tipping it over.
+ */
+async function createTempUserNoLogin(role, overrides = {}) {
+  const passwordHash = await argon2.hash('Smoke-Test-P4ssword!', { type: argon2.argon2id });
+  const email = `smoke-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
+  const id = await withDb(async (conn) => {
+    const [result] = await conn.execute(
+      'INSERT INTO users (name, email, password_hash, role, is_locked, failed_logins) VALUES (?, ?, ?, ?, ?, 0)',
+      [`Smoke ${role}`, email, passwordHash, role, overrides.isLocked ? 1 : 0],
+    );
+    return String(result.insertId);
+  });
+  return { id, email };
+}
+
 /** `cookie` is `"name=value"` (as captured from a `Set-Cookie` header) — the bare token is everything after the first `=`. */
 function rawTokenFromCookie(cookie) {
   return cookie.slice(cookie.indexOf('=') + 1);
@@ -330,12 +350,61 @@ test('permissions: editor is refused admin/applications, support is refused admi
     assert(reviewerMedia.status === 403, `reviewer should be refused admin/media (B5), got ${reviewerMedia.status}`);
     const editorMedia = await api('GET', '/admin/media', { session: editor });
     assert(editorMedia.status === 200, `editor should be allowed into admin/media (B5), got ${editorMedia.status}`);
+
+    // B6: recentAuditLog is admin-only — folded in here (reusing this
+    // case's already-logged-in reviewer) rather than its own test case,
+    // since POST admin/auth/login is throttled 5/60s/IP and this suite's
+    // other login-heavy cases already spend most of that budget.
+    const overviewAsAdmin = await api('GET', '/admin/overview');
+    assert(
+      Array.isArray(overviewAsAdmin.body.recentAuditLog) && overviewAsAdmin.body.recentAuditLog.length > 0,
+      'admin should see a non-empty recentAuditLog',
+    );
+    const overviewAsReviewer = await api('GET', '/admin/overview', { session: reviewer });
+    assert(
+      Array.isArray(overviewAsReviewer.body.recentAuditLog) && overviewAsReviewer.body.recentAuditLog.length === 0,
+      'reviewer should see an empty recentAuditLog (B6)',
+    );
+
+    // B7: assignees is exactly the unlocked admin/reviewer accounts, and
+    // assigning anyone else is refused. `lockedReviewer` never logs in — it
+    // only needs to exist and be locked, so it costs no login-throttle budget.
+    const lockedReviewer = await createTempUserNoLogin('reviewer', { isLocked: true });
+    const { a: applicant } = await sharedApplicants();
+    try {
+      const assignees = await api('GET', '/admin/applications/assignees');
+      assert(assignees.status === 200, `assignees failed: ${assignees.status}`);
+      const assigneeIds = assignees.body.map((u) => u.id);
+      assert(assigneeIds.includes(reviewer.id), 'assignees should include the unlocked reviewer (B7)');
+      assert(!assigneeIds.includes(lockedReviewer.id), 'assignees should exclude the locked reviewer (B7)');
+      assert(!assigneeIds.includes(editor.id), 'assignees should exclude the editor — not admin/reviewer (B7)');
+
+      const assignToEditor = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: editor.id } });
+      assert(assignToEditor.status === 422, `assigning to an editor should be 422 (B7), got ${assignToEditor.status}`);
+      assert(assignToEditor.body?.code === 'INVALID_ASSIGNEE', `expected INVALID_ASSIGNEE, got ${assignToEditor.body?.code}`);
+
+      const assignToLocked = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: lockedReviewer.id } });
+      assert(assignToLocked.status === 422, `assigning to a locked reviewer should be 422 (B7), got ${assignToLocked.status}`);
+      assert(assignToLocked.body?.code === 'INVALID_ASSIGNEE', `expected INVALID_ASSIGNEE, got ${assignToLocked.body?.code}`);
+
+      const assignToReviewer = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: reviewer.id } });
+      assert(
+        assignToReviewer.status === 200,
+        `assigning to a valid reviewer should succeed (B7), got ${assignToReviewer.status}: ${JSON.stringify(assignToReviewer.body)}`,
+      );
+      // Leave the shared fixture unassigned for whatever runs next.
+      const unassign = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { assignedReviewerId: null } });
+      assert(unassign.status === 200, `clearing the assignee failed: ${unassign.status}`);
+    } finally {
+      await deleteTempUser(lockedReviewer.id);
+    }
   } finally {
     await deleteTempUser(editor.id);
     await deleteTempUser(support.id);
     await deleteTempUser(reviewer.id);
   }
 });
+
 
 // ---------------------------------------------------------------------------
 // Locale collapse — the seed turned out fully bilingual (phase 4's report),
@@ -885,6 +954,23 @@ test('messages: honeypot no-ops, a real submission creates a message, admin repl
 // the change — cache.service.ts/crud.factory.ts's purge() — so no delay is
 // needed). Also bulk-delete legacy news and confirm exactly the seeded
 // count is removed.
+
+test('B9: the seeded placeholder testimonial is pending/unfeatured; home section buttons use locale-agnostic paths, not #/ hash routes', async () => {
+  const home = await fetch(`${BASE}/home`).then((r) => r.json());
+  const buttonUrls = home.sections.flatMap((s) => [s.primaryButtonUrl, s.secondaryButtonUrl]).filter(Boolean);
+  assert(buttonUrls.length > 0, 'expected at least one home section with a button URL to check');
+  for (const url of buttonUrls) {
+    assert(!url.startsWith('#'), `home section button URL should be a locale-agnostic path, not a hash route: ${url}`);
+    assert(url.startsWith('/'), `home section button URL should start with '/': ${url}`);
+  }
+
+  const testimonials = await fetch(`${BASE}/testimonials`).then((r) => r.json());
+  const allPublic = [...testimonials.featured, ...testimonials.list];
+  assert(
+    !allPublic.some((t) => t.quote?.includes('يُستكمل')),
+    'the placeholder-text testimonial must not appear on the public site (should be status=pending)',
+  );
+});
 
 test('content: hiding/reordering a home page_section is reflected on GET home with no delay', async () => {
   const pagesRes = await api('GET', '/admin/pages?q=home&limit=50');

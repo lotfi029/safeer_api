@@ -9,6 +9,7 @@ import { createPageSchema, updatePageSchema } from './dto/page.dto.js';
 @Roles('admin', 'editor')
 export class AdminPagesController extends CrudController<Page>({
   path: 'admin/pages',
+  deleteRoles: ['admin', 'editor'],
   entity: Page,
   createDto: createPageSchema,
   updateDto: updatePageSchema,

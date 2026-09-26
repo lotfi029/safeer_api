@@ -5672,6 +5672,25 @@
         ]
       }
     },
+    "/admin/applications/assignees": {
+      "get": {
+        "operationId": "AdminApplicationsController_assignees",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminApplications"
+        ]
+      }
+    },
     "/admin/applications/export.csv": {
       "get": {
         "operationId": "AdminApplicationsController_exportCsv",

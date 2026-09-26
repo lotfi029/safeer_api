@@ -105,10 +105,12 @@ export class MediaController {
     return asset;
   }
 
-  // B0-4: admin-only, not class-level — editors must keep list/upload/
-  // setAltText or they cannot attach images at all (the alt-text gate in
-  // crud.factory.ts requires them to upload and set alt text first).
-  @Roles('admin')
+  // B8 (safeer-backend-fr-review.md): the matrix gives media deletion to
+  // admin+editor, same as every other content collection — no
+  // method-level override needed now that the class-level @Roles above
+  // (B5) already covers both. (Previously admin-only here; B0-4's
+  // reasoning for keeping list/upload/setAltText open to editors still
+  // holds and is unaffected — this only concerns DELETE.)
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: RequestContext) {
     const asset = await this.mediaService.remove(id);

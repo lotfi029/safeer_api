@@ -42,6 +42,8 @@ export const ErrorCode = {
   INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
   /** B2 (safeer-backend-fr-review.md): `POST applications` rejects a second active (non-terminal) application for the same email or phone. Non-enumerating: the response never says which contact detail matched. */
   APPLICATION_EXISTS: 'APPLICATION_EXISTS',
+  /** B7 (safeer-backend-fr-review.md): an application was assigned to a user who isn't `admin`/`reviewer`, or whose account is locked. */
+  INVALID_ASSIGNEE: 'INVALID_ASSIGNEE',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

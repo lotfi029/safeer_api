@@ -12,6 +12,7 @@ import {
 
 const BaseAdminTestimonialsController = CrudController<Testimonial>({
   path: 'admin/testimonials',
+  deleteRoles: ['admin', 'support'],
   entity: Testimonial,
   createDto: createTestimonialSchema,
   updateDto: updateTestimonialSchema,

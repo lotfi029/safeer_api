@@ -9,6 +9,7 @@ import { createWorkAreaItemSchema, updateWorkAreaItemSchema } from './dto/work-a
 @Roles('admin', 'editor')
 export class AdminWorkAreaItemsController extends CrudController<WorkAreaItem>({
   path: 'admin/work-area-items',
+  deleteRoles: ['admin', 'editor'],
   entity: WorkAreaItem,
   createDto: createWorkAreaItemSchema,
   updateDto: updateWorkAreaItemSchema,
