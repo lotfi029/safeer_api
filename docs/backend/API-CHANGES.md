@@ -25,10 +25,22 @@ application's locale.
 
 ## Applicant portal
 
-- **OTP (C1, C22).** The mail subject no longer carries the code. A new code
-  invalidates older ones. After 10 wrong codes in a day the application is
-  locked out until the next UTC day: verify always answers `OTP_INVALID`,
-  and request-otp sends nothing but still answers the same.
+- **OTP (C1, C22, A1).** The mail subject no longer carries the code. A new
+  code invalidates older ones. Ten wrong codes inside an hour lock OTP
+  sign-in for **1 hour**; 30 in a UTC day lock it until the next UTC day.
+  Only a wrong code for a live code counts (a verify with no code issued, or
+  after a code's 5 attempts are spent, doesn't). While locked, verify always
+  answers `OTP_INVALID`, and request-otp sends nothing but still answers the
+  same. If the frontend explains a lockout, say "try again in an hour", not
+  "tomorrow".
+- **request-otp answers before sending (A4).** `POST portal/auth/request-otp`
+  still returns `{ok: true, channelHint}` (or 429), but now at once,
+  before the identifier is even looked up. The code arrives a moment later:
+  usually within a second, up to ~5 s when an SMS times out and falls back to
+  email. The response never means a message went out. For e2e runs against
+  a real API: `GET __dev/otp/:applicationId` (development/test only) waits
+  for sends still in flight before answering, and `POST __dev/settle` waits
+  for all background work.
 - **Editing (C15).** `PATCH portal/application` works only while `draft`;
   otherwise it returns 409 `APPLICATION_LOCKED`. While `docs_missing`, use
   `PATCH portal/application/corrections` instead. It accepts `firstName`,
@@ -63,7 +75,11 @@ application's locale.
     effect).
   - `PATCH admin/users/:id` takes `{status}` and `{unlock: true}`.
   - A disabled account cannot log in, reset or accept an invite.
-  - Ten failed logins lock the account for 15 min × 2^n.
+  - Ten failed logins lock the account for 15, then 30, then 60 min, never
+    longer than 1 h (A3). The backoff resets 24 h after the last lock, and
+    the failure count 24 h after the last wrong password. `lockedUntil` is
+    therefore at most an hour ahead.
+  - Every refused login takes the same time, whether or not the email exists (A2).
 - **Overview (C20).**
   - `statCards.newApplications|underReview|acceptedThisMonth`, `series` and
     `latestApplications` are present only for admin and reviewer.

@@ -57,9 +57,11 @@
   (Hostinger's Node.js hosting plans provision MariaDB, not MySQL). Both
   speak the same wire protocol and both are configured with
   `utf8mb4_unicode_ci` throughout this codebase specifically so the schema
-  and every query work unchanged on either — but this hasn't been verified
-  against every MariaDB version's SQL-mode defaults, only against the
-  MariaDB instance this phase's own verification ran against.
+  and every query work unchanged on either. One SQL mode is known to
+  matter: MariaDB's `SIMULTANEOUS_ASSIGNMENT` would break the lockout
+  counters, so every connection turns it off and boot fails if it can't (A3).
+  CI runs the whole suite on MySQL 8.0 and on MariaDB 10.11 with that mode
+  switched on globally.
 - **The CI workflow's dev-fixture comments predate Safeer's actual seed
   shape.** `.github/workflows/ci.yml` was ported from `african_api`
   (whose dev sample seeds a couple of editor accounts) in phase 1 and, until
