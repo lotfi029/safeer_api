@@ -131,6 +131,34 @@ describe('C17: interview booking', () => {
     }
   });
 
+  // A9 (safeer-delivery-review.md): each book/cancel sends a mail and an SMS,
+  // and neither route had its own throttle. 5 an hour per IP, each.
+  it('A9: booking and cancelling are each throttled to 5 an hour', async () => {
+    const slot = await createSlot(60 * HOUR);
+    const applicant = await interviewApplicant();
+    const call = (method: 'POST' | 'DELETE') =>
+      fetch(`${process.env.TEST_BASE_URL}/portal/interview`, {
+        method,
+        headers: {
+          Cookie: applicant.cookie,
+          'X-CSRF-Token': applicant.csrfToken,
+          'Content-Type': 'application/json',
+          'x-test-enforce-throttle': '1',
+        },
+        body: method === 'POST' ? JSON.stringify({ slotId: slot }) : undefined,
+      }).then((r) => r.status);
+    try {
+      for (let i = 0; i < 5; i++) {
+        expect(await call('POST')).toBe(201);
+        expect(await call('DELETE')).toBe(200);
+      }
+      expect(await call('POST')).toBe(429);
+      expect(await call('DELETE')).toBe(429);
+    } finally {
+      await deleteApplication(applicant.id);
+    }
+  });
+
   it('a slot must end after it starts, on create and on a partial PATCH', async () => {
     const start = new Date(Date.now() + 60 * HOUR);
     const bad = await adminApi('POST', '/admin/interview-slots', {
