@@ -26,6 +26,7 @@
     "schema:check": "typeorm schema:log -d dist/database/data-source.js",
     "openapi": "node scripts/export-openapi.mjs",
     "openapi:check": "node scripts/check-openapi.mjs",
+    "check:admin-roles": "node scripts/check-admin-roles.mjs",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {

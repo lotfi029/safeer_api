@@ -317,6 +317,19 @@ test('permissions: editor is refused admin/applications, support is refused admi
     assert(reviewerOwn.status === 200, `reviewer should be allowed into admin/applications, got ${reviewerOwn.status}`);
     const supportOwn = await api('GET', '/admin/messages', { session: support });
     assert(supportOwn.status === 200, `support should be allowed into admin/messages, got ${supportOwn.status}`);
+
+    // B4/B5 (safeer-backend-fr-review.md): redirects and media are
+    // admin+editor only — a reviewer or support account gets refused, an
+    // editor gets through.
+    const supportRedirects = await api('GET', '/admin/redirects', { session: support });
+    assert(supportRedirects.status === 403, `support should be refused admin/redirects (B4), got ${supportRedirects.status}`);
+    const editorRedirects = await api('GET', '/admin/redirects', { session: editor });
+    assert(editorRedirects.status === 200, `editor should be allowed into admin/redirects (B4), got ${editorRedirects.status}`);
+
+    const reviewerMedia = await api('GET', '/admin/media', { session: reviewer });
+    assert(reviewerMedia.status === 403, `reviewer should be refused admin/media (B5), got ${reviewerMedia.status}`);
+    const editorMedia = await api('GET', '/admin/media', { session: editor });
+    assert(editorMedia.status === 200, `editor should be allowed into admin/media (B5), got ${editorMedia.status}`);
   } finally {
     await deleteTempUser(editor.id);
     await deleteTempUser(support.id);
@@ -689,19 +702,66 @@ test('full review loop: apply → 3 docs → submit → reject/re-upload/accept 
     assert(meAfterReject.body.actionNeeded?.type === 'document_rejected', `expected actionNeeded.type 'document_rejected', got ${JSON.stringify(meAfterReject.body.actionNeeded)}`);
     assert(meAfterReject.body.actionNeeded.docType === 'id_copy', `expected the rejected docType to be id_copy, got ${meAfterReject.body.actionNeeded.docType}`);
 
-    // --- Re-upload and accept ----------------------------------------------
+    // --- B3 (safeer-backend-fr-review.md): rejecting a document does NOT
+    // itself unlock re-upload — the application is still 'under_review',
+    // and upload() only allows 'draft' or 'docs_missing'. A re-upload
+    // attempt here must be refused.
+    const blockedReupload = await uploadApplicationDocument(applicant, 'id_copy', 'review-id-copy-blocked');
+    assert(blockedReupload.status === 409, `re-upload while still under_review should be 409 APPLICATION_LOCKED, got ${blockedReupload.status}`);
+    assert(blockedReupload.body?.code === 'APPLICATION_LOCKED', `expected APPLICATION_LOCKED, got ${blockedReupload.body?.code}`);
+
+    // Staff explicitly asks for the rejected document — this is what
+    // actually unlocks re-upload (docs_missing, id_copy requested/rejected).
+    const requestDocs = await api('POST', `/admin/applications/${applicant.id}/request-documents`, {
+      body: { docTypes: ['id_copy'], message: 'Please re-upload a clearer copy of your ID.' },
+    });
+    assert(requestDocs.status === 200 || requestDocs.status === 201, `request-documents failed: ${requestDocs.status}: ${JSON.stringify(requestDocs.body)}`);
+
+    // A type that was neither requested nor currently rejected is still refused.
+    const wrongTypeReupload = await uploadApplicationDocument(applicant, 'certificate', 'review-cert-blocked');
+    assert(wrongTypeReupload.status === 409, `re-uploading a type that wasn't requested/rejected should be 409, got ${wrongTypeReupload.status}`);
+    assert(wrongTypeReupload.body?.code === 'APPLICATION_LOCKED', `expected APPLICATION_LOCKED, got ${wrongTypeReupload.body?.code}`);
+
+    // --- Re-upload (now allowed) and accept ---------------------------------
     const reupload = await uploadApplicationDocument(applicant, 'id_copy', 'review-id-copy-2');
     assert(reupload.status === 201, `re-upload failed: ${reupload.status}: ${JSON.stringify(reupload.body)}`);
 
     const detail2 = await api('GET', `/admin/applications/${applicant.id}`);
     const newIdCopyDoc = detail2.body.documents.find((d) => d.docType === 'id_copy');
     assert(newIdCopyDoc && newIdCopyDoc.id !== idCopyDoc.id, 're-upload should supersede the rejected document with a new row');
+    assert(
+      detail2.body.events.some((e) => e.type === 'DOCS_RESUBMITTED'),
+      'expected a DOCS_RESUBMITTED event once the only requested/rejected type (id_copy) had a fresh replacement',
+    );
+    const listAfterResubmit = await api('GET', '/admin/applications?q=' + encodeURIComponent(applicant.reference));
+    const listItem = listAfterResubmit.body.data.find((r) => r.id === applicant.id);
+    assert(listItem?.hasUnreviewedResubmission === true, 'the admin list should badge this application as having an unreviewed resubmission');
 
     const accepted = await api('PATCH', `/admin/applications/${applicant.id}/documents/${newIdCopyDoc.id}`, { body: { status: 'accepted' } });
     assert(accepted.status === 200, `document acceptance failed: ${accepted.status}: ${JSON.stringify(accepted.body)}`);
 
     const meAfterAccept = await api('GET', '/portal/me', { session: applicant });
     assert(meAfterAccept.body.actionNeeded === null, `actionNeeded should clear once the rejected document is replaced and accepted, got ${JSON.stringify(meAfterAccept.body.actionNeeded)}`);
+
+    // Back to under_review (docs_missing's only outgoing edge) — request-documents
+    // itself only accepts 'new'/'under_review'/'interview' as a starting point.
+    const backToReview = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { status: 'under_review' } });
+    assert(backToReview.status === 200, `status docs_missing → under_review failed: ${backToReview.status}: ${JSON.stringify(backToReview.body)}`);
+
+    // B3: an accepted document can never be superseded, even by a caseworker
+    // re-requesting the same type — request-documents lets it through (a
+    // caseworker's own mistake), but upload() itself refuses it.
+    const requestAcceptedAgain = await api('POST', `/admin/applications/${applicant.id}/request-documents`, {
+      body: { docTypes: ['id_copy'] },
+    });
+    assert(requestAcceptedAgain.status === 200 || requestAcceptedAgain.status === 201, `request-documents (re-request) failed: ${requestAcceptedAgain.status}`);
+    const blockedAcceptedReupload = await uploadApplicationDocument(applicant, 'id_copy', 'review-id-copy-blocked-2');
+    assert(blockedAcceptedReupload.status === 409, `re-uploading an already-accepted document should be 409, got ${blockedAcceptedReupload.status}`);
+    assert(blockedAcceptedReupload.body?.code === 'APPLICATION_LOCKED', `expected APPLICATION_LOCKED, got ${blockedAcceptedReupload.body?.code}`);
+
+    // Back to under_review again before interview.
+    const backToReview2 = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { status: 'under_review' } });
+    assert(backToReview2.status === 200, `status docs_missing → under_review failed: ${backToReview2.status}: ${JSON.stringify(backToReview2.body)}`);
 
     // --- interview → book → accept ------------------------------------------
     const toInterview = await api('PATCH', `/admin/applications/${applicant.id}`, { body: { status: 'interview' } });

@@ -43,6 +43,8 @@ export interface ApplicationListItem {
   submittedAt: Date | null;
   createdAt: Date;
   assignedReviewer: { id: string; name: string } | null;
+  /** B3: a badge — every requested/rejected document type has a fresh, un-reviewed replacement. */
+  hasUnreviewedResubmission: boolean;
 }
 
 export interface BulkActionResult {
@@ -98,6 +100,7 @@ export class AdminApplicationsService {
     const { page, limit, offset, beyondMaxOffset } = readPageLimit(query, { defaultLimit: 20, maxLimit: 100 });
     const qb = this.buildFilteredQuery(query);
     qb.leftJoinAndSelect('a.assignedReviewer', 'reviewer').orderBy('a.createdAt', 'DESC').addOrderBy('a.id', 'DESC');
+    this.addResubmissionBadge(qb);
 
     if (beyondMaxOffset) {
       const total = await qb.getCount();
@@ -105,8 +108,33 @@ export class AdminApplicationsService {
     }
 
     qb.skip(offset).take(limit);
-    const [rows, total] = await qb.getManyAndCount();
-    return { data: rows.map((a) => this.toListItem(a)), total, page, limit };
+    const total = await qb.getCount();
+    const { entities, raw } = await qb.getRawAndEntities();
+    const data = entities.map((a, i) => this.toListItem(a, Boolean(raw[i]?.has_resubmission)));
+    return { data, total, page, limit };
+  }
+
+  /**
+   * B3 (safeer-backend-fr-review.md): a scalar EXISTS subquery, not a
+   * separate query per row — `hasUnreviewedResubmission` is true exactly
+   * when a `DOCS_RESUBMITTED` event (written by
+   * `PortalDocumentsService.upload()` once every requested/rejected type
+   * has a fresh replacement) is newer than the application's own latest
+   * `DOCS_REQUESTED` event. Read via `getRawAndEntities()` since a plain
+   * `addSelect` scalar has no home on the mapped `Application` entity.
+   */
+  private addResubmissionBadge(qb: ReturnType<Repository<Application>['createQueryBuilder']>): void {
+    qb.addSelect((subQuery) => {
+      return subQuery
+        .select('1')
+        .from(ApplicationEvent, 'resub')
+        .where('resub.application_id = a.id')
+        .andWhere("resub.type = 'DOCS_RESUBMITTED'")
+        .andWhere(
+          `resub.created_at > COALESCE((SELECT MAX(req.created_at) FROM application_events req WHERE req.application_id = a.id AND req.type = 'DOCS_REQUESTED'), '1970-01-01')`,
+        )
+        .limit(1);
+    }, 'has_resubmission');
   }
 
   /** One row per `ApplicationStatus` value plus `all` — feeds the prototype's status chips. */
@@ -175,7 +203,7 @@ export class AdminApplicationsService {
     return qb;
   }
 
-  private toListItem(a: Application): ApplicationListItem {
+  private toListItem(a: Application, hasUnreviewedResubmission = false): ApplicationListItem {
     return {
       id: a.id,
       reference: a.reference,
@@ -192,6 +220,7 @@ export class AdminApplicationsService {
       submittedAt: a.submittedAt,
       createdAt: a.createdAt,
       assignedReviewer: a.assignedReviewer ? { id: a.assignedReviewer.id, name: a.assignedReviewer.name } : null,
+      hasUnreviewedResubmission,
     };
   }
 

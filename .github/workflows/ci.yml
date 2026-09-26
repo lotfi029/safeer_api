@@ -110,6 +110,11 @@ jobs:
       # frontend API client depends on it.
       - run: npm run openapi:check
 
+      # B4/B5 sweep (safeer-backend-fr-review.md phase 2): every admin/*
+      # route must be role-gated or on the explicit allow-list — see
+      # scripts/lib/check-admin-roles.mjs.
+      - run: npm run check:admin-roles
+
       - name: Boot the API
         run: |
           node --enable-source-maps dist/main.js > api.log 2>&1 &

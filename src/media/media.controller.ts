@@ -18,7 +18,14 @@ const MULTIPART_BODY_LIMIT = 20 * 1024 * 1024;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
+/**
+ * B5 (safeer-backend-fr-review.md): the matrix gives media to admin/editor
+ * only, but this hand-written controller (not CrudController-generated) had
+ * no class-level `@Roles` at all — only `DELETE` was gated. Reviewer and
+ * support accounts could list, upload and edit alt text on every asset.
+ */
 @Controller('admin/media')
+@Roles('admin', 'editor')
 @ApiCookieAuth()
 export class MediaController {
   constructor(
