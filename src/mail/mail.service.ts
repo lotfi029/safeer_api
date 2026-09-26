@@ -18,6 +18,8 @@ const RETRY_DELAYS_MINUTES = [1, 5, 15];
 const MAX_ATTEMPTS = 1 + RETRY_DELAYS_MINUTES.length;
 
 const MAX_PENDING = 500;
+/** A4: the longest `send({ awaitDelivery: true })` waits for its SMTP attempt. */
+const AWAIT_DELIVERY_MAX_MS = 8_000;
 
 interface PendingDelivery {
   rendered: RenderedMail;
@@ -56,8 +58,8 @@ export class MailService implements MailServiceInterface {
   ) {}
 
   /**
-   * Writes a `mail_log` row and returns — never awaits delivery, never
-   * throws into the caller (trap 13). `is_enabled = 0` (globally, or the
+   * Writes a `mail_log` row and returns — never awaits delivery (unless the
+   * caller asks with `awaitDelivery`, A4), never throws into the caller (trap 13). `is_enabled = 0` (globally, or the
    * specific template disabled) writes the row `skipped` and sends nothing
    * (FR-E-04).
    *
@@ -103,7 +105,20 @@ export class MailService implements MailServiceInterface {
       if (status === 'queued' && rendered) {
         this.evictIfAtCapacity();
         this.pending.set(saved.id, { rendered, nextRetryAt: null, terminal: false });
-        void this.attemptDelivery(saved.id);
+        if (params.awaitDelivery) {
+          // Bounded: SMTP has no timeout of its own short of minutes. Past
+          // this, the attempt carries on unawaited, as for any other mail.
+          let timer: NodeJS.Timeout | undefined;
+          await Promise.race([
+            this.attemptDelivery(saved.id),
+            new Promise<void>((resolve) => {
+              timer = setTimeout(resolve, AWAIT_DELIVERY_MAX_MS);
+            }),
+          ]);
+          clearTimeout(timer);
+        } else {
+          void this.attemptDelivery(saved.id);
+        }
       }
     } catch (err) {
       this.logger.error('MailService.send failed', err instanceof Error ? err.stack : String(err));

@@ -112,3 +112,21 @@ D8 → B11, R1 → B6/C20, "no test suite" → the Jest suite, "docs not pushed"
 - **C44 `schema:check`:** a purpose-built checker, because `typeorm schema:log` is ~280 lines of no-ops on MariaDB.
 - **Newsletter delete:** stays with admin + support (the `inbox` area), as before. The generated permission matrix showed an earlier doc claiming admin-only.
 - **B18 cache tag:** `about_items` (the tag every about-items write already purges), not a new `about-items` tag.
+
+## Delivery follow-ups (A items)
+
+From `docs/safeer-delivery-review.md` §3, on branch `fix/delivery-followups`.
+A1 and A4 share one commit (same service and spec). Each Medium item has a regression test that fails on `main` (`37c593d`) and
+passes with the fix.
+
+| Item | Fix | Commit | Test |
+|---|---|---|---|
+| A1 | Only a guess against a live code counts; 10 in a rolling hour → 1 h lock, 30 a UTC day → locked until the next day (017) | `5149343` | `otp-hardening.spec` (A1 ×4, A1/C22) |
+| A2 | Refused logins verify against a dummy hash built at boot with the real Argon2 parameters (`argon2-options.ts`) | `f646227` | `login-timing.spec` (retried ×2), unit `password-service.spec` |
+| A3 | Locks capped at 1 h; `lock_count` decays 24 h after the last lock, `failed_logins` 24 h after the last failure (016); `SIMULTANEOUS_ASSIGNMENT` off on every connection, checked at boot; CI on MySQL 8.0 + MariaDB 10.11 | `57fcc46` | `staff-auth.spec` (A3 ×5, SET order), CI matrix |
+| A4 | request-otp answers first; lookup/row/send on `BackgroundWork` (ordered per application, OTP mail awaited); shutdown hooks drain it; PM2 `kill_timeout` 12 s | `5149343` | `otp-hardening.spec` (A4 ×2, B1/C21), `shutdown.spec` (POSIX), unit `background-work.spec` |
+
+Verification for red-before-green: the new tests were run against a `main`
+build first — A1 counted 10 blind verifies, A2's unknown-email path ran at
+0.14× an active account, A3 locked for 57 599 s, A4 answered in 5.2 s with
+a hanging SMS provider.

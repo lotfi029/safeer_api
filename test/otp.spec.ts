@@ -10,7 +10,17 @@
 // TestAwareThrottlerGuard bypasses under NODE_ENV=test) would otherwise cap
 // this file at 5 request-otp calls total against one reference.
 
-import { api, createApplication, deleteApplication, readMailOtpCode, readSmsOtpCode, withDb, withSmsEnabled, type TestApplicant } from './helpers';
+import {
+  api,
+  createApplication,
+  deleteApplication,
+  readMailOtpCode,
+  readSmsOtpCode,
+  settleBackground,
+  withDb,
+  withSmsEnabled,
+  type TestApplicant,
+} from './helpers';
 
 describe('OTP (B1/B2)', () => {
   let applicant: TestApplicant;
@@ -49,6 +59,7 @@ describe('OTP (B1/B2)', () => {
     try {
       const byPhone = await api('POST', '/portal/auth/request-otp', { body: { identifier: localPhone } });
       expect([200, 201]).toContain(byPhone.status);
+      await settleBackground(); // A4: the row is written after the response
       const otpCount = await withDb((conn) =>
         conn
           .execute('SELECT COUNT(*) AS c FROM applicant_otps WHERE application_id = ?', [withLocalPhone.id])
@@ -104,6 +115,7 @@ describe('OTP (B1/B2)', () => {
     const req = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
     expect([200, 201]).toContain(req.status);
     expect(req.body.channelHint).toBe('email');
+    await settleBackground();
 
     const channel = await withDb((conn) =>
       conn

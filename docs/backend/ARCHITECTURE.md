@@ -66,12 +66,38 @@ figures for everyone but reviewers, the audit feed for admins only (C20).
   a session. Disabling ends its sessions and deletes its outstanding
   invite/reset links. Forgot-password, reset and accept-invite never act on
   a `disabled` account, so a disabled user can't re-enable themselves.
-- Ten wrong passwords lock the account for 15 minutes, then 30, 60 … (capped
-  at about 16 h) on each further lock, until a successful sign-in. The lock
-  doesn't end existing sessions. An admin clears it with
+- Ten wrong passwords lock the account for 15 minutes, then 30, then 60 on
+  each further lock, never longer than 1 hour (A3). The backoff resets after a
+  successful sign-in or 24 h after the last lock ended, and the count of
+  wrong passwords resets 24 h after the last one (`users.last_failed_login_at`,
+  migration 016). The lock doesn't end existing sessions. An admin clears it with
   `PATCH admin/users/:id {unlock: true}`; a completed password reset clears it too.
 - Login only ever writes targeted `UPDATE`s, so it can't overwrite a
   concurrent password reset or disable.
+- Every refusal (unknown email, disabled, invited, locked, wrong password)
+  runs one Argon2 verify at the same cost, against a dummy hash built at boot
+  with the real parameters (`src/auth/argon2-options.ts`), so response time
+  doesn't reveal which emails are staff accounts (A2).
+- The lockout counters are single `UPDATE`s whose `SET` runs left to right.
+  Every connection (`src/database/utc.ts`, `scripts/lib/db-connection.mjs`)
+  takes MariaDB's `SIMULTANEOUS_ASSIGNMENT` out of `sql_mode`, and boot
+  fails if it is still set (A3).
+
+### Applicant OTP sign-in
+
+- `POST portal/auth/request-otp` answers `{ok, channelHint}` at once (A4).
+  Only the per-identifier limiter (429) runs first. The lookup, the
+  `applicant_otps` row and the send run afterwards on `BackgroundWork`
+  (`src/common/background/`): lookups on one queue, then each
+  application's codes on their own queue, so codes are issued and delivered
+  in request order and the last one delivered is the live one. The row is
+  committed before the send (B1).
+- On SIGTERM/SIGINT the app waits up to 10 s for that work before exiting
+  (`app.enableShutdownHooks()`, `beforeApplicationShutdown`).
+- Only a wrong code checked against a live code counts (A1). Ten inside a
+  rolling hour lock OTP sign-in for 1 h; 30 in a UTC day lock it until the
+  next day. While locked, verify answers `OTP_INVALID` and request-otp sends
+  nothing, with the same responses as ever.
 
 ## Two cookie-session systems
 

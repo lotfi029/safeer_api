@@ -6,6 +6,7 @@
 
 import mysql, { type Connection } from 'mysql2/promise';
 import * as argon2 from 'argon2';
+import { UTC_SESSION_SQL } from '../src/database/utc';
 
 export const BASE = process.env.TEST_BASE_URL!;
 export const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL!;
@@ -78,7 +79,7 @@ export async function withDb<T>(fn: (conn: Connection) => Promise<T>): Promise<T
     charset: 'utf8mb4_unicode_ci',
     timezone: 'Z', // C9: same clock as the app (src/database/utc.ts)
   });
-  await conn.query("SET time_zone = '+00:00'");
+  await conn.query(UTC_SESSION_SQL); // C9 + A3: same session settings as the app
   try {
     return await fn(conn);
   } finally {
@@ -241,3 +242,14 @@ export async function waitForAuthToken(userId: string, purpose = 'reset', timeou
 }
 
 export const settleForgot = () => new Promise((r) => setTimeout(r, 500));
+
+/**
+ * A4: `POST portal/auth/request-otp` answers before it looks the identifier
+ * up; the lookup, the `applicant_otps` row and the send run afterwards
+ * (BackgroundWork). This waits until that work is done — for specs that
+ * check rows or logs straight after a request. `readOtp()` waits on its own.
+ */
+export async function settleBackground(): Promise<void> {
+  const res = await fetch(`${BASE}/__dev/settle`, { method: 'POST' });
+  if (!res.ok) throw new Error(`__dev/settle answered ${res.status}`);
+}

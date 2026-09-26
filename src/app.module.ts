@@ -41,6 +41,7 @@ import { AdminApplicationsModule } from './admin-applications/admin-applications
 import { SitemapModule } from './sitemap/sitemap.module.js';
 import { TestAwareThrottlerGuard } from './common/guards/test-aware-throttler.guard.js';
 import { DevModule } from './dev/dev.module.js';
+import { BackgroundWorkModule } from './common/background/background-work.module.js';
 
 // Phase 2 (done): the full schema (001_schema.sql) and entities for every
 // table the project plan's "Data model" section lists, plus the infra
@@ -76,6 +77,7 @@ import { DevModule } from './dev/dev.module.js';
     // MailService's 30 s retry sweep and MaintenanceService's nightly sweep
     // are both @Cron()/@Interval() handlers.
     ScheduleModule.forRoot(),
+    BackgroundWorkModule,
     HealthModule,
     CacheModule,
     AuditModule,

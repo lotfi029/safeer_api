@@ -18,7 +18,23 @@ permissions:
 
 jobs:
   build-and-test:
+    name: build-and-test (${{ matrix.db.name }})
     runs-on: ubuntu-latest
+
+    # A3: production runs on Hostinger's MariaDB, development on MySQL 8 —
+    # the whole pipeline runs on both. The MariaDB leg also switches on
+    # SIMULTANEOUS_ASSIGNMENT globally (see the step below), so the
+    # per-connection reset in src/database/utc.ts is actually exercised.
+    strategy:
+      fail-fast: false
+      matrix:
+        db:
+          - name: mysql-8.0
+            image: mysql:8.0
+            health: mysqladmin ping --silent
+          - name: mariadb-10.11
+            image: mariadb:10.11
+            health: healthcheck.sh --connect --innodb_initialized
 
     services:
       # MySQL 8.0 — the database.module.ts charset comment explains why the
@@ -28,7 +44,7 @@ jobs:
       # column with "Illegal mix of collations" and silently drops Arabic
       # accent-insensitivity.
       mysql:
-        image: mysql:8.0
+        image: ${{ matrix.db.image }}
         env:
           MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
           MYSQL_DATABASE: safeer
@@ -40,7 +56,7 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping --silent"
+          --health-cmd="${{ matrix.db.health }}"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
@@ -112,6 +128,21 @@ jobs:
             mysqladmin ping -h 127.0.0.1 -P 3306 -u root --silent && break
             sleep 1
           done
+
+      # The service creates `safeer` with the server's default charset —
+      # latin1 on MariaDB 10.11. Every table sets utf8mb4_unicode_ci itself,
+      # but the database default should match too (as db-reset.mjs creates it).
+      - name: Database collation
+        run: mysql -h 127.0.0.1 -P 3306 -u root -e 'ALTER DATABASE safeer CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+
+      # A3: the lockout counters rely on SET running left to right; this mode
+      # (MariaDB only) would evaluate every right-hand side against the old
+      # row. Every connection the app and scripts open must turn it off.
+      - name: Switch on SIMULTANEOUS_ASSIGNMENT (MariaDB)
+        if: matrix.db.name == 'mariadb-10.11'
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u root -e "SET GLOBAL sql_mode = CONCAT(@@GLOBAL.sql_mode, ',SIMULTANEOUS_ASSIGNMENT')"
+          mysql -h 127.0.0.1 -P 3306 -u root -N -e 'SELECT @@GLOBAL.sql_mode'
 
       - run: npm run migrate
 

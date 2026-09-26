@@ -254,9 +254,13 @@ in `admin/sms/settings` (`PUT /api/v1/admin/sms/settings`, admin only):
   nothing. With `log` in production, OTP requests fall back to email.
 - `driver: 'http'` remains for a generic JSON gateway (URL + bearer token).
 - Every provider call has a 5-second timeout. Notification SMS are queued
-  and sent in the background (`sms_log` shows `queued` → `sent`/`failed`);
-  only the OTP request waits for the result, and falls back to email if the
-  SMS isn't sent. SMS always go to the applicant's E.164 number.
+  and sent in the background (`sms_log` shows `queued` → `sent`/`failed`).
+  An OTP request answers before its code is sent (A4); the send then waits
+  for the SMS result and falls back to email if it isn't sent. SMS always go
+  to the applicant's E.164 number.
+- **Restarts (A4):** on SIGTERM/SIGINT the app waits up to 10 s for OTP
+  sends still running. `ecosystem.config.cjs` sets PM2's `kill_timeout`
+  to 12 s so that wait isn't cut short; keep it above 10 s if you change it.
 - OTP codes are never stored: `sms_log.message` and `mail_log.subject`
   hold `••••••` in their place, and no OTP mail payload is kept for retries.
   (In development/test only, `GET /api/v1/__dev/otp/:applicationId` returns

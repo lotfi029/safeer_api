@@ -108,6 +108,8 @@ module.exports = async function globalSetup() {
   process.env.TEST_BASE_URL = `http://localhost:${TEST_PORT}/api/v1`;
   process.env.TEST_HEALTH_URL = `http://localhost:${TEST_PORT}/health`;
   process.env.TEST_APP_TZ = appEnv.TZ;
+  // A4: test/shutdown.spec.ts boots a second instance with the same settings.
+  process.env.TEST_APP_ENV = JSON.stringify(appEnv);
   // C27 specs sign a newsletter unsubscribe link with the same key the app uses.
   process.env.TEST_APP_ENCRYPTION_KEY = appEncryptionKey;
   process.env.TEST_DB_NAME = TEST_DB_NAME;

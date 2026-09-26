@@ -33,6 +33,7 @@ import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import * as argon2 from 'argon2';
 import { requireDevDbConfirmation } from './lib/dev-db-guard.mjs';
+import { UTC_SESSION_SQL } from './lib/db-connection.mjs';
 
 requireDevDbConfirmation('smoke');
 
@@ -107,7 +108,7 @@ async function withDb(fn) {
     charset: 'utf8mb4_unicode_ci',
     timezone: 'Z', // C9: same clock as the app (src/database/utc.ts)
   });
-  await conn.query("SET time_zone = '+00:00'");
+  await conn.query(UTC_SESSION_SQL);
   try {
     return await fn(conn);
   } finally {
@@ -234,6 +235,16 @@ async function readOtp(applicationId) {
   const res = await fetch(`${BASE}/__dev/otp/${applicationId}`);
   if (!res.ok) throw new Error(`no OTP issued for application ${applicationId} (dev hook answered ${res.status})`);
   return res.json();
+}
+
+/**
+ * A4: request-otp answers before the code is looked up, written and sent
+ * (BackgroundWork). This waits for that work — before reading rows or logs
+ * straight after a request. readOtp() waits on its own.
+ */
+async function settle() {
+  const res = await fetch(`${BASE}/__dev/settle`, { method: 'POST' });
+  if (!res.ok) throw new Error(`__dev/settle answered ${res.status}`);
 }
 
 async function readSmsOtpCode(applicationId) {
@@ -621,6 +632,7 @@ test('OTP (B1/B2): SMS + phone identifier + lockout + bogus no-op + email fallba
       // A bogus identifier: the same non-committal {ok:true}, and no row created for it.
       const bogus = await api('POST', '/portal/auth/request-otp', { body: { identifier: `SA-2099-${Math.floor(Math.random() * 90000 + 10000)}` } });
       assert(bogus.body.ok === true, 'a bogus identifier must resolve the same {ok:true} as a real one');
+      await settle();
       const otpCountAfterSms = await withDb((conn) =>
         conn.execute('SELECT COUNT(*) AS c FROM applicant_otps WHERE application_id = ?', [applicant.id]).then(([r]) => Number(r[0].c)),
       );
@@ -636,6 +648,7 @@ test('OTP (B1/B2): SMS + phone identifier + lockout + bogus no-op + email fallba
     const reqEmail = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
     assert(reqEmail.status === 200 || reqEmail.status === 201, `request-otp (email fallback) failed: ${reqEmail.status}`);
     assert(reqEmail.body.channelHint === 'email', `SMS disabled should default channelHint to 'email', got ${reqEmail.body.channelHint}`);
+    await settle();
 
     const channel = await withDb((conn) =>
       conn

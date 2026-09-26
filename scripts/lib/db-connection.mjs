@@ -9,11 +9,16 @@
 //
 // C9: UTC, same as the app (src/database/utc.ts): `timezone: 'Z'` for JS
 // Dates, and `SET time_zone = '+00:00'` for NOW()/CURRENT_TIMESTAMP defaults.
+// A3: the same statement takes MariaDB's SIMULTANEOUS_ASSIGNMENT out of
+// sql_mode, so multi-assignment UPDATEs run left to right (see utc.ts).
+// smoke.mjs and reprocess-media.mjs import it from here.
 
 import mysql from 'mysql2/promise';
 import { DEV_ENVS } from './node-env.mjs';
 
-export const UTC_SESSION_SQL = "SET time_zone = '+00:00'";
+export const UTC_SESSION_SQL =
+  "SET time_zone = '+00:00', " +
+  "sql_mode = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', @@SESSION.sql_mode, ','), ',SIMULTANEOUS_ASSIGNMENT,', ','))";
 
 function required(scriptName, name, value) {
   if (value === undefined) {

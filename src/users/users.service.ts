@@ -14,6 +14,11 @@ import { toPublicUser, type PublicUser } from './public-user.js';
  * false) — this is not a security-by-obscurity placeholder, the account
  * genuinely cannot be signed into until /auth/accept/:token sets a real one
  * (FR-A-09: admins never type another user's password).
+ *
+ * It is a marker, not a timing shield: its cost is m=1,t=1, far cheaper than
+ * a real hash. Login's refusal paths verify against PasswordService's dummy
+ * hash instead (A2). Keep this exact value — BootstrapService and migration
+ * 008 recognise invited users by it.
  */
 export const UNUSABLE_PASSWORD_HASH =
   '$argon2id$v=19$m=1,t=1,p=1$AAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';

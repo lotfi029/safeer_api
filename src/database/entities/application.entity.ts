@@ -121,15 +121,25 @@ export class Application {
   consentAt: Date | null;
 
   /**
-   * C22: the daily (UTC) count of wrong OTP codes, written only by
-   * PortalOtpService with atomic UPDATEs. `select: false` — internal
-   * bookkeeping, never part of any response.
+   * C22 / A1: wrong OTP codes, written only by PortalOtpService with atomic
+   * UPDATEs. `select: false` — internal bookkeeping, never part of any
+   * response. The daily (UTC) count caps a day at 30; the rolling-hour
+   * window locks OTP sign-in for an hour (`otpLockedUntil`) at 10.
    */
   @Column({ name: 'otp_fail_date', type: 'date', nullable: true, select: false })
   otpFailDate?: string | null;
 
   @Column({ name: 'otp_fail_count', type: 'smallint', unsigned: true, default: 0, select: false })
   otpFailCount?: number;
+
+  @Column({ name: 'otp_hour_start', type: 'datetime', precision: 3, nullable: true, select: false })
+  otpHourStart?: Date | null;
+
+  @Column({ name: 'otp_hour_count', type: 'smallint', unsigned: true, default: 0, select: false })
+  otpHourCount?: number;
+
+  @Column({ name: 'otp_locked_until', type: 'datetime', precision: 3, nullable: true, select: false })
+  otpLockedUntil?: Date | null;
 
   @Column({ name: 'submitted_at', type: 'datetime', precision: 3, nullable: true })
   submittedAt: Date | null;
