@@ -58,6 +58,24 @@ describe('C20: dashboard overview', () => {
     }
   });
 
+  // A5 (safeer-delivery-review.md): editors don't own the inbox, so they
+  // must not see its unread count either — only admin and support do.
+  it.each([
+    ['editor', false],
+    ['reviewer', false],
+    ['support', true],
+  ] as const)('%s sees the unread-messages figures: %s', async (role, visible) => {
+    const user = await createTempUser(role);
+    try {
+      const res = await api('GET', '/admin/overview', { session: user });
+      expect(res.status).toBe(200);
+      expect('unreadMessages' in res.body.statCards).toBe(visible);
+      expect('unreadMessages' in res.body.badges).toBe(visible);
+    } finally {
+      await deleteTempUser(user.id);
+    }
+  });
+
   it('reviewer gets application figures but no audit feed', async () => {
     const user = await createTempUser('reviewer');
     try {
