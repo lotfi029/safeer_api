@@ -5,6 +5,7 @@ import { ApplicationEvent } from '../database/entities/application-event.entity.
 import { Counter } from '../database/entities/counter.entity.js';
 import { SiteSettings } from '../database/entities/site-settings.entity.js';
 import { MailModule } from '../mail/mail.module.js';
+import { SmsModule } from '../sms/sms.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { ConfigModule } from '../config/config.module.js';
 import { ApplicationsController } from './applications.controller.js';
@@ -18,7 +19,13 @@ import { ApplicationsService } from './applications.service.js';
  * this module mints.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Application, ApplicationEvent, Counter, SiteSettings]), MailModule, AuthModule, ConfigModule],
+  imports: [
+    TypeOrmModule.forFeature([Application, ApplicationEvent, Counter, SiteSettings]),
+    MailModule,
+    SmsModule,
+    AuthModule,
+    ConfigModule,
+  ],
   controllers: [ApplicationsController],
   providers: [ApplicationsService],
 })

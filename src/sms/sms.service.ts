@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SmsLog } from '../database/entities/sms-log.entity.js';
 import { SmsSettings } from '../database/entities/sms-settings.entity.js';
-import type { SmsServiceInterface, SendSmsParams } from './sms.service.interface.js';
+import type { SmsServiceInterface, SendSmsParams, SendSmsResult, SmsAvailability } from './sms.service.interface.js';
 import { SmsTemplatesService } from './sms-templates.service.js';
 import { SmsTransportService } from './sms-transport.service.js';
 
@@ -42,8 +42,12 @@ export class SmsService implements SmsServiceInterface {
    * mail.service.ts's trap 13). `is_enabled = 0` (globally, or the specific
    * template disabled) writes the row `skipped` and sends nothing, same as
    * mail. An empty `params.to` is its own `skipped` cause, named in `error`.
+   *
+   * Returns the outcome (B1, safeer-backend-fr-review.md) so a caller —
+   * `PortalOtpService.requestOtp` — can fall back to email when this
+   * doesn't come back `sent`, without needing to re-read `sms_log` itself.
    */
-  async send(params: SendSmsParams): Promise<void> {
+  async send(params: SendSmsParams): Promise<SendSmsResult> {
     try {
       const settings = await this.settingsRepo
         .createQueryBuilder('s')
@@ -70,7 +74,7 @@ export class SmsService implements SmsServiceInterface {
             entityId: params.entity?.id ?? null,
           }),
         );
-        return;
+        return { status: 'skipped' };
       }
 
       const result = await this.transport.deliver(settings, params.to, rendered);
@@ -89,8 +93,23 @@ export class SmsService implements SmsServiceInterface {
           sentAt: result.ok ? new Date() : null,
         }),
       );
+      return { status: result.ok ? 'sent' : 'failed' };
     } catch (err) {
       this.logger.error('SmsService.send failed', err instanceof Error ? err.stack : String(err));
+      return { status: 'failed' };
     }
+  }
+
+  /**
+   * `is_enabled = 0` -> 'disabled'. Driver 'log' -> 'log' (never leaves the
+   * process). Anything else (a real, configured driver) -> 'real'. B1: this
+   * is what `PortalOtpService` checks before deciding whether SMS is worth
+   * attempting for a given request, and what `request-otp`'s `channelHint`
+   * reflects when the caller doesn't specify a channel.
+   */
+  async availability(): Promise<SmsAvailability> {
+    const settings = await this.settingsRepo.findOne({ where: { id: '1' } });
+    if (!settings?.isEnabled) return 'disabled';
+    return settings.driver === 'log' ? 'log' : 'real';
   }
 }

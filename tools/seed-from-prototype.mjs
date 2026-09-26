@@ -533,6 +533,16 @@ function buildMailTemplates() {
       body_en: 'Your student portal sign-in code is: **{{code}}**\n\nIt is valid for {{minutes}} minutes. Do not share this code with anyone.\n\nIf you did not request it, you can ignore this message.',
       variables: ['code', 'minutes'],
     },
+    {
+      // B2 (safeer-backend-fr-review.md): sent by ApplicationsService.create
+      // when POST applications finds a non-terminal application already
+      // using the same email/phone, instead of creating a second one.
+      key: 'application_resume', name_ar: 'متابعة طلب قائم', name_en: 'Continue an existing application',
+      subject_ar: 'لديك طلب منحة قائم بالفعل', subject_en: 'You already have an application in progress',
+      body_ar: 'مرحبًا {{name}}،\n\nلديك طلب منحة قائم بالفعل برقم **{{reference}}**. يمكنك متابعته من بوابة الطالب في أي وقت:\n\n[{{link}}]({{link}})',
+      body_en: 'Hello {{name}},\n\nYou already have a scholarship application in progress, reference **{{reference}}**. You can continue it from the student portal at any time:\n\n[{{link}}]({{link}})',
+      variables: ['name', 'reference', 'link'],
+    },
   ];
   return templates.map((t) => ({
     key: t.key, name_ar: t.name_ar, name_en: t.name_en, subject_ar: t.subject_ar, subject_en: t.subject_en,
@@ -565,6 +575,13 @@ function buildSmsTemplates() {
       body_ar: 'جمعية سفير: يلزم استكمال مستندات لطلبك {{reference}}. راجع بوابة الطالب.',
       body_en: 'Safeer: documents are needed for application {{reference}}. Check the student portal.',
       variables: ['reference'],
+    },
+    {
+      // B2 — same trigger as the mail_templates row above, SMS variant.
+      key: 'application_resume', name_ar: 'متابعة طلب قائم', name_en: 'Continue an existing application',
+      body_ar: 'جمعية سفير: لديك طلب قائم برقم {{reference}}. تابعه عبر بوابة الطالب: {{link}}',
+      body_en: 'Safeer: you have an application in progress, ref {{reference}}. Continue it: {{link}}',
+      variables: ['reference', 'link'],
     },
   ];
   return templates.map((t) => ({

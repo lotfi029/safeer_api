@@ -210,6 +210,43 @@ async function readSmsOtpCode(applicationId) {
   return match[0];
 }
 
+/** B1's email-fallback path (portal-otp.service.ts) writes the code into mail_log's rendered payload/subject instead of sms_log. */
+async function readMailOtpCode(applicationId) {
+  const row = await withDb((conn) =>
+    conn
+      .execute(
+        "SELECT subject, payload FROM mail_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'otp_code' ORDER BY id DESC LIMIT 1",
+        [applicationId],
+      )
+      .then(([rows]) => rows[0]),
+  );
+  const haystack = `${row?.subject ?? ''} ${JSON.stringify(row?.payload ?? '')}`;
+  const match = haystack.match(/\d{6}/);
+  if (!match) throw new Error(`no 6-digit OTP found in mail_log for application ${applicationId}: ${JSON.stringify(row)}`);
+  return match[0];
+}
+
+/**
+ * B1: the seed default has SMS disabled (`sms_settings.is_enabled = 0`), so
+ * OTP requests fall back to email unless a case explicitly turns SMS on
+ * (with the harmless `log` driver) first. Returns a restore function that
+ * puts the previous settings back exactly.
+ */
+async function withSmsEnabled(fn) {
+  const before = await api('GET', '/admin/sms/settings');
+  assert(before.status === 200, `GET admin/sms/settings failed: ${before.status}`);
+  const enabled = await api('PUT', '/admin/sms/settings', { body: { isEnabled: true, driver: 'log' } });
+  assert(enabled.status === 200, `enabling SMS (log driver) failed: ${enabled.status}: ${JSON.stringify(enabled.body)}`);
+  try {
+    return await fn();
+  } finally {
+    const restored = await api('PUT', '/admin/sms/settings', {
+      body: { isEnabled: before.body.isEnabled, driver: before.body.driver },
+    });
+    assert(restored.status === 200, `restoring sms_settings failed: ${restored.status}`);
+  }
+}
+
 async function uploadApplicationDocument(session, docType, tag) {
   const form = new FormData();
   form.append('docType', docType);
@@ -443,54 +480,137 @@ test('cleanup: remove the shared apply-flow/isolation/CSRF fixture applications'
 });
 
 // ---------------------------------------------------------------------------
-// OTP — request-otp for a real reference, read the code back from sms_log
-// (every application from POST applications has a phone, so the channel is
-// always 'sms' — portal-otp.service.ts), verify-otp succeeds; a wrong code
-// repeated past the attempt limit is rejected even with the right code
-// after; a bogus identifier gets the same {ok:true} non-response with no
-// row created.
+// OTP (B1/B2, safeer-backend-fr-review.md) — everything here shares one
+// applicant and stays within the 5/hour/IP throttle on both `POST
+// applications` and `POST portal/auth/request-otp` (scripts/smoke.mjs's own
+// long-standing convention — see `sharedApplicants()` above): request via
+// reference with SMS on (`log` driver) → verify; request again via the
+// *local* `05...` form of the same phone number (B2's phone identifier,
+// resolving to the same application as its E.164 form) → 5 wrong guesses
+// lock out even the right code; a bogus identifier is a silent {ok:true}
+// no-op; with SMS back off (the seed default), a request falls back to
+// email and channelHint still doesn't depend on whether the identifier
+// matches anything; finally, a second `POST applications` for this same
+// applicant's email is refused (B2's duplicate-application check) and
+// sends it an `application_resume` notice.
 
-test('OTP: request → verify succeeds; 5 wrong guesses lock out even the right code; a bogus identifier is a silent no-op', async () => {
-  const applicant = await createApplication({ firstName: 'Khalid', lastName: 'Alotaibi' });
+test('OTP (B1/B2): SMS + phone identifier + lockout + bogus no-op + email fallback + duplicate application', async () => {
+  const localPhone = `05${String(Date.now()).slice(-8)}`;
+  const applicant = await createApplication({ firstName: 'Khalid', lastName: 'Alotaibi', phone: localPhone });
   try {
     const otpCountBefore = await withDb((conn) =>
       conn.execute('SELECT COUNT(*) AS c FROM applicant_otps WHERE application_id = ?', [applicant.id]).then(([r]) => Number(r[0].c)),
     );
 
-    const req1 = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
-    assert(req1.status === 200 || req1.status === 201, `request-otp failed: ${req1.status}`);
-    assert(req1.body.ok === true, 'request-otp must always resolve {ok:true}');
+    await withSmsEnabled(async () => {
+      const req1 = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference, channel: 'sms' } });
+      assert(req1.status === 200 || req1.status === 201, `request-otp failed: ${req1.status}`);
+      assert(req1.body.ok === true, 'request-otp must always resolve {ok:true}');
+      assert(req1.body.channelHint === 'sms', `channel:'sms' should echo channelHint 'sms', got ${req1.body.channelHint}`);
 
-    const code1 = await readSmsOtpCode(applicant.id);
-    const verify1 = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: code1 } });
-    assert(verify1.status === 200 || verify1.status === 201, `verify-otp with the right code failed: ${verify1.status}: ${JSON.stringify(verify1.body)}`);
-    assert(typeof verify1.body.csrfToken === 'string' && verify1.body.csrfToken.length > 0, 'verify-otp must return a csrfToken');
+      const code1 = await readSmsOtpCode(applicant.id);
+      const verify1 = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: code1 } });
+      assert(verify1.status === 200 || verify1.status === 201, `verify-otp with the right code failed: ${verify1.status}: ${JSON.stringify(verify1.body)}`);
+      assert(typeof verify1.body.csrfToken === 'string' && verify1.body.csrfToken.length > 0, 'verify-otp must return a csrfToken');
 
-    // A second, independent code — used to exercise the attempt limit
-    // without touching the already-consumed first one.
-    const req2 = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
-    assert(req2.body.ok === true, 'second request-otp must also resolve {ok:true}');
-    const code2 = await readSmsOtpCode(applicant.id);
-    const wrongCode = code2 === '000000' ? '111111' : '000000';
+      // B2: the *local* form of the same phone (createApplication stored it
+      // as `05...`, normalized to `+9665...` on save) — a second,
+      // independent code, also used to exercise the attempt limit without
+      // touching the already-consumed first one.
+      const req2 = await api('POST', '/portal/auth/request-otp', { body: { identifier: localPhone, channel: 'sms' } });
+      assert(req2.body.ok === true, 'request-otp by the local phone form must also resolve {ok:true}');
+      const code2 = await readSmsOtpCode(applicant.id);
+      const wrongCode = code2 === '000000' ? '111111' : '000000';
 
-    for (let i = 1; i <= 5; i++) {
-      const wrong = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: wrongCode } });
-      assert(wrong.status === 401, `wrong-code attempt #${i} should be 401, got ${wrong.status}`);
-      assert(wrong.body?.code === 'OTP_INVALID', `expected OTP_INVALID, got ${wrong.body?.code}`);
-    }
-    // The 6th attempt, now with the CORRECT code, must still be rejected —
-    // the attempt cap is checked before the code comparison.
-    const lockedOut = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: code2 } });
-    assert(lockedOut.status === 401, `the right code after 5 wrong attempts should still be 401, got ${lockedOut.status}`);
-    assert(lockedOut.body?.code === 'OTP_INVALID', `expected OTP_INVALID, got ${lockedOut.body?.code}`);
+      for (let i = 1; i <= 5; i++) {
+        const wrong = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: wrongCode } });
+        assert(wrong.status === 401, `wrong-code attempt #${i} should be 401, got ${wrong.status}`);
+        assert(wrong.body?.code === 'OTP_INVALID', `expected OTP_INVALID, got ${wrong.body?.code}`);
+      }
+      // The 6th attempt, now with the CORRECT code, must still be rejected —
+      // the attempt cap is checked before the code comparison.
+      const lockedOut = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: code2 } });
+      assert(lockedOut.status === 401, `the right code after 5 wrong attempts should still be 401, got ${lockedOut.status}`);
+      assert(lockedOut.body?.code === 'OTP_INVALID', `expected OTP_INVALID, got ${lockedOut.body?.code}`);
 
-    // A bogus identifier: the same non-committal {ok:true}, and no row created for it.
-    const bogus = await api('POST', '/portal/auth/request-otp', { body: { identifier: `SA-2099-${Math.floor(Math.random() * 90000 + 10000)}` } });
-    assert(bogus.body.ok === true, 'a bogus identifier must resolve the same {ok:true} as a real one');
-    const otpCountAfter = await withDb((conn) =>
-      conn.execute('SELECT COUNT(*) AS c FROM applicant_otps WHERE application_id = ?', [applicant.id]).then(([r]) => Number(r[0].c)),
+      // A bogus identifier: the same non-committal {ok:true}, and no row created for it.
+      const bogus = await api('POST', '/portal/auth/request-otp', { body: { identifier: `SA-2099-${Math.floor(Math.random() * 90000 + 10000)}` } });
+      assert(bogus.body.ok === true, 'a bogus identifier must resolve the same {ok:true} as a real one');
+      const otpCountAfterSms = await withDb((conn) =>
+        conn.execute('SELECT COUNT(*) AS c FROM applicant_otps WHERE application_id = ?', [applicant.id]).then(([r]) => Number(r[0].c)),
+      );
+      assert(
+        otpCountAfterSms === otpCountBefore + 2,
+        `expected exactly 2 new applicant_otps rows for this application (one per real request-otp call), got ${otpCountAfterSms - otpCountBefore}`,
+      );
+    });
+
+    // B1: sms_settings is back to disabled (withSmsEnabled restores it) —
+    // the same identifier now falls back to email, and channelHint reflects
+    // that default whether or not the identifier resolves to anything.
+    const reqEmail = await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
+    assert(reqEmail.status === 200 || reqEmail.status === 201, `request-otp (email fallback) failed: ${reqEmail.status}`);
+    assert(reqEmail.body.channelHint === 'email', `SMS disabled should default channelHint to 'email', got ${reqEmail.body.channelHint}`);
+
+    const channel = await withDb((conn) =>
+      conn
+        .execute('SELECT channel FROM applicant_otps WHERE application_id = ? ORDER BY id DESC LIMIT 1', [applicant.id])
+        .then(([rows]) => rows[0]?.channel),
     );
-    assert(otpCountAfter === otpCountBefore + 2, `expected exactly 2 new applicant_otps rows for this application (one per real request-otp call), got ${otpCountAfter - otpCountBefore}`);
+    assert(channel === 'email', `expected the applicant_otps row to record channel 'email' when SMS is disabled, got ${channel}`);
+
+    const emailCode = await readMailOtpCode(applicant.id);
+    const verifyEmail = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: emailCode } });
+    assert(
+      verifyEmail.status === 200 || verifyEmail.status === 201,
+      `verify-otp after email fallback failed: ${verifyEmail.status}: ${JSON.stringify(verifyEmail.body)}`,
+    );
+
+    const bogusHint = await api('POST', '/portal/auth/request-otp', { body: { identifier: `SA-2099-${Math.floor(Math.random() * 90000 + 10000)}` } });
+    assert(
+      bogusHint.body.channelHint === reqEmail.body.channelHint,
+      `channelHint for a bogus identifier (${bogusHint.body.channelHint}) must match a real one (${reqEmail.body.channelHint})`,
+    );
+
+    // B2: a second POST applications for this same applicant's email is
+    // refused, and sends *this* application an application_resume notice —
+    // never the newly submitted (fake) contact details.
+    const resumeMailBefore = await withDb((conn) =>
+      conn
+        .execute("SELECT COUNT(*) AS c FROM mail_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'application_resume'", [
+          applicant.id,
+        ])
+        .then(([r]) => Number(r[0].c)),
+    );
+
+    const dup = await fetch(`${BASE}/applications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: 'Someone',
+        lastName: 'Else',
+        birthDate: '2000-01-01',
+        phone: `+9665${String(Date.now()).slice(-8)}`,
+        nationality: 'SA',
+        email: applicant.email,
+        gender: 'male',
+      }),
+    });
+    const dupBody = await dup.json();
+    assert(dup.status === 409, `duplicate application should be refused with 409, got ${dup.status}: ${JSON.stringify(dupBody)}`);
+    assert(dupBody.code === 'APPLICATION_EXISTS', `expected APPLICATION_EXISTS, got ${dupBody.code}`);
+
+    const resumeMailAfter = await withDb((conn) =>
+      conn
+        .execute("SELECT COUNT(*) AS c FROM mail_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'application_resume'", [
+          applicant.id,
+        ])
+        .then(([r]) => Number(r[0].c)),
+    );
+    assert(
+      resumeMailAfter === resumeMailBefore + 1,
+      `expected one new application_resume mail_log row for the existing application, got ${resumeMailAfter - resumeMailBefore}`,
+    );
   } finally {
     await deleteApplication(applicant.id);
   }

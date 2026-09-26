@@ -40,6 +40,8 @@ export const ErrorCode = {
    * submit) — `extra.from`/`extra.to` name the rejected pair.
    */
   INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
+  /** B2 (safeer-backend-fr-review.md): `POST applications` rejects a second active (non-terminal) application for the same email or phone. Non-enumerating: the response never says which contact detail matched. */
+  APPLICATION_EXISTS: 'APPLICATION_EXISTS',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

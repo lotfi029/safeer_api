@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizePhone } from '../common/phone.js';
 
 /**
  * The three form steps the prototype's apply flow collects, as raw zod
@@ -15,7 +16,12 @@ export const step1Shape = {
   lastName: z.string().min(1).max(120),
   /** YYYY-MM-DD — matches `applications.birth_date`'s DATE column. */
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'birthDate must be YYYY-MM-DD'),
-  phone: z.string().min(5).max(40),
+  /** Normalised to E.164 on save (B2) — see `Application.syncPhoneE164`/`normalizePhone`. `+966` is the default country code for a local `05…` number. */
+  phone: z
+    .string()
+    .min(5)
+    .max(40)
+    .refine((v) => normalizePhone(v) !== null, 'phone must be a valid phone number (e.g. 05XXXXXXXX or +9665XXXXXXXX)'),
   /** ISO 3166-1 alpha-2, stored upper-case. */
   nationality: z
     .string()

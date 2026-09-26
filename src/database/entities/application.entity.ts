@@ -1,15 +1,44 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  Unique,
+  UpdateDateColumn,
+} from 'typeorm';
 import { User } from './user.entity.js';
 import type { Locale } from '../../common/request-context.js';
+import { normalizePhone } from '../../common/phone.js';
 
 export type ApplicationStatus = 'draft' | 'new' | 'under_review' | 'docs_missing' | 'interview' | 'accepted' | 'rejected';
 export type ApplicationGender = 'male' | 'female';
 export type ApplicationDegreeLevel = 'bachelor' | 'master' | 'phd';
 
+/**
+ * Every status except the two terminal decisions (B2, safeer-backend-fr-review.md):
+ * `PortalOtpService.findApplication` prefers the most recent one of these
+ * over an older terminal application, and `ApplicationsService.create`
+ * blocks a second `POST applications` while one already exists.
+ */
+export const NON_TERMINAL_APPLICATION_STATUSES: ApplicationStatus[] = [
+  'draft',
+  'new',
+  'under_review',
+  'docs_missing',
+  'interview',
+];
+
 @Entity('applications')
 @Unique('uq_applications_reference', ['reference'])
 @Index('ix_applications_status', ['status', 'submittedAt'])
 @Index('ix_applications_email', ['email'])
+@Index('ix_applications_phone_e164', ['phoneE164'])
+@Index('ix_applications_email_status', ['email', 'status'])
 export class Application {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: string;
@@ -43,6 +72,17 @@ export class Application {
 
   @Column({ type: 'varchar', length: 40, nullable: true })
   phone: string | null;
+
+  /**
+   * `phone` normalised to E.164 (B2, safeer-backend-fr-review.md) — kept in
+   * sync automatically from `phone` by the `@BeforeInsert`/`@BeforeUpdate`
+   * hooks below on every `save()`. Used to match an identifier to at most
+   * one application (`PortalOtpService.findApplication`) and to detect a
+   * duplicate active application (`ApplicationsService.create`) — never
+   * hand-written elsewhere.
+   */
+  @Column({ name: 'phone_e164', type: 'varchar', length: 16, nullable: true })
+  phoneE164: string | null;
 
   /** ISO2 */
   @Column({ type: 'char', length: 2, nullable: true })
@@ -104,4 +144,10 @@ export class Application {
     onUpdate: 'CURRENT_TIMESTAMP(3)',
   })
   updatedAt: Date;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  syncPhoneE164(): void {
+    this.phoneE164 = normalizePhone(this.phone);
+  }
 }
