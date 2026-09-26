@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Param, Post, Put, Req } from '@nestjs/common';
 import { ApiCookieAuth } from '@nestjs/swagger';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import type { RequestContext } from '../common/request-context.js';
 import { SmsTemplatesService } from './sms-templates.service.js';
 import { UpdateSmsTemplateDto, PreviewSmsTemplateDto } from './dto/sms-template.dto.js';
 
 @Controller('admin/sms/templates')
-@Roles('admin')
+@Area('settings')
 @ApiCookieAuth()
 export class SmsTemplatesController {
   constructor(private readonly templatesService: SmsTemplatesService) {}

@@ -80,6 +80,17 @@ export class CacheService {
   private readonly cache: LRUCache<string, CacheEntry>;
   private readonly memoCache: LRUCache<string, CacheEntry>;
   private readonly tagIndex = new Map<string, Set<string>>();
+  /**
+   * C31: bumped by every purgeTag() (and, for all tags at once, clear()).
+   * A caller snapshots the versions of the tags it will store under
+   * *before* reading the data (`versionOf()`), and passes that snapshot to
+   * set()/setMemo(): if a write purged one of those tags while the handler
+   * was reading, the value may predate the write, so it isn't stored.
+   * Without this, a miss → read → (purge) → set sequence re-cached stale
+   * data for a full TTL after the edit.
+   */
+  private readonly tagVersions = new Map<string, number>();
+  private epoch = 0;
   private hits = 0;
   private misses = 0;
   private readonly startedAt = Date.now();
@@ -116,7 +127,14 @@ export class CacheService {
     return entry.value as T;
   }
 
-  set<T>(key: string, value: T, tags: string[] = []): void {
+  /** C31: an opaque snapshot of `tags`' purge versions, for set()/setMemo()'s `ifVersion`. */
+  versionOf(tags: string[]): string {
+    return `${this.epoch}:${tags.map((t) => this.tagVersions.get(t) ?? 0).join(',')}`;
+  }
+
+  /** Returns false (and stores nothing) when `ifVersion` is given and one of `tags` was purged since that snapshot. */
+  set<T>(key: string, value: T, tags: string[] = [], ifVersion?: string): boolean {
+    if (ifVersion !== undefined && ifVersion !== this.versionOf(tags)) return false;
     // Replacing an existing entry: drop its old tag associations first so a
     // key never lingers in a tag's index under a tag it no longer carries.
     const existing = this.cache.peek(key);
@@ -124,6 +142,7 @@ export class CacheService {
 
     this.cache.set(key, { value, tags });
     this.tagKey(key, tags);
+    return true;
   }
 
   /** Same read contract as `get()`, against the boolean memo store instead of the response cache — see the class comment. */
@@ -133,12 +152,14 @@ export class CacheService {
   }
 
   /** Same write contract as `set()`, against the boolean memo store instead of the response cache — see the class comment. */
-  setMemo(key: string, value: boolean, tags: string[] = []): void {
+  setMemo(key: string, value: boolean, tags: string[] = [], ifVersion?: string): boolean {
+    if (ifVersion !== undefined && ifVersion !== this.versionOf(tags)) return false;
     const existing = this.memoCache.peek(key);
     if (existing) this.untagKey(key, existing.tags);
 
     this.memoCache.set(key, { value, tags });
     this.tagKey(key, tags);
+    return true;
   }
 
   /**
@@ -151,6 +172,7 @@ export class CacheService {
    * something FR-G-12's admin screen reports on.
    */
   purgeTag(tag: string): number {
+    this.tagVersions.set(tag, (this.tagVersions.get(tag) ?? 0) + 1);
     const keys = this.tagIndex.get(tag);
     if (!keys) return 0;
     let purged = 0;
@@ -163,6 +185,7 @@ export class CacheService {
   }
 
   clear(): void {
+    this.epoch++;
     this.cache.clear();
     this.memoCache.clear();
     this.tagIndex.clear();

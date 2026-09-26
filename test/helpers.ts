@@ -224,3 +224,20 @@ export async function verifyOtpSession(identifier: string, code: string): Promis
   if (!setCookie) throw new Error('verify-otp did not set a session cookie');
   return { cookie: setCookie.split(';')[0], csrfToken: JSON.parse(text).csrfToken };
 }
+
+/**
+ * C33: `POST admin/auth/forgot` answers before it looks the address up, so a
+ * spec waits for the reset token to appear (or, for "nothing is sent",
+ * lets the background work finish before checking).
+ */
+export async function waitForAuthToken(userId: string, purpose = 'reset', timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const [rows]: any = await withDb((conn) => conn.execute('SELECT id FROM auth_tokens WHERE user_id = ? AND purpose = ?', [userId, purpose]));
+    if (rows.length > 0) return;
+    if (Date.now() > deadline) throw new Error(`no ${purpose} token for user ${userId} within ${timeoutMs}ms`);
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
+export const settleForgot = () => new Promise((r) => setTimeout(r, 500));

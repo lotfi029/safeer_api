@@ -15,7 +15,7 @@ export const updateMailSettingsSchema = z
     username: z.string().max(191).nullable().optional(),
     password: z.string().min(1).max(255).optional(),
     fromNameAr: z.string().max(120).nullable().optional(),
-    fromNameEn: z.string().max(120).nullable().optional(),
+    fromNameEn: z.string().trim().max(120).nullable().optional(),
     fromEmail: z.string().email().max(191).nullable().optional(),
     replyTo: z.string().email().max(191).nullable().optional(),
     notifyEmail: z.string().email().max(191).nullable().optional(),

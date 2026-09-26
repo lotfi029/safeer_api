@@ -6,11 +6,11 @@ import { z } from 'zod';
 export const updateMailTemplateSchema = z
   .object({
     nameAr: z.string().min(1).max(191).optional(),
-    nameEn: z.string().max(191).nullable().optional(),
+    nameEn: z.string().trim().max(191).nullable().optional(),
     subjectAr: z.string().min(1).max(255).optional(),
-    subjectEn: z.string().max(255).nullable().optional(),
+    subjectEn: z.string().trim().max(255).nullable().optional(),
     bodyAr: z.string().min(1).optional(),
-    bodyEn: z.string().nullable().optional(),
+    bodyEn: z.string().trim().nullable().optional(),
     isEnabled: z.boolean().optional(),
   })
   .strict();

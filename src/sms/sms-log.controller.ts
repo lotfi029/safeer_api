@@ -3,7 +3,7 @@ import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SmsLog } from '../database/entities/sms-log.entity.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { readPageLimit, readString } from '../common/query/list-params.js';
 import { toPublicSmsLog } from './public-sms-log.js';
 
@@ -11,7 +11,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 @Controller('admin/sms/log')
-@Roles('admin')
+@Area('settings')
 @ApiCookieAuth()
 export class SmsLogController {
   constructor(@InjectRepository(SmsLog) private readonly repo: Repository<SmsLog>) {}

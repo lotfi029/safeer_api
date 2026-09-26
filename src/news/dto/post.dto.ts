@@ -9,11 +9,11 @@ import { RESERVED_POST_SLUGS, slugSchema } from '../../common/validation/slug.js
 export const createPostSchema = z
   .object({
     titleAr: z.string().min(1).max(191),
-    titleEn: z.string().max(191).nullable().optional(),
+    titleEn: z.string().trim().max(191).nullable().optional(),
     excerptAr: z.string().nullable().optional(),
-    excerptEn: z.string().nullable().optional(),
+    excerptEn: z.string().trim().nullable().optional(),
     bodyAr: z.string().nullable().optional(),
-    bodyEn: z.string().nullable().optional(),
+    bodyEn: z.string().trim().nullable().optional(),
     categoryId: z.string().min(1),
     coverAssetId: z.string().nullable().optional(),
     publishedOn: z

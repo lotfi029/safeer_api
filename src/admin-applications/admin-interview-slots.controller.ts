@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Inject, Logger, Param, Patch, Req } from '@nestjs/common';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import type { RequestContext } from '../common/request-context.js';
@@ -24,7 +24,7 @@ const InterviewSlotCrudBase = CrudController<InterviewSlot>({
   updateDto: updateInterviewSlotSchema,
   // No `sortOrder` column on this entity (slots are time-ordered, not
   // manually ordered) — `sortable`/`publishable` are both correctly omitted.
-  deleteRoles: ['admin', 'reviewer'],
+  deleteArea: 'applications',
   label: (s) => `interview slot #${s.id}`,
 });
 
@@ -42,7 +42,7 @@ const InterviewSlotCrudBase = CrudController<InterviewSlot>({
  * re-applied here — the base class's own decorators don't carry over.
  */
 @Controller('admin/interview-slots')
-@Roles('admin', 'reviewer')
+@Area('applications')
 export class AdminInterviewSlotsController extends InterviewSlotCrudBase {
   // Property injection: the CRUD kernel owns the constructor.
   @Inject(MAIL_SERVICE) private readonly mailService!: MailServiceInterface;
@@ -83,7 +83,7 @@ export class AdminInterviewSlotsController extends InterviewSlotCrudBase {
     return saved;
   }
 
-  @Roles('admin', 'reviewer')
+  @Area('applications')
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: RequestContext): Promise<{ deleted: true }> {
     const slot = await this.findOrNotFound(id);

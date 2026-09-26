@@ -10,10 +10,11 @@ import { AcceptInviteDto } from './dto/accept-invite.dto.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { Public } from './decorators/public.decorator.js';
-import { Roles } from './decorators/roles.decorator.js';
+import { Area } from './role-matrix.js';
 import { computeCsrfToken } from './csrf.util.js';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
+import { clearSessionCookieOptions, sessionCookieOptions } from './cookie-options.js';
 import { UsersService } from '../users/users.service.js';
 import { toPublicUser } from '../users/public-user.js';
 import type { RequestContext } from '../common/request-context.js';
@@ -45,7 +46,7 @@ export class AuthController {
   @Post('auth/logout')
   async logout(@Req() req: RequestContext, @Res({ passthrough: true }) res: Response) {
     await this.authService.logout(req.sessionId!);
-    res.clearCookie(this.env.SESSION_COOKIE_NAME, { path: '/' });
+    res.clearCookie(this.env.SESSION_COOKIE_NAME, clearSessionCookieOptions(this.env));
     req.auditContext = { action: 'update', entityType: 'sessions', entityId: req.sessionId, entityLabel: 'Sign out' };
     return { ok: true };
   }
@@ -82,6 +83,8 @@ export class AuthController {
     return { ended: count };
   }
 
+  // C33: a stolen session can't be used to brute-force the current password.
+  @Throttle({ default: { limit: 5, ttl: 15 * 60_000 } })
   @ApiCookieAuth()
   @Patch('auth/password')
   async changePassword(@Body() dto: ChangePasswordDto, @Req() req: RequestContext) {
@@ -90,7 +93,7 @@ export class AuthController {
     return { ok: true };
   }
 
-  @Roles('admin')
+  @Area('users')
   @ApiCookieAuth()
   @Post('auth/invite')
   async invite(@Body() dto: InviteDto, @Req() req: RequestContext) {
@@ -111,9 +114,10 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 3, ttl: 3_600_000 } }) // 3/hour/IP
   @Post('auth/forgot')
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    await this.authService.forgotPassword(dto.email);
-    // Always the same response, whether or not the address exists (FR-A-10).
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    this.authService.forgotPassword(dto.email);
+    // Always the same response, whether or not the address exists (FR-A-10),
+    // and in the same time (C33: the work runs after the response).
     return { ok: true };
   }
 
@@ -127,12 +131,6 @@ export class AuthController {
   }
 
   private setSessionCookie(res: Response, token: string): void {
-    res.cookie(this.env.SESSION_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: this.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: this.env.SESSION_ABSOLUTE_DAYS * 24 * 60 * 60 * 1000,
-    });
+    res.cookie(this.env.SESSION_COOKIE_NAME, token, sessionCookieOptions(this.env, this.env.SESSION_ABSOLUTE_DAYS * 24 * 60 * 60 * 1000));
   }
 }

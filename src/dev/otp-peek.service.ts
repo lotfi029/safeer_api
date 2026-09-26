@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { LRUCache } from 'lru-cache';
 import { ENV } from '../config/env.tokens.js';
-import type { Env } from '../config/env.js';
+import { DEV_ENVS, type Env } from '../config/env.js';
 
 /** The environments where the dev OTP hook exists at all (scripts/lib/node-env.mjs DEV_ENVS). */
-export const DEV_HOOK_ENVS: ReadonlyArray<Env['NODE_ENV']> = ['development', 'test'];
+export const DEV_HOOK_ENVS = DEV_ENVS;
 
 export interface PeekedOtp {
   code: string;

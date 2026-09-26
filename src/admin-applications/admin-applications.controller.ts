@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import type { RequestContext } from '../common/request-context.js';
 import { PrivateFileStore } from '../storage/private-file-store.service.js';
 import { AdminApplicationsService } from './admin-applications.service.js';
@@ -23,7 +23,7 @@ import { BulkActionDto } from './dto/bulk-action.dto.js';
  * discipline `crud.factory.ts` documents for its own `reorder`/`:id` split).
  */
 @Controller('admin/applications')
-@Roles('admin', 'reviewer')
+@Area('applications')
 @ApiCookieAuth()
 export class AdminApplicationsController {
   constructor(
@@ -56,8 +56,9 @@ export class AdminApplicationsController {
   @ApiQuery({ name: 'q', required: false, type: String })
   @ApiQuery({ name: 'reviewerId', required: false, type: String })
   @Get('export.csv')
-  async exportCsv(@Query() query: Record<string, unknown>, @Res() res: Response): Promise<void> {
-    const csv = await this.applications.exportCsv(query);
+  async exportCsv(@Query() query: Record<string, unknown>, @Req() req: RequestContext, @Res() res: Response): Promise<void> {
+    const { csv, truncated } = await this.applications.exportCsv(query, req);
+    res.setHeader('X-Truncated', String(truncated));
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="applications.csv"');
     res.send(csv);
@@ -106,7 +107,7 @@ export class AdminApplicationsController {
    * keeping only the reference, status and dates for the statistics.
    * Audited (without any of the removed data).
    */
-  @Roles('admin')
+  @Area('applications.delete')
   @Delete(':id')
   async anonymise(@Param('id') id: string, @Req() req: RequestContext) {
     return this.applications.anonymise(id, req);

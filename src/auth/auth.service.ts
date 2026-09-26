@@ -168,13 +168,17 @@ export class AuthService {
   // -------------------------------------------------------------------
 
   async listSessions(userId: string, currentSessionId: string): Promise<SessionSummary[]> {
-    const sessions = await this.sessionRepo.find({
-      where: { userId },
-      order: { lastSeenAt: 'DESC' },
-    });
-    return sessions
-      .filter((s) => !s.revokedAt && s.expiresAt > new Date())
-      .map((s) => ({
+    // C33: the same liveness test SessionGuard applies — a session idle
+    // past SESSION_IDLE_HOURS can no longer be used, so it isn't listed.
+    const sessions = await this.sessionRepo
+      .createQueryBuilder('s')
+      .where('s.user_id = :userId', { userId })
+      .andWhere('s.revoked_at IS NULL')
+      .andWhere('s.expires_at > NOW()')
+      .andWhere('s.last_seen_at > (NOW() - INTERVAL :idleHours HOUR)', { idleHours: this.env.SESSION_IDLE_HOURS })
+      .orderBy('s.last_seen_at', 'DESC')
+      .getMany();
+    return sessions.map((s) => ({
         id: s.id,
         userAgent: s.userAgent,
         createdAt: s.createdAt,
@@ -281,7 +285,21 @@ export class AuthService {
   // -------------------------------------------------------------------
 
   /** The response is identical whether or not the email exists (FR-A-10) — never used to enumerate staff. */
-  async forgotPassword(email: string): Promise<void> {
+  /**
+   * C33: returns at once, whether or not the address has an account; the
+   * lookup, token and mail run afterwards. Awaiting them made an existing
+   * address measurably slower to answer than an unknown one (a token write
+   * and a mail send), which told a caller which emails are staff accounts.
+   */
+  forgotPassword(email: string): void {
+    setImmediate(() => {
+      this.sendPasswordReset(email).catch((err) =>
+        this.logger.error('password reset mail failed', err instanceof Error ? err.stack : String(err)),
+      );
+    });
+  }
+
+  private async sendPasswordReset(email: string): Promise<void> {
     const user = await this.userRepo.findOne({ where: { email } });
     // C3: nothing for a disabled account, nor for a pending invitation (that
     // one completes through its own invite link) — same response either way.

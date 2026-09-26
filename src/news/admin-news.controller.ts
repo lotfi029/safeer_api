@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Param, Patch, Post as HttpPost, Req } from '@nestjs/common';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { Post } from '../database/entities/post.entity.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
@@ -11,7 +11,7 @@ import { CreatePostDto, UpdatePostDto, createPostSchema, updatePostSchema } from
 
 const BaseAdminNewsController = CrudController<Post>({
   path: 'admin/news',
-  deleteRoles: ['admin', 'editor'],
+  deleteArea: 'content',
   entity: Post,
   createDto: createPostSchema,
   updateDto: updatePostSchema,
@@ -32,7 +32,7 @@ const BaseAdminNewsController = CrudController<Post>({
 });
 
 @Controller('admin/news')
-@Roles('admin', 'editor')
+@Area('content')
 export class AdminNewsController extends BaseAdminNewsController {
   @HttpPost()
   override async create(@Body() dto: CreatePostDto, @Req() req: RequestContext): Promise<Post> {

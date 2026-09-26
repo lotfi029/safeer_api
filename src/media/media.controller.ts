@@ -8,7 +8,7 @@ import { CacheService } from '../cache/cache.service.js';
 import { declarePurger } from '../cache/cache-tag-registry.js';
 import { readPageLimit } from '../common/query/list-params.js';
 import type { RequestContext } from '../common/request-context.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { decodeUploadName } from '../common/http/filenames.js';
@@ -26,7 +26,7 @@ const MAX_LIMIT = 100;
  * support accounts could list, upload and edit alt text on every asset.
  */
 @Controller('admin/media')
-@Roles('admin', 'editor')
+@Area('content')
 @ApiCookieAuth()
 export class MediaController {
   constructor(

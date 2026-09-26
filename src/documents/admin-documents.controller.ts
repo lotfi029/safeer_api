@@ -1,15 +1,15 @@
 import { Controller } from '@nestjs/common';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { SafeerDocument } from '../database/entities/document.entity.js';
 import { createDocumentSchema, updateDocumentSchema } from './dto/document.dto.js';
 
 /** `?categoryId=` filters for free via the kernel's automatic exact-match query filter. */
 @Controller('admin/documents')
-@Roles('admin', 'editor')
+@Area('content')
 export class AdminDocumentsController extends CrudController<SafeerDocument>({
   path: 'admin/documents',
-  deleteRoles: ['admin', 'editor'],
+  deleteArea: 'content',
   entity: SafeerDocument,
   createDto: createDocumentSchema,
   updateDto: updateDocumentSchema,

@@ -40,7 +40,7 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 
 | Variable | Meaning |
 |---|---|
-| `NODE_ENV` | `development` \| `test` \| `staging` \| `production`. No default — deliberately: it gates both the session cookie's `Secure` flag and whether `ALLOW_DEV_PASSWORD_FIXUP` is even permitted. |
+| `NODE_ENV` | `development` \| `test` \| `staging` \| `production`. No default — deliberately: it gates both the session cookies' `Secure` flag (set in staging and production, C32) and whether `ALLOW_DEV_PASSWORD_FIXUP` is even permitted. |
 | `PORT` | HTTP port the API listens on. |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL/MariaDB connection used by the app. In production, a least-privilege account (`scripts/create-app-db-user.sql`). |
 | `MIGRATION_DB_USER`, `MIGRATION_DB_PASSWORD` | DDL-capable account for `npm run migrate` / `db:reset`. Required when `NODE_ENV` is `staging`/`production`; in `development`/`test` they fall back to `DB_USER`/`DB_PASSWORD`. |
@@ -58,7 +58,7 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `CORS_ORIGINS` | Comma-separated list of allowed origins for the (future) frontend. |
 | `FRONTEND_BASE_URL` | The public frontend's origin. Every link sent by mail or SMS points at a locale-prefixed page there: `/{locale}/admin/accept/{token}`, `/{locale}/admin/reset/{token}`, `/{locale}/admin/messages/{id}`, `/{locale}/portal/login`. Required when `NODE_ENV` is `staging`/`production`; defaults to `http://localhost:4200` otherwise. (Replaces `PUBLIC_BASE_URL`.) |
 | `CACHE_TTL_SECONDS`, `CACHE_MAX_ENTRIES` | The in-process response cache's TTL and entry ceiling. |
-| `ALLOW_DEV_PASSWORD_FIXUP` | Dev/staging only — **refused at boot when `NODE_ENV=production`**. Lets a seeded user still holding the unusable placeholder password hash be given `BOOTSTRAP_ADMIN_PASSWORD` instead, so a fresh dev database doesn't need a real invite/accept round-trip just to sign in as a second account. |
+| `ALLOW_DEV_PASSWORD_FIXUP` | Dev/staging only — **refused at boot when `NODE_ENV=production`**. Lets a seeded user still holding the unusable placeholder password hash be given `BOOTSTRAP_ADMIN_PASSWORD` instead, so a fresh dev database doesn't need a real invite/accept round-trip just to sign in as a second account. Only emails listed in `DEV_SEEDED_USER_EMAILS` (`src/auth/bootstrap.service.ts`) qualify, never an invitee (C33); the dev fixtures currently seed none. |
 | `PROTOTYPE_PATH` | `npm run seed` only — optional override for the prototype HTML. Default `docs/prototype/safeer-prototype.html`; relative paths resolve against the repo root. |
 
 ## Scripts

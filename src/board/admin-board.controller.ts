@@ -1,14 +1,14 @@
 import { Controller } from '@nestjs/common';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { BoardMember } from '../database/entities/board-member.entity.js';
 import { createBoardMemberSchema, updateBoardMemberSchema } from './dto/board-member.dto.js';
 
 @Controller('admin/board')
-@Roles('admin', 'editor')
+@Area('content')
 export class AdminBoardController extends CrudController<BoardMember>({
   path: 'admin/board',
-  deleteRoles: ['admin', 'editor'],
+  deleteArea: 'content',
   entity: BoardMember,
   createDto: createBoardMemberSchema,
   updateDto: updateBoardMemberSchema,

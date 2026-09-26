@@ -247,13 +247,20 @@ export class MediaService {
    * asset, publishes the owning row, and requires the very next anonymous
    * fetch to see a fresh `true`.
    */
+  /** C41: whether post `postId` shows this asset (its cover) — what a post preview token may unlock on /files. */
+  async isUsedByPost(assetId: string, postId: string): Promise<boolean> {
+    const rows: unknown[] = await this.dataSource.query('SELECT 1 FROM posts WHERE id = ? AND cover_asset_id = ? LIMIT 1', [postId, assetId]);
+    return rows.length > 0;
+  }
+
   async isPubliclyReadable(assetId: string): Promise<boolean> {
     const key = `asset-public:${assetId}`;
     const memoised = this.cache.getMemo(key);
     if (memoised !== undefined) return memoised;
 
+    const version = this.cache.versionOf(ASSET_PUBLIC_MEMO_TAGS); // C31
     const isPublic = await this.queryIsPubliclyReadable(assetId);
-    this.cache.setMemo(key, isPublic, ASSET_PUBLIC_MEMO_TAGS);
+    this.cache.setMemo(key, isPublic, ASSET_PUBLIC_MEMO_TAGS, version);
     return isPublic;
   }
 

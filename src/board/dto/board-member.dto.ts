@@ -4,14 +4,14 @@ import { z } from 'zod';
 export const createBoardMemberSchema = z
   .object({
     nameAr: z.string().min(1).max(191),
-    nameEn: z.string().max(191).nullable().optional(),
+    nameEn: z.string().trim().max(191).nullable().optional(),
     roleAr: z.string().min(1).max(120),
-    roleEn: z.string().max(120).nullable().optional(),
+    roleEn: z.string().trim().max(120).nullable().optional(),
     grp: z.enum(['board', 'executive']),
     isLead: z.boolean().optional(),
     /** B12 (safeer-backend-fr-review.md) */
     bioAr: z.string().min(1).max(5000).nullable().optional(),
-    bioEn: z.string().max(5000).nullable().optional(),
+    bioEn: z.string().trim().max(5000).nullable().optional(),
     photoAssetId: z.string().nullable().optional(),
     isPublished: z.boolean().optional(),
     sortOrder: z.number().int().optional(),

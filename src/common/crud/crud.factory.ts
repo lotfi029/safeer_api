@@ -10,8 +10,7 @@ import { escapeLikeValue, readPageLimit, readString } from '../query/list-params
 import { ProblemException } from '../problem-details/problem.exception.js';
 import { ErrorCode } from '../problem-details/error-codes.js';
 import type { RequestContext } from '../request-context.js';
-import { Roles } from '../../auth/decorators/roles.decorator.js';
-import type { UserRole } from '../../database/entities/user.entity.js';
+import { Area } from '../../auth/role-matrix.js';
 
 /**
  * Deliberately `any`: zod's own `ZodType`/`ZodSchema` type defaults its
@@ -120,13 +119,12 @@ export interface CrudFactoryOptions<E extends { id: string }> {
   /** Adds `POST /reorder` (C4: a different HTTP method from `PATCH /:id`, never `PATCH /reorder` — see the comment above `reorderBodySchema`). */
   sortable?: boolean;
   /**
-   * B0-4: roles allowed to `DELETE /:id`. Defaults to admin-only —
-   * 11-architecture.md §3 puts "destructive endpoints" alongside users and
-   * settings, and the association will have multiple editors. Pass
-   * `['admin', 'editor']` for a collection where an editor genuinely owns
-   * deletion.
+   * B0-4/B17: the role-matrix area (src/auth/role-matrix.ts) whose roles
+   * may `DELETE /:id`. Required, so every collection states it: the
+   * collection's own area where its owners genuinely own deletion (e.g.
+   * `'content'`), or an admin-only `*.delete` area.
    */
-  deleteRoles?: UserRole[];
+  deleteArea: Area;
   /** Human label for the audit row. */
   label: (e: E) => string;
   /** Throws a PUBLISH_BLOCKED ProblemException when `e` isn't ready to publish. Runs on create, update and publish (C13). */
@@ -152,6 +150,15 @@ export interface CrudFactoryOptions<E extends { id: string }> {
    */
   redirectFrom?: (e: E) => string | null;
   searchable?: (keyof E & string)[];
+  /**
+   * B10: adds computed fields to one page of `GET /` rows (e.g. a page's
+   * `sectionsCount`) — one extra query for exactly the ids on that page,
+   * run only when there are rows. TypeORM 1.1 has no
+   * `loadRelationCountAndMap`, so a query-builder hook alone can't map a
+   * count onto the entity; this keeps the kernel's own filtering, paging
+   * and OpenAPI docs instead of a hand-written `list()` override.
+   */
+  listEnrich?: (rows: E[], dataSource: DataSource) => Promise<E[]>;
   /**
    * Extra cache tags to purge on every write, beyond the collection's own
    * (P9): a collection that feeds `GET /home` or another composite read —
@@ -300,7 +307,8 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
 
       qb.skip(offset).take(limit);
 
-      const [data, total] = await qb.getManyAndCount();
+      const [rows, total] = await qb.getManyAndCount();
+      const data = opts.listEnrich && rows.length > 0 ? await opts.listEnrich(rows, this.dataSource) : rows;
       return { data, total, page, limit };
     }
 
@@ -535,9 +543,9 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
   // editor could delete any row in every collection built on this kernel.
   // Same trap as C4: a subclass that ever overrides `remove` gets a *new*
   // function object with no metadata on it and must re-apply `@Roles(...)`
-  // itself. No subclass does today.
+  // itself (AdminInterviewSlotsController does).
   const removeDescriptor = Object.getOwnPropertyDescriptor(GeneratedCrudController.prototype, 'remove')!;
-  Roles(...(opts.deleteRoles ?? ['admin']))(GeneratedCrudController.prototype, 'remove', removeDescriptor);
+  Area(opts.deleteArea)(GeneratedCrudController.prototype, 'remove', removeDescriptor);
   Delete(':id')(GeneratedCrudController.prototype, 'remove', removeDescriptor);
 
   if (opts.publishable) {
@@ -575,10 +583,6 @@ export class CrudControllerBase<E extends { id: string }> {
     throw new Error('CrudControllerBase.purge was not overridden');
   }
 
-  // B10 (safeer-backend-fr-review.md): was `Record<string, string>`, which
-  // didn't match `GeneratedCrudController.list()`'s own real parameter type
-  // below — harmless as long as nothing called `super.list()`, but
-  // `AdminPagesController` now does (admin-pages.controller.ts).
   async list(_query: Record<string, unknown>): Promise<PagedResult<E>> {
     throw new Error('CrudControllerBase.list was not overridden');
   }

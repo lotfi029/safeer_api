@@ -361,6 +361,77 @@ function buildHomeSections(seed) {
   return rows.map((r, i) => ({ page_id: pageRef('home'), sort_order: i, image_asset_id: null, ...r }));
 }
 
+/**
+ * B18 (migration 014): the `about` and `scholarships` pages' sections, from
+ * pAbout() (~line 729-778) and pScholar() (~line 851-913) — each block's
+ * secHead(label, heading, lead) and its buttons, verbatim. The cards and
+ * lists inside the blocks are about_items (vision, mission, goal,
+ * care_pillar, scholarship_step, requirement), served by GET about-items.
+ */
+function buildInnerPageSections() {
+  const none = { primary_button_label_ar: null, primary_button_label_en: null, primary_button_url: null, secondary_button_label_ar: null, secondary_button_label_en: null, secondary_button_url: null };
+  const about = [
+    {
+      section_key: 'intro',
+      label_ar: 'عن الجمعية', label_en: 'About the association',
+      heading_ar: 'نشر تعاليم الإسلام السمحة ورعاية طلابه', heading_en: "Sharing Islam's teachings and caring for its students",
+      body_ar: 'جمعية سفير الدعوية جمعية تهدف إلى نشر الإسلام وتعاليمه السمحة بين الناس من خلال العديد من الخدمات والأنشطة. تقدم الجمعية برامج توعوية وتعليمية تستهدف مختلف الفئات العمرية، وتعقد دورات تدريبية لتعزيز فهم الإسلام وتعاليمه.\n\nكما تنظّم الجمعية محاضرات وندوات دينية، وتهتم بتوزيع الكتب والنشرات التثقيفية التي تشرح المبادئ الإسلامية بشكل مبسّط وواضح.',
+      body_en: 'Safeer Association works to share Islam and its teachings through a range of services and activities. It runs awareness and education programmes for all age groups and holds training courses that deepen understanding of Islam.\n\nIt also organises lectures and seminars, and distributes books and educational material explaining Islamic principles clearly and simply.',
+      ...none,
+      primary_button_label_ar: 'التراخيص والسياسات', primary_button_label_en: 'Licences & policies', primary_button_url: '/documents',
+      secondary_button_label_ar: 'مجلس الإدارة', secondary_button_label_en: 'Board of directors', secondary_button_url: '/board',
+    },
+    // The vision + mission cards (about_items kind vision/mission) under the block heading.
+    { section_key: 'vision_mission', label_ar: 'مهمتنا', label_en: 'Our mission', heading_ar: 'الرؤية والرسالة والأهداف', heading_en: 'Vision, mission and goals', body_ar: null, body_en: null, ...none },
+    // The goals card and the numbered list (about_items kind goal).
+    { section_key: 'goals', label_ar: 'الأهداف', label_en: 'Goals', heading_ar: null, heading_en: null, body_ar: 'خمسة أهداف معلنة تحكم كل برامج الجمعية وتُقاس عليها.', body_en: 'Five stated goals that govern and measure every programme.', ...none },
+    {
+      section_key: 'governance',
+      label_ar: 'الحوكمة', label_en: 'Governance',
+      heading_ar: 'الاجتماعات والمحاضر', heading_en: 'Meetings and minutes',
+      body_ar: 'تُنشر محاضر الاجتماعات كملفات PDF قابلة للتحميل، وتُدار من قسم «المستندات» في لوحة التحكم.',
+      body_en: 'Minutes are published as downloadable PDFs, managed from the Documents section of the dashboard.',
+      ...none,
+    },
+  ];
+  const scholarships = [
+    {
+      section_key: 'hero',
+      label_ar: 'منح الوافدين', label_en: 'Scholarships',
+      heading_ar: 'منح الوافدين للدراسة بالجامعات السعودية', heading_en: 'Scholarships for international students in Saudi universities',
+      body_ar: 'تلعب الجمعية دوراً محورياً في رعاية طلاب المنح الدوليين، عبر دعم شامل يسهّل تكيّفهم ويعزّز تجربتهم الأكاديمية والثقافية.',
+      body_en: 'The association plays a central role in caring for international scholarship students, with support that eases adaptation and enriches their academic and cultural experience.',
+      ...none,
+      primary_button_label_ar: 'ابدأ الطلب الآن', primary_button_label_en: 'Start your application', primary_button_url: '/apply',
+      secondary_button_label_ar: 'تتبّع طلبي', secondary_button_label_en: 'Track my application', secondary_button_url: '/portal/login',
+    },
+    { section_key: 'pillars', label_ar: 'أوجه الرعاية', label_en: 'How we help', heading_ar: 'أربعة أوجه للدعم', heading_en: 'Four kinds of support', body_ar: null, body_en: null, ...none },
+    {
+      section_key: 'steps',
+      label_ar: 'الخطوات', label_en: 'Steps',
+      heading_ar: 'من الطلب إلى القبول', heading_en: 'From application to acceptance',
+      body_ar: 'كل خطوة لها حالة ظاهرة للطالب في بوابته، وحالة مقابلة في لوحة تحكم الجمعية.',
+      body_en: 'Each step has a status visible in the student portal and a matching one in the dashboard.',
+      ...none,
+    },
+    { section_key: 'requirements', label_ar: 'المتطلبات', label_en: 'Requirements', heading_ar: 'ما تحتاجه قبل التقديم', heading_en: 'What to prepare', body_ar: null, body_en: null, ...none },
+    {
+      section_key: 'cta',
+      label_ar: 'دعوة للتسجيل', label_en: 'Call to action',
+      heading_ar: 'جاهز للتقديم؟', heading_en: 'Ready to apply?',
+      body_ar: 'النموذج يحفظ تقدّمك تلقائياً، ويمكنك العودة لإكماله لاحقاً من بوابة الطالب.',
+      body_en: 'The form saves your progress automatically — come back and finish it from the student portal.',
+      ...none,
+      primary_button_label_ar: 'تسجيل طلب منحة', primary_button_label_en: 'Apply for a scholarship', primary_button_url: '/apply',
+      secondary_button_label_ar: 'لديك سؤال؟ تواصل معنا', secondary_button_label_en: 'Questions? Contact us', secondary_button_url: '/contact',
+    },
+  ];
+  return [
+    ...about.map((r, i) => ({ page_id: pageRef('about'), sort_order: i, image_asset_id: null, is_published: 1, ...r })),
+    ...scholarships.map((r, i) => ({ page_id: pageRef('scholarships'), sort_order: i, image_asset_id: null, is_published: 1, ...r })),
+  ];
+}
+
 function buildAboutItems(seed) {
   const rows = [];
   rows.push({ kind: 'vision', icon: 'eye', title_ar: VISION.titleAr, title_en: VISION.titleEn, body_ar: VISION.bodyAr, body_en: VISION.bodyEn, sort_order: 0 });
@@ -1067,6 +1138,8 @@ async function main() {
   sql002 += insertStatement('pages', ['slug', 'title_ar', 'title_en', 'meta_title_ar', 'meta_title_en', 'meta_description_ar', 'meta_description_en', 'is_published', 'needs_review'], buildPages(seed)) + '\n';
   sql002 += comment('page_sections: the home page\'s 9 sections, in prototype order (partners hidden)') + '\n';
   sql002 += insertStatement('page_sections', ['page_id', 'section_key', 'label_ar', 'label_en', 'heading_ar', 'heading_en', 'body_ar', 'body_en', 'primary_button_label_ar', 'primary_button_label_en', 'primary_button_url', 'secondary_button_label_ar', 'secondary_button_label_en', 'secondary_button_url', 'image_asset_id', 'is_published', 'sort_order'], buildHomeSections(seed)) + '\n';
+  sql002 += comment('page_sections: the about and scholarships pages (B18, migration 014)') + '\n';
+  sql002 += insertStatement('page_sections', ['page_id', 'section_key', 'label_ar', 'label_en', 'heading_ar', 'heading_en', 'body_ar', 'body_en', 'primary_button_label_ar', 'primary_button_label_en', 'primary_button_url', 'secondary_button_label_ar', 'secondary_button_label_en', 'secondary_button_url', 'image_asset_id', 'is_published', 'sort_order'], buildInnerPageSections()) + '\n';
   sql002 += comment('about_items: vision + mission, 5 goals, 4 care pillars, 5 scholarship steps, 4 requirements') + '\n';
   sql002 += insertStatement('about_items', ['kind', 'icon', 'title_ar', 'title_en', 'body_ar', 'body_en', 'is_published', 'sort_order'], buildAboutItems(seed)) + '\n';
   sql002 += insertStatement('stats', ['value', 'label_ar', 'label_en', 'sub_ar', 'sub_en', 'is_published', 'sort_order'], buildStats()) + '\n';

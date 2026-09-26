@@ -6,7 +6,7 @@
 //   C12 a time-boxed lock with backoff that doesn't end sessions; admin unlock clears it
 
 import { createHash, randomBytes } from 'node:crypto';
-import { adminApi, api, createTempUser, deleteTempUser, withDb } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, settleForgot, withDb } from './helpers';
 
 const PASSWORD = 'Jest-Test-P4ssword!';
 
@@ -62,6 +62,7 @@ describe('staff auth', () => {
         expect((await api('POST', `/admin/auth/reset/${token}`, { body: { password: 'Another-P4ssword!' } })).status).toBe(400);
         await withDb((conn) => conn.execute('DELETE FROM auth_tokens WHERE user_id = ?', [user.id]));
         await api('POST', '/admin/auth/forgot', { body: { email: user.email } });
+        await settleForgot();
         expect(await liveTokens(user.id)).toBe(0);
         expect((await userRow(user.id)).status).toBe('disabled');
         expect((await login(user.email, PASSWORD)).status).toBe(401);
@@ -99,6 +100,7 @@ describe('staff auth', () => {
       try {
         await withDb((conn) => conn.execute("DELETE FROM auth_tokens WHERE user_id = ? AND purpose = 'invite'", [invited.body.id]));
         await api('POST', '/admin/auth/forgot', { body: { email } });
+        await settleForgot();
         expect(await liveTokens(invited.body.id)).toBe(0);
 
         const token = await insertToken(invited.body.id, 'invite');

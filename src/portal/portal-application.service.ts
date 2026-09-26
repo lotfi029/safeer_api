@@ -65,7 +65,19 @@ export interface PortalMeResult {
   decidedAt: Date | null;
   timeline: ReturnType<typeof deriveTimeline>;
   actionNeeded: ActionNeeded | null;
-  recentEvents: { id: string; type: string; data: Record<string, unknown> | null; createdAt: Date }[];
+  recentEvents: PortalEvent[];
+}
+
+/** What an applicant sees of an application event (recentEvents, GET portal/notifications). */
+export interface PortalEvent {
+  id: string;
+  type: string;
+  data: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
+export function toPortalEvent(e: ApplicationEvent): PortalEvent {
+  return { id: e.id, type: e.type, data: e.data, createdAt: e.createdAt };
 }
 
 @Injectable()
@@ -291,7 +303,7 @@ export class PortalApplicationService {
       decidedAt: application.decidedAt,
       timeline,
       actionNeeded,
-      recentEvents: recentEvents.map((e) => ({ id: e.id, type: e.type, data: e.data, createdAt: e.createdAt })),
+      recentEvents: recentEvents.map(toPortalEvent),
     };
   }
 
@@ -303,14 +315,15 @@ export class PortalApplicationService {
     applicationId: string,
     page: number,
     limit: number,
-  ): Promise<{ data: ApplicationEvent[]; total: number; page: number; limit: number }> {
-    const [data, total] = await this.eventRepo.findAndCount({
+  ): Promise<{ data: PortalEvent[]; total: number; page: number; limit: number }> {
+    const [rows, total] = await this.eventRepo.findAndCount({
       where: { applicationId, visibleToApplicant: true },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
-    return { data, total, page, limit };
+    // C35: the same shape as /portal/me's recentEvents — never actorId or visibleToApplicant.
+    return { data: rows.map(toPortalEvent), total, page, limit };
   }
 
   countNotifications(applicationId: string): Promise<number> {

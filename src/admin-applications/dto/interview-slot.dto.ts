@@ -15,7 +15,7 @@ const interviewSlotShape = {
   startsAt: z.iso.datetime({ offset: true }),
   endsAt: z.iso.datetime({ offset: true }),
   locationAr: z.string().max(255).nullable().optional(),
-  locationEn: z.string().max(255).nullable().optional(),
+  locationEn: z.string().trim().max(255).nullable().optional(),
 };
 
 /** C17: a slot ends after it starts (the update path re-checks against the stored values too). */

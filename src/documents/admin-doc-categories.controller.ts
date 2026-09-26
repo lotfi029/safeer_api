@@ -1,14 +1,14 @@
 import { Controller } from '@nestjs/common';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { DocCategory } from '../database/entities/doc-category.entity.js';
 import { createDocCategorySchema, updateDocCategorySchema } from './dto/doc-category.dto.js';
 
 @Controller('admin/doc-categories')
-@Roles('admin', 'editor')
+@Area('content')
 export class AdminDocCategoriesController extends CrudController<DocCategory>({
   path: 'admin/doc-categories',
-  deleteRoles: ['admin', 'editor'],
+  deleteArea: 'content',
   entity: DocCategory,
   createDto: createDocCategorySchema,
   updateDto: updateDocCategorySchema,

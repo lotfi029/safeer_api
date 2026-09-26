@@ -1,5 +1,4 @@
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import { constants as fsConstants, promises as fs } from 'node:fs';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
@@ -22,13 +21,16 @@ export class HealthService {
     }
   }
 
-  /** Storage is "up" when STORAGE_ROOT exists (or can be created) and is writable. */
+  /**
+   * Storage is "up" when STORAGE_ROOT exists (or can be created) and is
+   * writable. C30: an access check, not a write-then-unlink of one fixed
+   * probe file — two overlapping probes raced on that file (one's unlink
+   * removed the other's, which then failed with ENOENT and reported 503).
+   */
   async checkStorage(): Promise<boolean> {
     try {
       await fs.mkdir(this.env.STORAGE_ROOT, { recursive: true });
-      const probe = path.join(this.env.STORAGE_ROOT, '.health-check');
-      await fs.writeFile(probe, '');
-      await fs.unlink(probe);
+      await fs.access(this.env.STORAGE_ROOT, fsConstants.W_OK);
       return true;
     } catch {
       return false;

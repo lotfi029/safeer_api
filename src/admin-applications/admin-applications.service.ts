@@ -169,15 +169,30 @@ export class AdminApplicationsService {
     return result;
   }
 
-  async exportCsv(query: Record<string, unknown>): Promise<string> {
+  /**
+   * C36: capped at EXPORT_MAX_ROWS, but never silently — `truncated` says
+   * whether more rows matched (the controller sends it as `X-Truncated`),
+   * and the export is audited with its filters and row count.
+   */
+  async exportCsv(query: Record<string, unknown>, req: RequestContext): Promise<{ csv: string; rows: number; truncated: boolean }> {
     const qb = this.buildFilteredQuery(query);
     qb.leftJoinAndSelect('a.assignedReviewer', 'reviewer')
       .orderBy('a.createdAt', 'DESC')
       .addOrderBy('a.id', 'DESC')
-      .take(EXPORT_MAX_ROWS);
-    const rows = await qb.getMany();
+      .take(EXPORT_MAX_ROWS + 1);
+    const fetched = await qb.getMany();
+    const truncated = fetched.length > EXPORT_MAX_ROWS;
+    const rows = truncated ? fetched.slice(0, EXPORT_MAX_ROWS) : fetched;
 
-    return toCsvWithBom(rows, [
+    const filters = Object.fromEntries(['status', 'q', 'reviewerId'].map((k) => [k, readString(query, k) ?? null]));
+    req.auditContext = {
+      action: 'export',
+      entityType: 'applications',
+      entityLabel: `applications CSV export (${rows.length} row(s)${truncated ? ', truncated' : ''})`,
+      after: { filters, rows: rows.length, truncated },
+    };
+
+    const csv = toCsvWithBom(rows, [
       { header: 'Reference', value: (a) => a.reference },
       { header: 'Name', value: (a) => fullName(a) },
       { header: 'Nationality', value: (a) => a.nationality },
@@ -189,6 +204,7 @@ export class AdminApplicationsService {
       { header: 'Submitted', value: (a) => (a.submittedAt ? a.submittedAt.toISOString() : '') },
       { header: 'Assigned reviewer', value: (a) => a.assignedReviewer?.name ?? '' },
     ]);
+    return { csv, rows: rows.length, truncated };
   }
 
   private buildFilteredQuery(query: Record<string, unknown>) {

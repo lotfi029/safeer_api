@@ -5,6 +5,7 @@ import type { Response } from 'express';
 import { ApplicantSession } from '../database/entities/applicant-session.entity.js';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
+import { clearSessionCookieOptions, sessionCookieOptions } from './cookie-options.js';
 import { generateSessionToken, hashToken } from './session-token.util.js';
 import { computeCsrfToken } from './csrf.util.js';
 import type { RequestContext } from '../common/request-context.js';
@@ -66,16 +67,10 @@ export class ApplicantSessionService {
   }
 
   setCookie(res: Response, token: string): void {
-    res.cookie(this.env.APPLICANT_SESSION_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: this.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: this.env.APPLICANT_SESSION_ABSOLUTE_DAYS * 24 * 60 * 60 * 1000,
-    });
+    res.cookie(this.env.APPLICANT_SESSION_COOKIE_NAME, token, sessionCookieOptions(this.env, this.env.APPLICANT_SESSION_ABSOLUTE_DAYS * 24 * 60 * 60 * 1000));
   }
 
   clearCookie(res: Response): void {
-    res.clearCookie(this.env.APPLICANT_SESSION_COOKIE_NAME, { path: '/' });
+    res.clearCookie(this.env.APPLICANT_SESSION_COOKIE_NAME, clearSessionCookieOptions(this.env));
   }
 }

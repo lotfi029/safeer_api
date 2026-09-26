@@ -120,3 +120,36 @@ application's locale.
   - Public originals and PDFs are cached for 5 minutes (variants stay
     immutable).
   - A document is public only while its category is published.
+
+## Phase 5 additions
+
+- **Roles (B17).** New `GET admin/roles` (any staff) returns `{roles, matrix}`,
+  where `matrix` maps an area to the roles allowed in it (see
+  `docs/backend/ARCHITECTURE.md`). Build the dashboard navigation from it.
+- **Pages list (B10).** Each row in `GET admin/pages` carries `sectionsCount`.
+- **About items (B18).** New public `GET about-items?kind=vision,mission,goal,care_pillar,scholarship_step,requirement`
+  (all kinds if `kind` is omitted). It returns `{ [kind]: [{id, icon, title, body, sortOrder}] }`,
+  with only published items, sorted, and `body` as sanitized HTML. An unknown
+  kind returns 400.
+  `GET pages/about` now has sections `intro`, `vision_mission`, `goals` and
+  `governance`; `GET pages/scholarships` has `hero`, `pillars`, `steps`,
+  `requirements` and `cta` (migration 014, prototype copy).
+- **Portal notifications (C35).** `GET portal/notifications` items are
+  `{id, type, data, createdAt}`, the same shape as `/portal/me`'s `recentEvents`.
+- **CSV export (C36).** The response has `X-Truncated: true|false` (exposed
+  through CORS). The export is capped at 5000 rows.
+- **News detail (C39, C41).**
+  - `readMinutes` now matches the body shown in the requested language.
+  - A whitespace-only English field falls back to Arabic.
+  - With a valid `?preview=` token, the response has `previewFileQuery`.
+    Append it to that post's `/files/…` URLs so an unpublished cover loads
+    without a session.
+- **Markdown (C40).** `#` renders as `<h2>`, and GFM tables render as `<table>`
+  (with `align` on cells). Style both.
+- **Filters (C42).** `GET news?category=<unknown slug>` and
+  `GET partners?category=<unknown>` return 400 instead of an empty list.
+- **Forgot password (C33).** The response no longer waits for the mail, so
+  it takes the same time whether or not the address exists. Changing a
+  password is limited to 5 attempts per 15 minutes.
+- **English text (C39).** Admin DTOs trim every `*En` field.
+

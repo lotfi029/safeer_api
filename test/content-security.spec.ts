@@ -49,7 +49,7 @@ async function uploadMedia(buffer: Buffer, filename: string, type: string) {
 }
 
 describe('content security', () => {
-  it('B4/B5 sweep: every admin/* route is role-gated or explicitly allow-listed', () => {
+  it('B4/B5/B17 sweep: every admin/* route is gated by its role-matrix area or explicitly allow-listed', () => {
     const result = runScript('scripts/check-admin-roles.mjs', {
       ...process.env,
       DOTENV_CONFIG_PATH: '/dev/null',
@@ -61,7 +61,7 @@ describe('content security', () => {
       DB_PASSWORD: process.env.TEST_DB_PASSWORD ?? '',
       STORAGE_ROOT: STORAGE_ROOT,
     });
-    expect(result.output).toContain('Every admin/* route is role-gated or explicitly allow-listed.');
+    expect(result.output).toContain('Every admin/* route is gated by its role-matrix area or explicitly allow-listed.');
     expect(result.status).toBe(0);
   });
 

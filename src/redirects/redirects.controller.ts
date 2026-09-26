@@ -5,15 +5,15 @@ import { CreateRedirectDto, UpdateRedirectDto, createRedirectSchema, updateRedir
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import type { RequestContext } from '../common/request-context.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 
 /**
  * No `is_published` / `sort_order` columns (12-database.md) — plain CRUD
  * only, no publish/reorder routes.
  *
  * B4 (safeer-backend-fr-review.md): CrudController only ever applies
- * `@Roles` to its own generated `DELETE` (`deleteRoles`, admin-only by
- * default) — read/create/update are open to any signed-in staff member
+ * roles to its own generated `DELETE` (`deleteArea`, here the admin-only
+ * `redirects.delete`) — read/create/update are open to any signed-in staff member
  * unless the subclass adds a class-level `@Roles` of its own, the same way
  * every other content controller (admin-news.controller.ts,
  * admin-partners.controller.ts, …) already does. Redirects were the one
@@ -22,6 +22,7 @@ import { Roles } from '../auth/decorators/roles.decorator.js';
  */
 const BaseRedirectsController = CrudController<Redirect>({
   path: 'admin/redirects',
+  deleteArea: 'redirects.delete',
   entity: Redirect,
   createDto: createRedirectSchema,
   updateDto: updateRedirectSchema,
@@ -34,7 +35,7 @@ const BaseRedirectsController = CrudController<Redirect>({
 });
 
 @Controller('admin/redirects')
-@Roles('admin', 'editor')
+@Area('content')
 export class RedirectsController extends BaseRedirectsController {
   @HttpPost()
   override async create(@Body() dto: CreateRedirectDto, @Req() req: RequestContext): Promise<Redirect> {

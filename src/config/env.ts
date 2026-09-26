@@ -178,3 +178,10 @@ export function corsOrigins(env: Env): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+/** The local environments (scripts/lib/node-env.mjs DEV_ENVS): dev-only hooks, plain-HTTP cookies. */
+export const DEV_ENVS: ReadonlyArray<Env['NODE_ENV']> = ['development', 'test'];
+
+export function isDevEnv(env: Pick<Env, 'NODE_ENV'>): boolean {
+  return DEV_ENVS.includes(env.NODE_ENV);
+}

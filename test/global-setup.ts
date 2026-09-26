@@ -71,7 +71,9 @@ module.exports = async function globalSetup() {
   // The same APP_ENCRYPTION_KEY the app gets below: migration 012 encrypts
   // id numbers with it (C28), and the app must be able to decrypt them.
   const appEncryptionKey = process.env.APP_ENCRYPTION_KEY ?? 'ukhiU9W4qpmJr9pwnzL01FaECwZTTOF3Y2vPKga7xrk=';
-  const migrateEnv = { ...rootDbEnv, NODE_ENV: 'test', DB_NAME: TEST_DB_NAME, APP_ENCRYPTION_KEY: appEncryptionKey };
+  const storageRoot = process.env.TEST_STORAGE_ROOT ?? './var/assets-test';
+  // STORAGE_ROOT too: migrate writes placeholder files for the dev fixtures' stored keys there (C45).
+  const migrateEnv = { ...rootDbEnv, NODE_ENV: 'test', DB_NAME: TEST_DB_NAME, APP_ENCRYPTION_KEY: appEncryptionKey, STORAGE_ROOT: storageRoot };
   runNode('scripts/migrate.mjs', migrateEnv);
 
   // 3. Boot the real (compiled) app against that database, on its own port.
@@ -83,7 +85,7 @@ module.exports = async function globalSetup() {
     ...migrateEnv,
     TZ: process.env.TEST_APP_TZ ?? 'Asia/Riyadh',
     PORT: TEST_PORT,
-    STORAGE_ROOT: process.env.TEST_STORAGE_ROOT ?? './var/assets-test',
+    STORAGE_ROOT: storageRoot,
     BOOTSTRAP_ADMIN_EMAIL: process.env.BOOTSTRAP_ADMIN_EMAIL ?? 'admin@safeer-sa.org',
     BOOTSTRAP_ADMIN_PASSWORD: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? 'test-only-password',
     APP_ENCRYPTION_KEY: appEncryptionKey,

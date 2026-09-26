@@ -2,7 +2,6 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../database/entities/user.entity.js';
-import type { AuthTokenPurpose } from '../database/entities/auth-token.entity.js';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
 import { PasswordService } from './password.service.js';
@@ -18,24 +17,23 @@ import { UNUSABLE_PASSWORD_HASH } from '../users/users.service.js';
  *
  * 2. Only when ALLOW_DEV_PASSWORD_FIXUP=true (never true in production —
  *    B0-1's schema refuses that combination at boot): give a *seeded* user
- *    still holding the placeholder hash (003_dev_sample.sql's two editors)
- *    a real, usable password — BOOTSTRAP_ADMIN_PASSWORD, same as the
- *    bootstrap admin. A migration cannot carry a hash derived from .env (it
- *    would go stale the moment the password changed, and it would put a
- *    secret-derived value in a committed file), so 003 seeds an unusable
- *    hash and this is what turns it into something you can actually sign
- *    in with.
+ *    still holding the placeholder hash a real, usable password —
+ *    BOOTSTRAP_ADMIN_PASSWORD, same as the bootstrap admin. A migration
+ *    cannot carry a hash derived from .env, so a dev fixture would seed an
+ *    unusable hash and this turns it into something you can sign in with.
  *
- *    B0-6: the candidate set is *not* "every row holding the placeholder
- *    hash" — createInvitedUser() (users.service.ts) sets that exact same
- *    hash on every pending invite, including a pending admin invite. Left
- *    unfiltered, every restart of a dev instance would silently hand
- *    BOOTSTRAP_ADMIN_PASSWORD to anyone with an outstanding invitation,
- *    unlocked, before they ever open the link. A pending invitee always has
- *    an `auth_tokens` row with purpose='invite' (AuthService.invite); the
- *    two seeded accounts never do. Excluding anyone with such a row limits
- *    this to accounts that were actually seeded, not invited.
+ *    C33: the candidates are an explicit allow-list of seeded emails
+ *    (DEV_SEEDED_USER_EMAILS), not "placeholder hash and no invite token".
+ *    createInvitedUser() gives every pending invite that same placeholder
+ *    hash, and an invite whose token was consumed, purged or expired has no
+ *    token row left, so the old filter could hand BOOTSTRAP_ADMIN_PASSWORD
+ *    to a real invitee on a staging-like instance. The dev fixtures
+ *    (migrations/dev/003) currently seed no staff users, so the list is
+ *    empty and the fixup does nothing; add an email here together with a
+ *    fixture that seeds it.
  */
+export const DEV_SEEDED_USER_EMAILS: readonly string[] = [];
+
 @Injectable()
 export class BootstrapService implements OnApplicationBootstrap {
   private readonly logger = new Logger(BootstrapService.name);
@@ -71,13 +69,11 @@ export class BootstrapService implements OnApplicationBootstrap {
       return;
     }
 
+    if (DEV_SEEDED_USER_EMAILS.length === 0) return;
     const candidates = await this.userRepo
       .createQueryBuilder('u')
-      .where('u.password_hash = :placeholder', { placeholder: UNUSABLE_PASSWORD_HASH })
-      .andWhere(
-        `NOT EXISTS (SELECT 1 FROM auth_tokens t WHERE t.user_id = u.id AND t.purpose = :purpose)`,
-        { purpose: 'invite' satisfies AuthTokenPurpose },
-      )
+      .where('u.email IN (:...emails)', { emails: [...DEV_SEEDED_USER_EMAILS] })
+      .andWhere('u.password_hash = :placeholder', { placeholder: UNUSABLE_PASSWORD_HASH })
       .getMany();
     if (candidates.length === 0) return;
 

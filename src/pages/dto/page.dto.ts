@@ -7,11 +7,11 @@ export const createPageSchema = z
   .object({
     slug: slugSchema(), // C14
     titleAr: z.string().min(1).max(191),
-    titleEn: z.string().max(191).nullable().optional(),
+    titleEn: z.string().trim().max(191).nullable().optional(),
     metaTitleAr: z.string().max(191).nullable().optional(),
-    metaTitleEn: z.string().max(191).nullable().optional(),
+    metaTitleEn: z.string().trim().max(191).nullable().optional(),
     metaDescriptionAr: z.string().max(500).nullable().optional(),
-    metaDescriptionEn: z.string().max(500).nullable().optional(),
+    metaDescriptionEn: z.string().trim().max(500).nullable().optional(),
     isPublished: z.boolean().optional(),
     needsReview: z.boolean().optional(),
   })
@@ -33,16 +33,16 @@ export const createPageSectionSchema = z
     pageId: z.string().min(1),
     sectionKey: z.string().min(1).max(64),
     labelAr: z.string().max(191).nullable().optional(),
-    labelEn: z.string().max(191).nullable().optional(),
+    labelEn: z.string().trim().max(191).nullable().optional(),
     headingAr: z.string().max(255).nullable().optional(),
-    headingEn: z.string().max(255).nullable().optional(),
+    headingEn: z.string().trim().max(255).nullable().optional(),
     bodyAr: z.string().nullable().optional(),
-    bodyEn: z.string().nullable().optional(),
+    bodyEn: z.string().trim().nullable().optional(),
     primaryButtonLabelAr: z.string().max(120).nullable().optional(),
-    primaryButtonLabelEn: z.string().max(120).nullable().optional(),
+    primaryButtonLabelEn: z.string().trim().max(120).nullable().optional(),
     primaryButtonUrl: safeUrl({ relative: true }).nullable().optional(), // C10
     secondaryButtonLabelAr: z.string().max(120).nullable().optional(),
-    secondaryButtonLabelEn: z.string().max(120).nullable().optional(),
+    secondaryButtonLabelEn: z.string().trim().max(120).nullable().optional(),
     secondaryButtonUrl: safeUrl({ relative: true }).nullable().optional(), // C10
     imageAssetId: z.string().nullable().optional(),
     isPublished: z.boolean().optional(),

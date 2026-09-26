@@ -109,6 +109,8 @@ export class CacheInterceptor implements NestInterceptor {
     }
 
     const tags = this.reflector.get<string[]>(CACHE_TAGS_KEY, context.getHandler()) ?? [];
+    // C31: taken before the handler reads anything — see CacheService.versionOf().
+    const version = this.cache.versionOf(tags);
     return next.handle().pipe(
       tap((data) => {
         if (req.previewVerified) {
@@ -126,7 +128,7 @@ export class CacheInterceptor implements NestInterceptor {
         // *read* can never serve one searcher's results back to another —
         // this only stops the *write*.
         if (req.skipCacheWrite) return;
-        this.cache.set(key, data, tags);
+        this.cache.set(key, data, tags, version);
       }),
     );
   }

@@ -10,6 +10,9 @@
 // fake content, sample applications) and is included only when NODE_ENV is
 // development or test. staging and production never get them. NODE_ENV
 // must be one of the values src/config/env.ts accepts (scripts/lib/node-env.mjs).
+// C45: in development/test with STORAGE_DRIVER=local, it then writes a
+// placeholder file for every stored key those fixtures reference that is
+// missing under STORAGE_ROOT (scripts/lib/dev-assets.mjs).
 //
 // C29:
 // - Every applied file's sha256 is stored in schema_migrations.checksum
@@ -41,6 +44,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import 'dotenv/config';
 import { DEV_ENVS, requireNodeEnv } from './lib/node-env.mjs';
 import { openMigrationConnection } from './lib/db-connection.mjs';
+import { ensureDevAssetFiles } from './lib/dev-assets.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = process.env.MIGRATIONS_DIR
@@ -270,6 +274,10 @@ async function main() {
       await verifyChecksums(connection, files, applied);
       const count = await applyPending(connection, files, applied);
       console.log(count ? `All migrations applied (${count} new).` : 'Nothing to migrate — already up to date.');
+      // C45: development/test only, and only for files on local disk.
+      if (DEV_ENVS.includes(nodeEnv) && (process.env.STORAGE_DRIVER ?? 'local') === 'local') {
+        await ensureDevAssetFiles(connection, { storageRoot: process.env.STORAGE_ROOT || './var/assets', log: (m) => console.log(m) });
+      }
     } finally {
       await connection.query('SELECT RELEASE_LOCK(?)', [LOCK_NAME]).catch(() => {});
     }

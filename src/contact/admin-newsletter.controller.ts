@@ -3,7 +3,7 @@ import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { Response } from 'express';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { readPageLimit, readString } from '../common/query/list-params.js';
 import { toCsvWithBom } from '../common/csv.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
@@ -23,7 +23,7 @@ const MAX_LIMIT = 100;
  * can't express.
  */
 @Controller('admin/newsletter')
-@Roles('admin', 'support')
+@Area('inbox')
 @ApiCookieAuth()
 export class AdminNewsletterController {
   constructor(@InjectRepository(NewsletterSubscriber) private readonly repo: Repository<NewsletterSubscriber>) {}
