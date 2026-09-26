@@ -38,6 +38,7 @@ import { MessagesModule } from './messages/messages.module.js';
 import { ApplicationsModule } from './applications/applications.module.js';
 import { PortalModule } from './portal/portal.module.js';
 import { AdminApplicationsModule } from './admin-applications/admin-applications.module.js';
+import { SitemapModule } from './sitemap/sitemap.module.js';
 
 // Phase 2 (done): the full schema (001_schema.sql) and entities for every
 // table the project plan's "Data model" section lists, plus the infra
@@ -105,6 +106,7 @@ import { AdminApplicationsModule } from './admin-applications/admin-applications
     ApplicationsModule,
     PortalModule,
     AdminApplicationsModule,
+    SitemapModule,
   ],
   providers: [
     // Guards run before interceptors regardless of relative registration

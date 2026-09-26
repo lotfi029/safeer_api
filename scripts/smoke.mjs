@@ -972,6 +972,59 @@ test('B9: the seeded placeholder testimonial is pending/unfeatured; home section
   );
 });
 
+test('B10-B15: pages sectionsCount, work-area-item publish toggle, board bio, sitemap-index, escaped news search', async () => {
+  // B10: GET admin/pages returns sectionsCount (and updatedAt, already there).
+  const pagesRes = await api('GET', '/admin/pages?limit=50');
+  assert(pagesRes.status === 200, `admin/pages failed: ${pagesRes.status}`);
+  const homePage = pagesRes.body.data.find((p) => p.slug === 'home');
+  assert(homePage, 'could not find the "home" page via admin/pages');
+  assert(typeof homePage.sectionsCount === 'number' && homePage.sectionsCount > 0, `expected home.sectionsCount > 0, got ${homePage.sectionsCount}`);
+  assert(homePage.updatedAt, 'expected admin/pages rows to carry updatedAt');
+
+  // B11: unpublishing a work-area item removes it from the public /work-areas list; publish restores it.
+  const itemsRes = await api('GET', '/admin/work-area-items?limit=1');
+  const item = itemsRes.body.data[0];
+  assert(item, 'expected at least one seeded work-area item');
+  try {
+    const unpublish = await api('PATCH', `/admin/work-area-items/${item.id}/publish`, { body: { isPublished: false } });
+    assert(unpublish.status === 200, `unpublish failed: ${unpublish.status}: ${JSON.stringify(unpublish.body)}`);
+    const publicAfterUnpublish = await fetch(`${BASE}/work-areas`).then((r) => r.json());
+    const idsAfterUnpublish = publicAfterUnpublish.flatMap((a) => a.items.map((i) => i.id));
+    assert(!idsAfterUnpublish.includes(item.id), 'an unpublished work-area item (B11) should not appear on the public /work-areas list');
+  } finally {
+    const republish = await api('PATCH', `/admin/work-area-items/${item.id}/publish`, { body: { isPublished: true } });
+    assert(republish.status === 200, `republish failed: ${republish.status}`);
+  }
+
+  // B12: board_members.bioAr/bioEn round-trip through the admin API and collapse to `bio` publicly.
+  const boardRes = await api('GET', '/admin/board?limit=1');
+  const member = boardRes.body.data[0];
+  assert(member, 'expected at least one seeded board member');
+  const bioText = 'سيرة تجريبية للاختبار الآلي';
+  try {
+    const setBio = await api('PATCH', `/admin/board/${member.id}`, { body: { bioAr: bioText } });
+    assert(setBio.status === 200, `setting bioAr failed: ${setBio.status}: ${JSON.stringify(setBio.body)}`);
+    const publicBoard = await fetch(`${BASE}/board`).then((r) => r.json());
+    const publicMember = [...publicBoard.board, ...publicBoard.executive].find((m) => m.id === member.id);
+    assert(publicMember?.bio === bioText, `expected the public board endpoint to expose the new bio, got ${JSON.stringify(publicMember?.bio)}`);
+  } finally {
+    await api('PATCH', `/admin/board/${member.id}`, { body: { bioAr: member.bioAr ?? null } });
+  }
+
+  // B13: a '%'/'_' in a news search term is treated literally, not as a SQL wildcard (no 500, no over-broad match).
+  const wildcardSearch = await fetch(`${BASE}/news?q=${encodeURIComponent('%')}`).then((r) => r.json());
+  assert(Array.isArray(wildcardSearch.data) && wildcardSearch.data.length === 0, `searching news for a literal '%' should match nothing, got ${wildcardSearch.data?.length}`);
+
+  // B15: the sitemap index lists only published pages/posts, each with a slug and updatedAt.
+  const sitemap = await fetch(`${BASE}/sitemap-index`).then((r) => r.json());
+  assert(Array.isArray(sitemap.pages) && sitemap.pages.length > 0, 'expected at least one page in the sitemap index');
+  assert(Array.isArray(sitemap.posts), 'expected sitemap.posts to be an array');
+  assert(Array.isArray(sitemap.categories) && sitemap.categories.length > 0, 'expected at least one category in the sitemap index');
+  for (const entry of sitemap.pages) {
+    assert(typeof entry.slug === 'string' && entry.updatedAt, `malformed sitemap page entry: ${JSON.stringify(entry)}`);
+  }
+});
+
 test('content: hiding/reordering a home page_section is reflected on GET home with no delay', async () => {
   const pagesRes = await api('GET', '/admin/pages?q=home&limit=50');
   const homePage = pagesRes.body.data.find((p) => p.slug === 'home');

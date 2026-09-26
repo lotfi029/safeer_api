@@ -9,6 +9,9 @@ export const createBoardMemberSchema = z
     roleEn: z.string().max(120).nullable().optional(),
     grp: z.enum(['board', 'executive']),
     isLead: z.boolean().optional(),
+    /** B12 (safeer-backend-fr-review.md) */
+    bioAr: z.string().min(1).max(5000).nullable().optional(),
+    bioEn: z.string().max(5000).nullable().optional(),
     photoAssetId: z.string().nullable().optional(),
     isPublished: z.boolean().optional(),
     sortOrder: z.number().int().optional(),

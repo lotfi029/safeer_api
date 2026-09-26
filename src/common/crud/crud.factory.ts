@@ -519,7 +519,11 @@ export class CrudControllerBase<E extends { id: string }> {
     throw new Error('CrudControllerBase.purge was not overridden');
   }
 
-  async list(_query: Record<string, string>): Promise<PagedResult<E>> {
+  // B10 (safeer-backend-fr-review.md): was `Record<string, string>`, which
+  // didn't match `GeneratedCrudController.list()`'s own real parameter type
+  // below — harmless as long as nothing called `super.list()`, but
+  // `AdminPagesController` now does (admin-pages.controller.ts).
+  async list(_query: Record<string, unknown>): Promise<PagedResult<E>> {
     throw new Error('CrudControllerBase.list was not overridden');
   }
 

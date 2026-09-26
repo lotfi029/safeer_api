@@ -28,7 +28,7 @@ export class WorkAreasController {
     if (areas.length === 0) return [];
 
     const items = await this.itemRepo.find({
-      where: areas.map((a) => ({ workAreaId: a.id })),
+      where: areas.map((a) => ({ workAreaId: a.id, isPublished: true })),
       order: { sortOrder: 'ASC' },
     });
     const itemsByArea = new Map<string, WorkAreaItem[]>();

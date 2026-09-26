@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { Application, type ApplicationStatus } from '../database/entities/application.entity.js';
 import { ApplicationDocument } from '../database/entities/application-document.entity.js';
 import { ApplicationEvent } from '../database/entities/application-event.entity.js';
@@ -79,18 +79,26 @@ export class PortalApplicationService {
    * never regresses the step the UI resumes them on. No mail/SMS — a plain
    * autosave is not an event worth notifying anyone about.
    */
+  /**
+   * B14 (safeer-backend-fr-review.md): runs under `pessimistic_write` on
+   * the application row, inside a transaction — two concurrent autosaves
+   * (a double-click, or two open tabs) now serialise instead of racing to
+   * overwrite each other's `Object.assign`.
+   */
   async patch(applicationId: string, dto: UpdateApplicationDto): Promise<{ status: ApplicationStatus; currentStep: number }> {
-    const application = await this.findEditable(applicationId);
+    return this.applicationRepo.manager.transaction(async (manager) => {
+      const application = await this.findEditable(applicationId, manager);
 
-    const keys = Object.keys(dto);
-    Object.assign(application, this.toEntityPatch(dto));
-    if (dto.consent === true && !application.consentAt) {
-      application.consentAt = new Date();
-    }
-    application.currentStep = Math.max(application.currentStep, highestStepInPayload(keys));
+      const keys = Object.keys(dto);
+      Object.assign(application, this.toEntityPatch(dto));
+      if (dto.consent === true && !application.consentAt) {
+        application.consentAt = new Date();
+      }
+      application.currentStep = Math.max(application.currentStep, highestStepInPayload(keys));
 
-    await this.applicationRepo.save(application);
-    return { status: application.status, currentStep: application.currentStep };
+      await manager.save(application);
+      return { status: application.status, currentStep: application.currentStep };
+    });
   }
 
   // -------------------------------------------------------------------
@@ -107,45 +115,63 @@ export class PortalApplicationService {
    * see that service's own comment on why re-review is left to phase 7).
    */
   async submit(applicationId: string, dto: SubmitApplicationDto): Promise<{ status: ApplicationStatus; submittedAt: Date }> {
-    const application = await this.applicationRepo.findOne({ where: { id: applicationId } });
-    if (!application) {
-      throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Application not found');
-    }
-    if (application.status !== 'draft') {
-      throw new ProblemException(
-        409,
-        ErrorCode.APPLICATION_LOCKED,
-        'This application has already been submitted and can no longer be resubmitted',
+    // B14 (safeer-backend-fr-review.md): `pessimistic_write` on the
+    // application row, inside a transaction — a double-click (two
+    // near-simultaneous submits) now serialises instead of racing; the
+    // second call sees the first's committed `status = 'new'` and is
+    // rejected by the check below, same outcome as today but now actually
+    // guaranteed rather than merely likely.
+    const application = await this.applicationRepo.manager.transaction(async (manager) => {
+      const application = await manager
+        .createQueryBuilder(Application, 'a')
+        .setLock('pessimistic_write')
+        .where('a.id = :id', { id: applicationId })
+        .getOne();
+      if (!application) {
+        throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Application not found');
+      }
+      if (application.status !== 'draft') {
+        throw new ProblemException(
+          409,
+          ErrorCode.APPLICATION_LOCKED,
+          'This application has already been submitted and can no longer be resubmitted',
+        );
+      }
+
+      const completeness = await computeCompleteness(manager.getRepository(ApplicationDocument), applicationId);
+      if (completeness.missingTypes.length > 0) {
+        throw new ProblemException(
+          409,
+          ErrorCode.DOCUMENTS_INCOMPLETE,
+          'One or more required documents are missing or were rejected',
+          { missing: completeness.missingTypes },
+        );
+      }
+
+      Object.assign(application, this.toEntityPatch(dto));
+      application.consentAt = application.consentAt ?? new Date();
+      application.currentStep = 3;
+      application.status = 'new';
+      application.submittedAt = new Date();
+      await manager.save(application);
+
+      await manager.save(
+        manager.create(ApplicationEvent, {
+          applicationId,
+          type: 'SUBMITTED',
+          actorId: null,
+          visibleToApplicant: true,
+          data: { reference: application.reference },
+        }),
       );
-    }
 
-    const completeness = await computeCompleteness(this.documentRepo, applicationId);
-    if (completeness.missingTypes.length > 0) {
-      throw new ProblemException(
-        409,
-        ErrorCode.DOCUMENTS_INCOMPLETE,
-        'One or more required documents are missing or were rejected',
-        { missing: completeness.missingTypes },
-      );
-    }
+      return application;
+    });
 
-    Object.assign(application, this.toEntityPatch(dto));
-    application.consentAt = application.consentAt ?? new Date();
-    application.currentStep = 3;
-    application.status = 'new';
-    application.submittedAt = new Date();
-    await this.applicationRepo.save(application);
-
-    await this.eventRepo.save(
-      this.eventRepo.create({
-        applicationId,
-        type: 'SUBMITTED',
-        actorId: null,
-        visibleToApplicant: true,
-        data: { reference: application.reference },
-      }),
-    );
-
+    // Mail/SMS sent only after the transaction commits — same discipline as
+    // ApplicationsService.create()'s own comment on why (a slow/broken send
+    // must never hold the row lock open, and a rolled-back submit must
+    // never have already notified anyone).
     const link = `${this.env.PUBLIC_BASE_URL}/portal`;
     const name = `${application.firstName ?? ''} ${application.lastName ?? ''}`.trim();
     await this.mailService.send({
@@ -163,7 +189,9 @@ export class PortalApplicationService {
       entity: { type: 'applications', id: applicationId },
     });
 
-    return { status: application.status, submittedAt: application.submittedAt };
+    // Non-null: this function is the only writer of `submittedAt`, and the
+    // transaction above just set it unconditionally before returning `application`.
+    return { status: application.status, submittedAt: application.submittedAt! };
   }
 
   // -------------------------------------------------------------------
@@ -271,8 +299,13 @@ export class PortalApplicationService {
     return null;
   }
 
-  private async findEditable(applicationId: string): Promise<Application> {
-    const application = await this.applicationRepo.findOne({ where: { id: applicationId } });
+  /** B14: locks the row (`pessimistic_write`) within the caller's transaction — see `patch()`. */
+  private async findEditable(applicationId: string, manager: EntityManager): Promise<Application> {
+    const application = await manager
+      .createQueryBuilder(Application, 'a')
+      .setLock('pessimistic_write')
+      .where('a.id = :id', { id: applicationId })
+      .getOne();
     if (!application) {
       throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Application not found');
     }

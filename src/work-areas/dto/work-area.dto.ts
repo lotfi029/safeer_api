@@ -21,6 +21,8 @@ export const createWorkAreaItemSchema = z
     workAreaId: z.string().min(1),
     textAr: z.string().min(1).max(255),
     textEn: z.string().max(255).nullable().optional(),
+    /** B11 (safeer-backend-fr-review.md) — same publish toggle as the parent work area. */
+    isPublished: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })
   .strict();

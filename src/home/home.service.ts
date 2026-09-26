@@ -97,7 +97,8 @@ export class HomeService {
 
     const workAreaItems = workAreas.length
       ? await this.workAreaItemRepo.find({
-          where: workAreas.map((a) => ({ workAreaId: a.id })),
+          // B11 (safeer-backend-fr-review.md)
+          where: workAreas.map((a) => ({ workAreaId: a.id, isPublished: true })),
           order: { sortOrder: 'ASC' },
         })
       : [];

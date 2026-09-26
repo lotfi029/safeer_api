@@ -14,6 +14,8 @@ export class AdminWorkAreaItemsController extends CrudController<WorkAreaItem>({
   createDto: createWorkAreaItemSchema,
   updateDto: updateWorkAreaItemSchema,
   sortable: true,
+  // B11 (safeer-backend-fr-review.md): adds PATCH /:id/publish, same as the parent work-areas collection.
+  publishable: true,
   searchable: ['textAr', 'textEn'],
   extraPurgeTags: ['work_areas', 'home'],
   label: (i) => i.textAr,

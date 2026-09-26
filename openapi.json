@@ -1565,40 +1565,7 @@
     "/admin/pages": {
       "get": {
         "operationId": "AdminPagesController_list",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "published",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": ""
@@ -2912,6 +2879,44 @@
         },
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminWorkAreaItems"
+        ]
+      }
+    },
+    "/admin/work-area-items/{id}/publish": {
+      "patch": {
+        "operationId": "AdminWorkAreaItemsController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/admin_work_area_itemsPublishDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -6173,6 +6178,20 @@
           "AdminOverview"
         ]
       }
+    },
+    "/sitemap-index": {
+      "get": {
+        "operationId": "SitemapController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Sitemap"
+        ]
+      }
     }
   },
   "info": {
@@ -6766,6 +6785,30 @@
             "nullable": true
           },
           "xUrl": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "uri",
+            "nullable": true
+          },
+          "youtubeUrl": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "uri",
+            "nullable": true
+          },
+          "linkedinUrl": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "uri",
+            "nullable": true
+          },
+          "whatsappUrl": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "uri",
+            "nullable": true
+          },
+          "tiktokUrl": {
             "type": "string",
             "maxLength": 255,
             "format": "uri",
@@ -7495,6 +7538,9 @@
             "maxLength": 255,
             "nullable": true
           },
+          "isPublished": {
+            "type": "boolean"
+          },
           "sortOrder": {
             "type": "integer",
             "minimum": -9007199254740991,
@@ -7546,6 +7592,9 @@
             "maxLength": 255,
             "nullable": true
           },
+          "isPublished": {
+            "type": "boolean"
+          },
           "sortOrder": {
             "type": "integer",
             "minimum": -9007199254740991,
@@ -7595,6 +7644,17 @@
           },
           "isLead": {
             "type": "boolean"
+          },
+          "bioAr": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "nullable": true
+          },
+          "bioEn": {
+            "type": "string",
+            "maxLength": 5000,
+            "nullable": true
           },
           "photoAssetId": {
             "type": "string",
@@ -7670,6 +7730,17 @@
           },
           "isLead": {
             "type": "boolean"
+          },
+          "bioAr": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "nullable": true
+          },
+          "bioEn": {
+            "type": "string",
+            "maxLength": 5000,
+            "nullable": true
           },
           "photoAssetId": {
             "type": "string",
