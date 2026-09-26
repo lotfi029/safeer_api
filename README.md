@@ -45,7 +45,10 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `APPLICANT_SESSION_COOKIE_NAME` | Student-portal session cookie name (default `sf_app_sid`) — see "Two cookie-session systems" below. |
 | `APPLICANT_SESSION_IDLE_HOURS`, `APPLICANT_SESSION_ABSOLUTE_DAYS` | Applicant session lifetime (default 12h idle / 7d absolute). |
 | `APP_ENCRYPTION_KEY` | 32 random bytes, base64-encoded. Encrypts the stored SMTP password and the SMS provider token (AES-256-GCM). **Permanent once real settings exist** — rotating it makes the stored secrets unreadable. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
-| `STORAGE_ROOT` | Local disk path for uploaded files (both the public media pipeline and applicants' private documents). Must be an absolute path outside the deployed build directory in production. |
+| `STORAGE_ROOT` | Local disk path for uploaded files (both the public media pipeline and applicants' private documents). Must be an absolute path outside the deployed build directory in production. Only used when `STORAGE_DRIVER=local`. |
+| `STORAGE_DRIVER` | `local` (default) or `s3`. See `S3_*` below. |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_PUBLIC`, `S3_BUCKET_PRIVATE`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Required only when `STORAGE_DRIVER=s3` — any S3-compatible endpoint, two buckets (public assets, private applicant documents). |
+| `S3_SIGNED_URL_TTL_SECONDS` | How long a signed GET URL for a private document stays valid in S3 mode (default 300). |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | The first admin account. `002_seed.sql` deliberately seeds no users — `BootstrapService` creates this account (or, if it already exists, leaves it alone) on every boot. Password needs at least 8 characters. |
 | `IP_HASH_SALT` | Salt for hashing visitor IPs before they're stored (contact messages, newsletter signups, sessions) — never store a raw IP. |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins for the (future) frontend. |

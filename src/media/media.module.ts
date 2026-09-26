@@ -6,9 +6,10 @@ import { ConfigModule } from '../config/config.module.js';
 import { MediaService } from './media.service.js';
 import { MediaController } from './media.controller.js';
 import { CacheModule } from '../cache/cache.module.js';
+import { StorageModule } from '../storage/storage.module.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MediaAsset, MediaVariant]), ConfigModule, CacheModule],
+  imports: [TypeOrmModule.forFeature([MediaAsset, MediaVariant]), ConfigModule, CacheModule, StorageModule],
   controllers: [MediaController],
   providers: [MediaService],
   exports: [MediaService],

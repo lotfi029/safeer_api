@@ -54,14 +54,21 @@ const envSchema = z.object({
       }
     }, 'APP_ENCRYPTION_KEY must be 32 bytes, base64-encoded'),
 
-  // B3-4: STORAGE_DRIVER (a single-member 'disk' enum with no code ever
-  // switching on it) and PUBLIC_FILE_BASE (never read — FilesController's
-  // path is the compile-time literal 'files', which a NestJS @Controller()
-  // decorator can't take from an injected env value anyway) were both
-  // validated at boot and dead. Removed rather than wired up — building a
-  // real storage-driver abstraction for a single implementation isn't a
-  // remediation-scope change.
   STORAGE_ROOT: z.string().min(1).default('./var/assets'),
+
+  // Storage abstraction (decision 3, safeer-backend-fix-prompt.md) —
+  // B3-4's comment above is now out of date: MediaService/PrivateFileStore
+  // go through src/storage/storage-driver.interface.ts, and this is the
+  // switch. S3_* below are validated as required only when
+  // STORAGE_DRIVER=s3 (the superRefine below) — 'local' needs none of them.
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_REGION: z.string().min(1).optional(),
+  S3_BUCKET_PUBLIC: z.string().min(1).optional(),
+  S3_BUCKET_PRIVATE: z.string().min(1).optional(),
+  S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  S3_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(300),
 
   BOOTSTRAP_ADMIN_EMAIL: z.string().email(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().min(8),
@@ -95,6 +102,21 @@ const envSchema = z.object({
       path: ['ALLOW_DEV_PASSWORD_FIXUP'],
       message: 'ALLOW_DEV_PASSWORD_FIXUP must be false when NODE_ENV=production',
     });
+  }
+  if (v.STORAGE_DRIVER === 's3') {
+    const required = [
+      'S3_ENDPOINT',
+      'S3_REGION',
+      'S3_BUCKET_PUBLIC',
+      'S3_BUCKET_PRIVATE',
+      'S3_ACCESS_KEY_ID',
+      'S3_SECRET_ACCESS_KEY',
+    ] as const;
+    for (const key of required) {
+      if (!v[key]) {
+        ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required when STORAGE_DRIVER=s3` });
+      }
+    }
   }
 });
 
