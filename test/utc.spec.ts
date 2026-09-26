@@ -8,7 +8,7 @@
 //   accepted, and rows a minute past must be refused.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { api, createApplication, createTempUser, deleteApplication, deleteTempUser, loginAs, readMailOtpCode, withDb } from './helpers';
+import { api, createApplication, createTempUser, deleteApplication, deleteTempUser, loginAs, readMailOtpCode, waitForAuthToken, withDb } from './helpers';
 
 const IDLE_HOURS = Number(process.env.SESSION_IDLE_HOURS ?? 8);
 const ABSOLUTE_DAYS = Number(process.env.SESSION_ABSOLUTE_DAYS ?? 30);
@@ -63,6 +63,7 @@ describe('UTC everywhere (C9)', () => {
     try {
       const forgot = await api('POST', '/admin/auth/forgot', { body: { email: user.email } });
       expect([200, 201]).toContain(forgot.status);
+      await waitForAuthToken(user.id);
       const left = await secondsUntil('auth_tokens', 'expires_at', "user_id = ? AND purpose = 'reset'", [user.id]);
       expect(Math.abs(left - 3600)).toBeLessThanOrEqual(15);
 

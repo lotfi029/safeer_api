@@ -10,9 +10,9 @@ export const createStatSchema = z
       .nullable()
       .optional(),
     labelAr: z.string().min(1).max(120),
-    labelEn: z.string().max(120).nullable().optional(),
+    labelEn: z.string().trim().max(120).nullable().optional(),
     subAr: z.string().max(191).nullable().optional(),
-    subEn: z.string().max(191).nullable().optional(),
+    subEn: z.string().trim().max(191).nullable().optional(),
     isPublished: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })

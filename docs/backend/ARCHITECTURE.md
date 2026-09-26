@@ -33,17 +33,45 @@ There is no self-registration — the only way to create a staff account is
 the very first admin comes from `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`
 instead, created automatically on first boot.
 
-| Area | admin | reviewer | editor | support |
-|---|:---:|:---:|:---:|:---:|
-| Applications, application docs/notes, interview slots, applications CSV export | ✅ | ✅ | | |
-| Pages/sections, news, categories, work areas, board, stats, about-items, partners, doc categories, documents, media | ✅ | | ✅ | |
-| Messages, testimonials, testimonial themes, newsletter subscribers | ✅ | | | ✅ |
-| Users, settings, mail, audit, cache | ✅ | | | |
+The matrix lives in one place, `src/auth/role-matrix.ts` (B17). Every
+role-gated admin route is tagged `@Area('<area>')`, which applies exactly
+that area's roles. `GET admin/roles` (any signed-in staff member) returns the
+same constants as `{roles, matrix}`. `npm run check:admin-roles` (CI, and
+Jest via `test/content-security.spec.ts`) fails on any admin route with no
+area, or whose roles differ from its area's.
 
-`GET admin/overview` adapts to the caller's role: applications figures are
-hidden from editors, message figures from reviewers. `GET admin/roles`, which
-will return this same matrix for the admin users screen, does not exist yet
-(B17 in `docs/safeer-backend-fix-prompt.md`, Phase 5).
+| Area | admin | reviewer | editor | support | Covers |
+|---|:---:|:---:|:---:|:---:|---|
+| `applications` | ✅ | ✅ | | | applications, their documents/notes, interview slots, CSV export |
+| `applications.delete` | ✅ | | | | `DELETE admin/applications/:id` (anonymise) |
+| `content` | ✅ | | ✅ | | pages/sections, news + categories, work areas, board, stats, about items, partners, documents + categories, media, redirects |
+| `redirects.delete` | ✅ | | | | deleting a redirect |
+| `inbox` | ✅ | | | ✅ | contact messages, testimonials + themes, newsletter subscribers |
+| `inbox.delete` | ✅ | | | | deleting a contact message |
+| `users` | ✅ | | | | staff accounts, invitations |
+| `settings` | ✅ | | | | site settings, mail and SMS settings/templates/logs, cache |
+| `audit` | ✅ | | | | the audit log |
+
+Open to any signed-in staff member, with no area: `admin/me`,
+`admin/auth/*` (own sessions, own password), `admin/overview`,
+`admin/preview-token`, `admin/roles`. `GET admin/overview` adapts to the
+caller's role: application figures only for admin and reviewer, message
+figures for everyone but reviewers, the audit feed for admins only (C20).
+
+### Staff accounts: status and lockout
+
+- `users.status` is `active`, `disabled` or `invited`. Only an admin changes
+  it (`PATCH admin/users/:id {status}`), except that accepting an invitation
+  turns `invited` into `active`. Only an `active` account can sign in or hold
+  a session. Disabling ends its sessions and deletes its outstanding
+  invite/reset links. Forgot-password, reset and accept-invite never act on
+  a `disabled` account, so a disabled user can't re-enable themselves.
+- Ten wrong passwords lock the account for 15 minutes, then 30, 60 … (capped
+  at about 16 h) on each further lock, until a successful sign-in. The lock
+  doesn't end existing sessions. An admin clears it with
+  `PATCH admin/users/:id {unlock: true}`; a completed password reset clears it too.
+- Login only ever writes targeted `UPDATE`s, so it can't overwrite a
+  concurrent password reset or disable.
 
 ## Two cookie-session systems
 
@@ -65,7 +93,14 @@ portal route, and an applicant cookie is never accepted on a staff route
 
 Both use the same underlying mechanics (a random token, only its SHA-256
 ever stored, an HMAC CSRF token derived from that hash) — just against
-different cookies, tables, and lifetimes.
+different cookies, tables, and lifetimes. Both cookies are `HttpOnly`,
+`SameSite=Strict` and, outside development/test, `Secure`
+(`src/auth/cookie-options.ts`, C32). Staging must therefore run over HTTPS,
+like production.
+
+A staff member's session list (`GET admin/auth/sessions`) shows only
+sessions that could still be used: not revoked, not expired, and not idle
+past `SESSION_IDLE_HOURS` (C33).
 
 ## Time zone
 

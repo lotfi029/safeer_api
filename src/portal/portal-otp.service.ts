@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { randomInt } from 'node:crypto';
 import { LRUCache } from 'lru-cache';
 import { Application, NON_TERMINAL_APPLICATION_STATUSES } from '../database/entities/application.entity.js';
@@ -15,10 +15,13 @@ import type { RequestContext } from '../common/request-context.js';
 import { normalizePhone } from '../common/phone.js';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
+import { OtpPeekService } from '../dev/otp-peek.service.js';
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
+/** C22: wrong codes per application per UTC day before OTP sign-in locks until the next day. */
+const OTP_DAILY_FAILURE_LIMIT = 10;
 
 /** `applications.reference` shape, e.g. `SA-2026-00185` (ApplicationsService.create). */
 const REFERENCE_RE = /^[A-Z]{1,10}-\d{4}-\d{5}$/i;
@@ -59,6 +62,7 @@ export class PortalOtpService {
     @Inject(SMS_SERVICE) private readonly smsService: SmsServiceInterface,
     private readonly applicantSessions: ApplicantSessionService,
     @Inject(ENV) private readonly env: Env,
+    private readonly otpPeek: OtpPeekService,
   ) {}
 
   /**
@@ -84,60 +88,96 @@ export class PortalOtpService {
     const channelHint = channel ?? (await this.defaultChannelHint());
 
     const application = await this.findApplication(identifier);
-    if (!application) {
+    // C22: every silent stop below returns exactly what a miss returns, so
+    // none of them enumerates: no application, the per-application request
+    // budget spent (whichever identifier named it), or OTP sign-in locked
+    // for today after too many wrong codes.
+    if (!application || !this.takeApplicationRequestSlot(application.id) || (await this.isLockedToday(application.id))) {
       return { ok: true, channelHint };
     }
 
     const code = String(randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, '0');
-    const vars = { code, minutes: String(OTP_EXPIRY_MINUTES) };
-    const entity = { type: 'applications', id: application.id };
-    const usedChannel = await this.deliver(application, channel, vars, entity);
+    const smsTo = await this.smsRecipient(application, channel);
+    const plannedChannel: ApplicantOtpChannel = smsTo ? 'sms' : 'email';
 
-    await this.otpRepo.save(
-      this.otpRepo.create({
-        applicationId: application.id,
-        codeHash: hashToken(code),
-        channel: usedChannel,
-        expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
-        attempts: 0,
-      }),
-    );
+    // The row is written (and every older live code invalidated — C22)
+    // before anything is sent, so a code the applicant receives always
+    // exists to be verified.
+    const otp = await this.otpRepo.manager.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder()
+        .update(ApplicantOtp)
+        .set({ consumedAt: () => 'CURRENT_TIMESTAMP(3)' })
+        .where('application_id = :id', { id: application.id })
+        .andWhere('consumed_at IS NULL')
+        .execute();
+      return manager.save(
+        manager.create(ApplicantOtp, {
+          applicationId: application.id,
+          codeHash: hashToken(code),
+          channel: plannedChannel,
+          expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
+          attempts: 0,
+        }),
+      );
+    });
+
+    const usedChannel = await this.deliver(application, smsTo, code);
+    if (usedChannel !== plannedChannel) {
+      await this.otpRepo.update(otp.id, { channel: usedChannel });
+    }
+    this.otpPeek.record(application.id, code, usedChannel);
 
     return { ok: true, channelHint };
   }
 
   /**
-   * Sends the code and returns the channel actually used, stored on the
-   * `applicant_otps` row. SMS is only attempted when it's "usable" — a real
-   * driver is configured, or the `log` driver outside production (so local
-   * development/CI, which seed the `log` driver, still exercise the SMS
-   * path) — and the application has a phone. Every other case, and any SMS
-   * send that doesn't come back `sent`, falls back to email.
+   * The E.164 number to try by SMS first, or null to go straight to email:
+   * SMS is only attempted when the caller didn't ask for email, SMS is
+   * "usable" (a real driver, or the `log` driver outside production, so
+   * local development/CI still exercise the SMS path) and the application
+   * has a phone.
    */
-  private async deliver(
-    application: Application,
-    requestedChannel: RequestedOtpChannel,
-    vars: Record<string, string>,
-    entity: { type: string; id: string },
-  ): Promise<ApplicantOtpChannel> {
-    if (requestedChannel !== 'email') {
-      const smsUsable = (await this.smsUsable()) && Boolean(application.phone);
-      if (smsUsable) {
-        const result = await this.smsService.send({
-          key: 'otp_code',
-          to: application.phone ?? '',
-          vars,
-          locale: application.locale,
-          entity,
-        });
-        if (result.status === 'sent') {
-          return 'sms';
-        }
-        // Fall through to email — a chosen-but-failed SMS must still reach the applicant.
+  private async smsRecipient(application: Application, requestedChannel: RequestedOtpChannel): Promise<string | null> {
+    if (requestedChannel === 'email') return null;
+    const to = application.phoneE164 ?? normalizePhone(application.phone);
+    if (!to || !(await this.smsUsable())) return null;
+    return to;
+  }
+
+  /**
+   * Sends the code and returns the channel actually used (stored on the
+   * `applicant_otps` row). An SMS that doesn't come back `sent` — failed,
+   * skipped, or timed out after 5 s — falls back to email (B1). The code is
+   * a sensitive variable: masked in `sms_log` / `mail_log` (C1).
+   */
+  private async deliver(application: Application, smsTo: string | null, code: string): Promise<ApplicantOtpChannel> {
+    const vars = { code, minutes: String(OTP_EXPIRY_MINUTES) };
+    const entity = { type: 'applications', id: application.id };
+    const sensitiveVars = ['code'];
+
+    if (smsTo) {
+      const result = await this.smsService.sendNow({
+        key: 'otp_code',
+        to: smsTo,
+        vars,
+        locale: application.locale,
+        entity,
+        sensitiveVars,
+      });
+      if (result.status === 'sent') {
+        return 'sms';
       }
     }
 
-    await this.mailService.send({ key: 'otp_code', to: application.email ?? '', vars, locale: application.locale, entity });
+    await this.mailService.send({
+      key: 'otp_code',
+      to: application.email ?? '',
+      vars,
+      locale: application.locale,
+      entity,
+      sensitiveVars,
+    });
     return 'email';
   }
 
@@ -166,18 +206,16 @@ export class PortalOtpService {
    */
   async verifyOtp(identifier: string, code: string, req: RequestContext): Promise<VerifyOtpResult> {
     const application = await this.findApplication(identifier);
-    if (!application) {
+    if (!application || (await this.isLockedToday(application.id))) {
       throw genericOtpError();
     }
 
     // The transaction's callback must never throw on a *wrong* code: a
     // thrown error rolls back everything the callback did, including the
-    // `attempts` increment we specifically need to survive so the 5-guess
-    // cap is real. So the callback always returns normally — a tagged
-    // outcome — and only the caller, after the transaction has committed,
-    // decides whether to throw `genericOtpError()`. An application that
-    // doesn't exist at all, or has no live OTP row, never reaches the
-    // transaction in the first place, so nothing needs recording for those.
+    // `attempts` and daily-failure increments we specifically need to
+    // survive so the caps are real. So the callback always returns normally
+    // — a tagged outcome — and only the caller, after the transaction has
+    // committed, decides whether to throw `genericOtpError()`.
     const outcome = await this.otpRepo.manager.transaction(async (manager) => {
       const otp = await manager
         .createQueryBuilder(ApplicantOtp, 'o')
@@ -186,21 +224,22 @@ export class PortalOtpService {
         .andWhere('o.consumed_at IS NULL')
         .andWhere('o.expires_at > NOW()')
         .orderBy('o.created_at', 'DESC')
+        .addOrderBy('o.id', 'DESC')
         .getOne();
 
-      if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS) {
-        return { ok: false as const };
-      }
-
-      if (hashToken(code) !== otp.codeHash) {
-        otp.attempts += 1;
-        await manager.save(otp);
+      if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS || hashToken(code) !== otp.codeHash) {
+        if (otp) {
+          otp.attempts += 1;
+          await manager.save(otp);
+        }
+        await this.recordDailyFailure(manager, application.id);
         return { ok: false as const };
       }
 
       otp.attempts += 1;
       otp.consumedAt = new Date();
       await manager.save(otp);
+      await manager.query('UPDATE applications SET otp_fail_count = 0 WHERE id = ?', [application.id]);
 
       const minted = await this.applicantSessions.mint(manager, application.id, req);
       return { ok: true as const, minted };
@@ -210,6 +249,44 @@ export class PortalOtpService {
       throw genericOtpError();
     }
     return outcome.minted;
+  }
+
+  /**
+   * C22: one more wrong code today (UTC). Atomic, and assignment order
+   * matters: MySQL evaluates SET left to right, so the count is computed
+   * against the *old* date before the date is moved to today.
+   */
+  private async recordDailyFailure(manager: EntityManager, applicationId: string): Promise<void> {
+    await manager.query(
+      `UPDATE applications
+          SET otp_fail_count = IF(otp_fail_date = UTC_DATE(), otp_fail_count + 1, 1),
+              otp_fail_date = UTC_DATE()
+        WHERE id = ?`,
+      [applicationId],
+    );
+  }
+
+  /** C22: OTP sign-in is locked for the rest of the UTC day after OTP_DAILY_FAILURE_LIMIT wrong codes. */
+  private async isLockedToday(applicationId: string): Promise<boolean> {
+    const rows: Array<{ locked: number | string }> = await this.applicationRepo.query(
+      'SELECT (otp_fail_date = UTC_DATE() AND otp_fail_count >= ?) AS locked FROM applications WHERE id = ?',
+      [OTP_DAILY_FAILURE_LIMIT, applicationId],
+    );
+    return Number(rows[0]?.locked) === 1;
+  }
+
+  /**
+   * C22: the per-identifier limiter can't see that a reference, an email and
+   * a phone all name the same application, so each application also gets
+   * its own budget of OTP_REQUEST_LIMIT codes per window, whichever way it
+   * was named. Returns false (send nothing) once it's spent.
+   */
+  private takeApplicationRequestSlot(applicationId: string): boolean {
+    const key = `application:${applicationId}`;
+    const count = this.requestAttempts.get(key) ?? 0;
+    if (count >= OTP_REQUEST_LIMIT) return false;
+    this.requestAttempts.set(key, count + 1);
+    return true;
   }
 
   /**
@@ -226,10 +303,13 @@ export class PortalOtpService {
     const trimmed = identifier.trim();
     const qb = this.applicationRepo.createQueryBuilder('a');
 
+    // C43: plain `=` — the columns' utf8mb4_unicode_ci collation already
+    // compares case-insensitively, and UPPER()/LOWER() would stop MySQL from
+    // using uq reference / ix_applications_email_status on this public route.
     if (REFERENCE_RE.test(trimmed)) {
-      qb.where('UPPER(a.reference) = UPPER(:identifier)', { identifier: trimmed });
+      qb.where('a.reference = :identifier', { identifier: trimmed });
     } else if (trimmed.includes('@')) {
-      qb.where('LOWER(a.email) = LOWER(:identifier)', { identifier: trimmed });
+      qb.where('a.email = :identifier', { identifier: trimmed });
     } else {
       const phone = normalizePhone(trimmed);
       if (!phone) {

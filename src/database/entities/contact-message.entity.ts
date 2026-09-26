@@ -6,6 +6,7 @@ export type ContactMessageStatus = 'unread' | 'read' | 'archived';
 
 @Entity('contact_messages')
 @Index('ix_messages_inbox', ['status', 'createdAt'])
+@Index('ix_contact_messages_created', ['createdAt'])
 export class ContactMessage {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: string;

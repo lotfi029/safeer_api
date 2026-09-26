@@ -7,7 +7,7 @@ import { AuditLog } from '../../database/entities/audit-log.entity.js';
 import { isAdminRoute, type RequestContext } from '../request-context.js';
 
 /**
- * After any successful non-GET under /admin, writes an audit_log row from
+ * After any successful request under /admin, writes an audit_log row from
  * `req.auditContext` — set by the service/controller that handled the
  * write, since only it knows what actually changed
  * (13-backend-build-plan.md P5, P8). A route that performs no domain write
@@ -22,9 +22,10 @@ export class AuditInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest<RequestContext>();
-    const isWrite = req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS';
-
-    if (!isAdminRoute(req.path) || !isWrite) {
+    // C36: a read is audited only when its handler asks to be (the
+    // applications CSV export sets `auditContext`); every other GET leaves
+    // it unset and records nothing, same as before.
+    if (!isAdminRoute(req.path) || req.method === 'HEAD' || req.method === 'OPTIONS') {
       return next.handle();
     }
 

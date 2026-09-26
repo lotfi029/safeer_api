@@ -40,6 +40,7 @@ import { PortalModule } from './portal/portal.module.js';
 import { AdminApplicationsModule } from './admin-applications/admin-applications.module.js';
 import { SitemapModule } from './sitemap/sitemap.module.js';
 import { TestAwareThrottlerGuard } from './common/guards/test-aware-throttler.guard.js';
+import { DevModule } from './dev/dev.module.js';
 
 // Phase 2 (done): the full schema (001_schema.sql) and entities for every
 // table the project plan's "Data model" section lists, plus the infra
@@ -107,6 +108,7 @@ import { TestAwareThrottlerGuard } from './common/guards/test-aware-throttler.gu
     ApplicationsModule,
     PortalModule,
     AdminApplicationsModule,
+    DevModule,
     SitemapModule,
   ],
   providers: [

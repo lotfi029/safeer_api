@@ -5,7 +5,9 @@ import { fileTypeFromBuffer } from 'file-type';
 import type { Response } from 'express';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
-import { PRIVATE_STORAGE_DRIVER, type StorageDriver } from './storage-driver.interface.js';
+import type { Readable } from 'node:stream';
+import { PRIVATE_STORAGE_DRIVER, StorageObjectNotFoundError, type StorageDriver } from './storage-driver.interface.js';
+import { contentDisposition } from '../common/http/filenames.js';
 
 export const MAX_PRIVATE_FILE_BYTES = 5 * 1024 * 1024;
 
@@ -90,18 +92,26 @@ export class PrivateFileStore {
    * headers either way matters only for the streamed branch.
    */
   async serve(res: Response, doc: { storageKey: string; mime: string; originalName: string }): Promise<void> {
+    const disposition = contentDisposition('inline', doc.originalName);
     if (this.driver.signedUrl) {
-      const url = await this.driver.signedUrl(doc.storageKey);
+      const url = await this.driver.signedUrl(doc.storageKey, { contentType: doc.mime, contentDisposition: disposition });
+      res.setHeader('Cache-Control', 'private, no-store');
       res.redirect(302, url);
       return;
     }
 
+    let stream: Readable;
+    try {
+      stream = await this.driver.getStream(doc.storageKey);
+    } catch (err) {
+      if (err instanceof StorageObjectNotFoundError) throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Not found');
+      throw err;
+    }
     res.setHeader('Content-Type', doc.mime);
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Disposition', `inline; filename="${doc.originalName.replace(/"/g, '')}"`);
+    res.setHeader('Content-Disposition', disposition);
 
-    const stream = await this.driver.getStream(doc.storageKey);
     stream.on('error', () => {
       if (!res.headersSent) res.status(404);
       res.end();

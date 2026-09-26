@@ -58,6 +58,8 @@ async function bootstrap() {
   app.enableCors({
     origin: corsOrigins(env),
     credentials: true,
+    // C36: the dashboard reads it to warn that an export was capped.
+    exposedHeaders: ['X-Truncated'],
   });
 
   app.setGlobalPrefix('api/v1', {

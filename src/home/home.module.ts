@@ -12,11 +12,13 @@ import { Partner } from '../database/entities/partner.entity.js';
 import { PageSection } from '../database/entities/page-section.entity.js';
 import { HomeService } from './home.service.js';
 import { HomeController } from './home.controller.js';
+import { MarkdownModule } from '../common/markdown/markdown.module.js';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([SiteSettings, Stat, AboutItem, WorkArea, WorkAreaItem, Post, Testimonial, Partner, PageSection]),
     CacheModule,
+    MarkdownModule,
   ],
   controllers: [HomeController],
   providers: [HomeService],

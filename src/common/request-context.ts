@@ -59,6 +59,8 @@ export interface RequestContext extends Request {
    * as normal; only the `cache.set()` after it is skipped.
    */
   skipCacheWrite?: boolean;
+  /** C24: set by a @PreviewAware() handler once it has verified a preview token — the response is then private and never cached. */
+  previewVerified?: boolean;
 }
 
 const ADMIN_PREFIX = /^\/api\/v1\/admin(\/|$)/;

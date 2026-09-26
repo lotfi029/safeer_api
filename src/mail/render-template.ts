@@ -26,6 +26,27 @@ function escapeMarkdown(value: string): string {
 }
 
 /**
+ * C16: GFM autolinks bare `http://…`, `www.…` and `user@host.tld` text. A
+ * value typed by an outsider (a name, a contact message) must never become a
+ * clickable link inside a genuine Safeer email, so `:`, `.` and `@` are
+ * backslash-escaped too — the escape breaks the autolink pattern while the
+ * character still renders literally.
+ */
+const AUTOLINK_CHARS = /[:.@]/g;
+
+/**
+ * Variables the code builds itself and that are meant to be clickable: the
+ * frontend links (src/common/links/frontend-url.ts). Everything else is
+ * escaped against autolinking.
+ */
+const TRUSTED_LINK_VARS = new Set(['link']);
+
+function escapeValue(name: string, value: string): string {
+  const escaped = escapeMarkdown(value);
+  return TRUSTED_LINK_VARS.has(name) ? escaped : escaped.replace(AUTOLINK_CHARS, '\\$&');
+}
+
+/**
  * M2/finding C: substitutes `{{var}}` into the Markdown **source**, before
  * `MarkdownService.render()` (which runs DOMPurify) ever sees it — the
  * previous order rendered first and substituted into the already-sanitised
@@ -48,7 +69,7 @@ function escapeMarkdown(value: string): string {
  * Substituting first means `marked` sees and encodes the real URL.
  */
 export function substituteMarkdown(markdown: string, vars: Record<string, string>): string {
-  return markdown.replace(VAR_PATTERN, (_, name: string) => escapeMarkdown(vars[name] ?? ''));
+  return markdown.replace(VAR_PATTERN, (_, name: string) => escapeValue(name, vars[name] ?? ''));
 }
 
 /**

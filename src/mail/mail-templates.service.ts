@@ -68,6 +68,12 @@ export class MailTemplatesService {
   private renderFrom(template: MailTemplate, vars: Record<string, string>, locale: Locale): RenderedMail {
     const subjectSource = (locale === 'en' && template.subjectEn) || template.subjectAr;
     const bodySource = (locale === 'en' && template.bodyEn) || template.bodyAr;
+    // C23: mail clients lay HTML out left-to-right unless told otherwise, so
+    // Arabic mail comes wrapped in dir="rtl" lang="ar" — decided by the body
+    // actually used (an English request falls back to the Arabic body when
+    // the template has no English one).
+    const bodyLang = locale === 'en' && template.bodyEn ? 'en' : 'ar';
+    const dir = bodyLang === 'ar' ? 'rtl' : 'ltr';
     return {
       subject: substitutePlain(subjectSource, vars),
       // M2/finding C: substitute into the Markdown source first, so
@@ -76,7 +82,7 @@ export class MailTemplatesService {
       // arrive — see render-template.ts's substituteMarkdown for the full
       // reasoning, including why this also fixes a dead link in three of
       // the five seeded templates.
-      html: this.markdown.render(substituteMarkdown(bodySource, vars)),
+      html: `<div dir="${dir}" lang="${bodyLang}">${this.markdown.render(substituteMarkdown(bodySource, vars))}</div>`,
       text: substitutePlain(bodySource, vars),
     };
   }

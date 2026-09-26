@@ -95,7 +95,7 @@ export async function createTempUser(role: StaffRole): Promise<Session & { id: s
   const email = `jest-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   const id = await withDb(async (conn) => {
     const [result] = await conn.execute(
-      'INSERT INTO users (name, email, password_hash, role, is_locked, failed_logins) VALUES (?, ?, ?, ?, 0, 0)',
+      "INSERT INTO users (name, email, password_hash, role, status, failed_logins) VALUES (?, ?, ?, ?, 'active', 0)",
       [`Jest ${role}`, email, passwordHash, role],
     );
     return String((result as any).insertId);
@@ -112,6 +112,7 @@ export interface TestApplicant extends Session {
   id: string;
   reference: string;
   email: string;
+  phone: string;
 }
 
 /** `POST applications` — mirrors scripts/smoke.mjs's own createApplication(). */
@@ -146,7 +147,7 @@ export async function createApplication(overrides: Record<string, unknown> = {})
       .then(([rows]: any) => rows[0]?.id && String(rows[0].id)),
   );
   if (!id) throw new Error(`could not resolve the numeric id for reference ${json.reference}`);
-  return { id, reference: json.reference, cookie, csrfToken: json.csrfToken, email };
+  return { id, reference: json.reference, cookie, csrfToken: json.csrfToken, email, phone: String(body.phone) };
 }
 
 export async function deleteApplication(applicationId: string): Promise<void> {
@@ -156,33 +157,29 @@ export async function deleteApplication(applicationId: string): Promise<void> {
   });
 }
 
-export async function readSmsOtpCode(applicationId: string): Promise<string> {
-  const message = await withDb((conn) =>
-    conn
-      .execute(
-        "SELECT message FROM sms_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'otp_code' ORDER BY id DESC LIMIT 1",
-        [applicationId],
-      )
-      .then(([rows]: any) => rows[0]?.message),
-  );
-  const match = typeof message === 'string' ? message.match(/\d{6}/) : null;
-  if (!match) throw new Error(`no 6-digit OTP found in sms_log.message for application ${applicationId}: ${JSON.stringify(message)}`);
-  return match[0];
+/**
+ * C1: OTP codes are no longer readable from sms_log / mail_log (masked), so
+ * specs read the last code issued for an application from the dev/test-only
+ * hook (src/dev/dev-otp.controller.ts), along with the channel it went out on.
+ */
+export async function readOtp(applicationId: string): Promise<{ code: string; channel: 'sms' | 'email' }> {
+  const res = await fetch(`${BASE}/__dev/otp/${applicationId}`);
+  if (!res.ok) throw new Error(`no OTP issued for application ${applicationId} (dev hook answered ${res.status})`);
+  return res.json();
 }
 
+/** The last code for `applicationId`, which must have gone out by SMS. */
+export async function readSmsOtpCode(applicationId: string): Promise<string> {
+  const otp = await readOtp(applicationId);
+  if (otp.channel !== 'sms') throw new Error(`expected the OTP to go out by sms, it went by ${otp.channel}`);
+  return otp.code;
+}
+
+/** The last code for `applicationId`, which must have gone out by email. */
 export async function readMailOtpCode(applicationId: string): Promise<string> {
-  const row = await withDb((conn) =>
-    conn
-      .execute(
-        "SELECT subject, payload FROM mail_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'otp_code' ORDER BY id DESC LIMIT 1",
-        [applicationId],
-      )
-      .then(([rows]: any) => rows[0]),
-  );
-  const haystack = `${row?.subject ?? ''} ${JSON.stringify(row?.payload ?? '')}`;
-  const match = haystack.match(/\d{6}/);
-  if (!match) throw new Error(`no 6-digit OTP found in mail_log for application ${applicationId}: ${JSON.stringify(row)}`);
-  return match[0];
+  const otp = await readOtp(applicationId);
+  if (otp.channel !== 'email') throw new Error(`expected the OTP to go out by email, it went by ${otp.channel}`);
+  return otp.code;
 }
 
 export async function withSmsEnabled<T>(fn: () => Promise<T>): Promise<T> {
@@ -227,3 +224,20 @@ export async function verifyOtpSession(identifier: string, code: string): Promis
   if (!setCookie) throw new Error('verify-otp did not set a session cookie');
   return { cookie: setCookie.split(';')[0], csrfToken: JSON.parse(text).csrfToken };
 }
+
+/**
+ * C33: `POST admin/auth/forgot` answers before it looks the address up, so a
+ * spec waits for the reset token to appear (or, for "nothing is sent",
+ * lets the background work finish before checking).
+ */
+export async function waitForAuthToken(userId: string, purpose = 'reset', timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const [rows]: any = await withDb((conn) => conn.execute('SELECT id FROM auth_tokens WHERE user_id = ? AND purpose = ?', [userId, purpose]));
+    if (rows.length > 0) return;
+    if (Date.now() > deadline) throw new Error(`no ${purpose} token for user ${userId} within ${timeoutMs}ms`);
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
+export const settleForgot = () => new Promise((r) => setTimeout(r, 500));

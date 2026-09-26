@@ -2,6 +2,7 @@ import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, Primary
 import { MediaAsset } from './media-asset.entity.js';
 
 export type PartnerCategory = 'government' | 'university' | 'association' | 'supporter';
+export const PARTNER_CATEGORIES: PartnerCategory[] = ['government', 'university', 'association', 'supporter'];
 
 /** شركاء النجاح */
 @Entity('partners')
@@ -16,7 +17,7 @@ export class Partner {
   @Column({ name: 'name_en', type: 'varchar', length: 191, nullable: true })
   nameEn: string | null;
 
-  @Column({ type: 'enum', enum: ['government', 'university', 'association', 'supporter'] as PartnerCategory[] })
+  @Column({ type: 'enum', enum: PARTNER_CATEGORIES })
   category: PartnerCategory;
 
   @Column({ type: 'varchar', length: 255, nullable: true })

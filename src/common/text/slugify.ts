@@ -1,5 +1,6 @@
 import type { Repository } from 'typeorm';
 import { normalizeAr } from './normalize-ar.js';
+import { SLUG_MAX, isValidSlug } from '../validation/slug.js';
 
 /**
  * Same algorithm tools/seed-from-prototype.mjs uses for dev-sample slugs
@@ -38,8 +39,14 @@ export async function generateUniqueSlug<E extends { id: string; slug: string }>
   titleEn: string | null | undefined,
   titleAr: string | null | undefined,
   fallback: string,
+  reserved?: ReadonlySet<string>,
 ): Promise<string> {
-  const base = slugBase(titleEn, titleAr) || fallback;
+  // C14: a generated slug always satisfies the same rules as a hand-set one
+  // — trimmed at a word boundary to leave room for a `-N` suffix inside
+  // SLUG_MAX, and never a reserved word (→ the fallback instead).
+  const full = slugBase(titleEn, titleAr);
+  let base = (full.length > SLUG_MAX - 6 ? full.slice(0, SLUG_MAX - 6).replace(/-[^-]*$/, '') : full).replace(/-+$/, '');
+  if (!isValidSlug(base, reserved)) base = fallback;
   let candidate = base;
   let i = 2;
   // eslint-disable-next-line no-await-in-loop -- sequential by design: each check depends on the last candidate

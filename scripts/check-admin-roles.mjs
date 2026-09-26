@@ -20,15 +20,15 @@ async function main() {
   await app.close();
 
   if (violations.length > 0) {
-    console.error(`${violations.length} admin/* route(s) have no @Roles() and are not allow-listed:\n`);
+    console.error(`${violations.length} admin/* route(s) are not gated by their role-matrix area:\n`);
     for (const v of violations) {
-      console.error(`  ${v.controller}.${v.method} -> /${v.path}`);
+      console.error(`  ${v.controller}.${v.method} -> /${v.path}: ${v.problem}`);
     }
-    console.error('\nAdd @Roles(...) (class- or method-level), or add the exact route to the allow-list in scripts/lib/check-admin-roles.mjs if it is intentionally open to any signed-in staff member.');
+    console.error('\nTag it with @Area(...) from src/auth/role-matrix.ts (class- or method-level), or add the exact route to the allow-list in scripts/lib/check-admin-roles.mjs if it is intentionally open to any signed-in staff member.');
     process.exit(1);
   }
 
-  console.log('Every admin/* route is role-gated or explicitly allow-listed.');
+  console.log('Every admin/* route is gated by its role-matrix area or explicitly allow-listed.');
 }
 
 await main();

@@ -6,9 +6,9 @@ import { z } from 'zod';
 export const updateSmsTemplateSchema = z
   .object({
     nameAr: z.string().min(1).max(191).optional(),
-    nameEn: z.string().max(191).nullable().optional(),
+    nameEn: z.string().trim().max(191).nullable().optional(),
     bodyAr: z.string().min(1).max(480).optional(),
-    bodyEn: z.string().max(480).nullable().optional(),
+    bodyEn: z.string().trim().max(480).nullable().optional(),
     isEnabled: z.boolean().optional(),
   })
   .strict();

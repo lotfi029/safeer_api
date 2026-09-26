@@ -40,7 +40,7 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 
 | Variable | Meaning |
 |---|---|
-| `NODE_ENV` | `development` \| `test` \| `staging` \| `production`. No default — deliberately: it gates both the session cookie's `Secure` flag and whether `ALLOW_DEV_PASSWORD_FIXUP` is even permitted. |
+| `NODE_ENV` | `development` \| `test` \| `staging` \| `production`. No default — deliberately: it gates both the session cookies' `Secure` flag (set in staging and production, C32) and whether `ALLOW_DEV_PASSWORD_FIXUP` is even permitted. |
 | `PORT` | HTTP port the API listens on. |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL/MariaDB connection used by the app. In production, a least-privilege account (`scripts/create-app-db-user.sql`). |
 | `MIGRATION_DB_USER`, `MIGRATION_DB_PASSWORD` | DDL-capable account for `npm run migrate` / `db:reset`. Required when `NODE_ENV` is `staging`/`production`; in `development`/`test` they fall back to `DB_USER`/`DB_PASSWORD`. |
@@ -48,7 +48,7 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `SESSION_IDLE_HOURS`, `SESSION_ABSOLUTE_DAYS` | Staff session lifetime (default 8h idle / 30d absolute). |
 | `APPLICANT_SESSION_COOKIE_NAME` | Student-portal session cookie name (default `sf_app_sid`) — see [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md). |
 | `APPLICANT_SESSION_IDLE_HOURS`, `APPLICANT_SESSION_ABSOLUTE_DAYS` | Applicant session lifetime (default 12h idle / 7d absolute). |
-| `APP_ENCRYPTION_KEY` | 32 random bytes, base64-encoded. Encrypts the stored SMTP password and the SMS provider token (AES-256-GCM). **Permanent once real settings exist** — rotating it makes the stored secrets unreadable. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
+| `APP_ENCRYPTION_KEY` | 32 random bytes, base64-encoded. Encrypts the stored SMTP password, the SMS provider token and applicants' ID numbers (AES-256-GCM); also keys the signed newsletter links. **Permanent once real settings exist** — rotating it makes the stored secrets unreadable. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
 | `STORAGE_ROOT` | Local disk path for uploaded files (both the public media pipeline and applicants' private documents). Must be an absolute path outside the deployed build directory in production. Only used when `STORAGE_DRIVER=local`. |
 | `STORAGE_DRIVER` | `local` (default) or `s3`. See `S3_*` below. |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_PUBLIC`, `S3_BUCKET_PRIVATE`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Required only when `STORAGE_DRIVER=s3` — any S3-compatible endpoint, two buckets (public assets, private applicant documents). |
@@ -56,9 +56,9 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | The first admin account. `002_seed.sql` deliberately seeds no users — `BootstrapService` creates this account (or, if it already exists, leaves it alone) on every boot. Password needs at least 8 characters. |
 | `IP_HASH_SALT` | Salt for hashing visitor IPs before they're stored (contact messages, newsletter signups, sessions) — never store a raw IP. |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins for the (future) frontend. |
-| `PUBLIC_BASE_URL` | Base URL used to build links inside emails/SMS (invite, password reset, portal links). |
+| `FRONTEND_BASE_URL` | The public frontend's origin. Every link sent by mail or SMS points at a locale-prefixed page there: `/{locale}/admin/accept/{token}`, `/{locale}/admin/reset/{token}`, `/{locale}/admin/messages/{id}`, `/{locale}/portal/login`. Required when `NODE_ENV` is `staging`/`production`; defaults to `http://localhost:4200` otherwise. (Replaces `PUBLIC_BASE_URL`.) |
 | `CACHE_TTL_SECONDS`, `CACHE_MAX_ENTRIES` | The in-process response cache's TTL and entry ceiling. |
-| `ALLOW_DEV_PASSWORD_FIXUP` | Dev/staging only — **refused at boot when `NODE_ENV=production`**. Lets a seeded user still holding the unusable placeholder password hash be given `BOOTSTRAP_ADMIN_PASSWORD` instead, so a fresh dev database doesn't need a real invite/accept round-trip just to sign in as a second account. |
+| `ALLOW_DEV_PASSWORD_FIXUP` | Dev/staging only — **refused at boot when `NODE_ENV=production`**. Lets a seeded user still holding the unusable placeholder password hash be given `BOOTSTRAP_ADMIN_PASSWORD` instead, so a fresh dev database doesn't need a real invite/accept round-trip just to sign in as a second account. Only emails listed in `DEV_SEEDED_USER_EMAILS` (`src/auth/bootstrap.service.ts`) qualify, never an invitee (C33); the dev fixtures currently seed none. |
 | `PROTOTYPE_PATH` | `npm run seed` only — optional override for the prototype HTML. Default `docs/prototype/safeer-prototype.html`; relative paths resolve against the repo root. |
 
 ## Scripts
@@ -77,7 +77,8 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `npm test` | Jest + supertest HTTP tests (`test/*.spec.ts`) against a dedicated, real MySQL database (`<DB_NAME>_test`, recreated each run) and a real running instance of the app, started with `TZ=Asia/Riyadh` on purpose (`test/global-setup.ts`). Needs `npm run build` first and a DB user that can create databases. |
 | `npm run check:admin-roles` | Fails if any `admin/*` route has no `@Roles()` and isn't explicitly allow-listed (`scripts/lib/check-admin-roles.mjs`). Needs a migrated database, like `openapi:check`. |
 | `npm run backup:storage` | `STORAGE_DRIVER=local`: tars `STORAGE_ROOT`. `STORAGE_DRIVER=s3`: no-op (the provider's own job). |
-| `npm run schema:check` | `typeorm schema:log` against the compiled data source — a read-only diff between the entities and the live schema. |
+| `npm run schema:check` | Fails if the entities and the migrated database disagree (tables, columns, nullability, type, length, enum values, declared indexes, unmapped required columns) — `scripts/check-schema.mjs`, run in CI (C44). Needs `npm run build`. |
+| `npm run schema:log` | TypeORM's own `schema:log` diff. Informational only: on MariaDB it lists many no-op changes (FKs, JSON columns, indexes). |
 
 ## Docs
 
@@ -86,6 +87,8 @@ Project documentation lives in [`docs/`](docs/):
 - [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md) — roles and the permission matrix, the two cookie-session systems, UTC.
 - [`docs/backend/DEPLOYMENT-HOSTINGER.md`](docs/backend/DEPLOYMENT-HOSTINGER.md) — production deployment, env checklist, SMS/S3 setup, migrations, backups.
 - [`docs/backend/KNOWN-ISSUES.md`](docs/backend/KNOWN-ISSUES.md) — out-of-scope items and gotchas.
+- [`docs/backend/API-CHANGES.md`](docs/backend/API-CHANGES.md) — contract changes the frontend has to follow (fix plan).
+- [`docs/backend/FIX-PLAN-STATUS.md`](docs/backend/FIX-PLAN-STATUS.md) — every B/C item: fix, commit, test.
 - [`docs/safeer-design-spec.md`](docs/safeer-design-spec.md), [`docs/safeer-implementation-prompt.md`](docs/safeer-implementation-prompt.md) — the product spec and build brief.
 - [`docs/safeer-backend-fr-review.md`](docs/safeer-backend-fr-review.md), [`docs/safeer-backend-fix-prompt.md`](docs/safeer-backend-fix-prompt.md) — the review and the current fix plan.
 - [`docs/prototype/safeer-prototype.html`](docs/prototype/safeer-prototype.html) — the clickable prototype `npm run seed` reads.

@@ -138,7 +138,7 @@ async function createTempUser(role) {
   const email = `smoke-${role}-${Date.now()}@example.com`;
   const id = await withDb(async (conn) => {
     const [result] = await conn.execute(
-      'INSERT INTO users (name, email, password_hash, role, is_locked, failed_logins) VALUES (?, ?, ?, ?, 0, 0)',
+      "INSERT INTO users (name, email, password_hash, role, status, failed_logins) VALUES (?, ?, ?, ?, 'active', 0)",
       [`Smoke ${role}`, email, passwordHash, role],
     );
     return String(result.insertId);
@@ -163,8 +163,8 @@ async function createTempUserNoLogin(role, overrides = {}) {
   const email = `smoke-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   const id = await withDb(async (conn) => {
     const [result] = await conn.execute(
-      'INSERT INTO users (name, email, password_hash, role, is_locked, failed_logins) VALUES (?, ?, ?, ?, ?, 0)',
-      [`Smoke ${role}`, email, passwordHash, role, overrides.isLocked ? 1 : 0],
+      'INSERT INTO users (name, email, password_hash, role, status, failed_logins) VALUES (?, ?, ?, ?, ?, 0)',
+      [`Smoke ${role}`, email, passwordHash, role, overrides.isLocked ? 'disabled' : 'active'],
     );
     return String(result.insertId);
   });
@@ -225,34 +225,28 @@ async function deleteApplication(applicationId) {
   });
 }
 
-async function readSmsOtpCode(applicationId) {
-  const message = await withDb((conn) =>
-    conn
-      .execute(
-        "SELECT message FROM sms_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'otp_code' ORDER BY id DESC LIMIT 1",
-        [applicationId],
-      )
-      .then(([rows]) => rows[0]?.message),
-  );
-  const match = typeof message === 'string' ? message.match(/\d{6}/) : null;
-  if (!match) throw new Error(`no 6-digit OTP found in sms_log.message for application ${applicationId}: ${JSON.stringify(message)}`);
-  return match[0];
+/**
+ * C1: codes are masked in sms_log/mail_log, so the last code issued for an
+ * application comes from the development/test-only hook
+ * (src/dev/dev-otp.controller.ts), with the channel it went out on.
+ */
+async function readOtp(applicationId) {
+  const res = await fetch(`${BASE}/__dev/otp/${applicationId}`);
+  if (!res.ok) throw new Error(`no OTP issued for application ${applicationId} (dev hook answered ${res.status})`);
+  return res.json();
 }
 
-/** B1's email-fallback path (portal-otp.service.ts) writes the code into mail_log's rendered payload/subject instead of sms_log. */
+async function readSmsOtpCode(applicationId) {
+  const otp = await readOtp(applicationId);
+  if (otp.channel !== 'sms') throw new Error(`expected the OTP to go out by sms, it went by ${otp.channel}`);
+  return otp.code;
+}
+
+/** B1's email-fallback path (portal-otp.service.ts). */
 async function readMailOtpCode(applicationId) {
-  const row = await withDb((conn) =>
-    conn
-      .execute(
-        "SELECT subject, payload FROM mail_log WHERE entity_type = 'applications' AND entity_id = ? AND template_key = 'otp_code' ORDER BY id DESC LIMIT 1",
-        [applicationId],
-      )
-      .then(([rows]) => rows[0]),
-  );
-  const haystack = `${row?.subject ?? ''} ${JSON.stringify(row?.payload ?? '')}`;
-  const match = haystack.match(/\d{6}/);
-  if (!match) throw new Error(`no 6-digit OTP found in mail_log for application ${applicationId}: ${JSON.stringify(row)}`);
-  return match[0];
+  const otp = await readOtp(applicationId);
+  if (otp.channel !== 'email') throw new Error(`expected the OTP to go out by email, it went by ${otp.channel}`);
+  return otp.code;
 }
 
 /**
@@ -1082,6 +1076,53 @@ test('content: DELETE admin/news/legacy removes exactly the legacy-flagged rows'
   // without a fresh db:reset) must report 0, not error.
   const second = await api('DELETE', '/admin/news/legacy');
   assert(second.body.deleted === 0, `a second call with nothing legacy left should report deleted: 0, got ${JSON.stringify(second.body)}`);
+});
+
+test('fix plan phases 4–6: role matrix, about items, unknown filters, anonymise, readiness', async () => {
+  // B17: the matrix RolesGuard enforces, readable by any staff member.
+  const roles = await api('GET', '/admin/roles');
+  assert(roles.status === 200 && roles.body.matrix?.content?.includes('editor'), `GET admin/roles: ${roles.status} ${JSON.stringify(roles.body)}`);
+  const editor = await createTempUser('editor');
+  try {
+    const asEditor = await api('GET', '/admin/roles', { session: editor });
+    assert(asEditor.status === 200, `an editor could not read admin/roles: ${asEditor.status}`);
+  } finally {
+    await deleteTempUser(editor.id);
+  }
+
+  // B18 + C26: grouped, published, rendered.
+  const items = await fetch(`${BASE}/about-items?kind=vision,goal`).then((r) => r.json());
+  assert(items.vision?.length === 1 && items.goal?.length >= 1, `GET about-items: ${JSON.stringify(items).slice(0, 200)}`);
+  assert(String(items.vision[0].body ?? '').startsWith('<p>'), 'about-item bodies should be rendered HTML');
+  const about = await fetch(`${BASE}/pages/about`).then((r) => r.json());
+  assert(about.sections?.some((s) => s.sectionKey === 'governance'), 'the about page should carry its seeded sections (migration 014)');
+
+  // C42: a made-up filter value is a 400, not a cached empty list.
+  const bogus = await fetch(`${BASE}/news?category=smoke-${Date.now()}`);
+  assert(bogus.status === 400, `an unknown news category should be 400, got ${bogus.status}`);
+
+  // C27: an admin anonymises an application; its PII is gone, the reference stays.
+  // Inserted directly: POST applications' 5/hour/IP budget is spent by the cases above.
+  const reference = `SMOKE-${Date.now()}`;
+  const applicant = await withDb(async (conn) => {
+    const [result] = await conn.execute(
+      "INSERT INTO applications (reference, status, first_name, last_name, email) VALUES (?, 'new', 'Smoke', 'Anon', ?)",
+      [reference, `smoke-anon-${Date.now()}@example.com`],
+    );
+    return { id: String(result.insertId), reference };
+  });
+  try {
+    const removed = await api('DELETE', `/admin/applications/${applicant.id}`);
+    assert(removed.status === 200 && removed.body.anonymized === true, `anonymise failed: ${removed.status}`);
+    const [row] = await withDb((conn) => conn.execute('SELECT email, reference FROM applications WHERE id = ?', [applicant.id]).then(([r]) => r));
+    assert(row.email === null && row.reference === applicant.reference, 'anonymise should clear the email and keep the reference');
+  } finally {
+    await deleteApplication(applicant.id);
+  }
+
+  // C30 / Phase 6: readiness includes the storage driver's own check.
+  const ready = await fetch(`${BASE.replace(/\/api\/v1$/, '')}/health/ready`).then((r) => r.json());
+  assert(ready.checks?.storage === 'up', `readiness: ${JSON.stringify(ready)}`);
 });
 
 // ---------------------------------------------------------------------------

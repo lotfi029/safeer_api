@@ -8,20 +8,40 @@
 //
 // Phase 6 (safeer-backend-fix-prompt.md): Jest + ts-jest + supertest, a
 // real MySQL database created and migrated in globalSetup, no ORM mock.
-module.exports = {
+const e2e = {
+  displayName: 'e2e',
   rootDir: 'test',
   preset: 'ts-jest',
   testEnvironment: 'node',
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
   },
-  testMatch: ['**/*.spec.ts'],
+  // Top-level test/*.spec.ts only — test/unit/ is its own project below.
+  testMatch: ['<rootDir>/*.spec.ts'],
   globalSetup: '<rootDir>/global-setup.ts',
   globalTeardown: '<rootDir>/global-teardown.ts',
-  // Each spec file drives the same shared server/database — a slow OTP
-  // lockout case or a large bulk action next to it would otherwise stall
-  // the rest of the suite behind Jest's default 5s.
-  testTimeout: 30_000,
+  // A 30 s per-test timeout (jest.setup.ts): Jest ignores `testTimeout`
+  // inside `projects`.
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+};
+
+// Pure helpers from src/ (escaping, validation, CSV, phone numbers …),
+// imported directly — no server, no database. src/ imports use the ESM
+// `./x.js` form, mapped back to the .ts source here.
+const unit = {
+  displayName: 'unit',
+  rootDir: '.',
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  transform: {
+    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/test/unit/tsconfig.json' }],
+  },
+  moduleNameMapper: { '^(\\.{1,2}/.*)\\.js$': '$1' },
+  testMatch: ['<rootDir>/test/unit/**/*.spec.ts'],
+};
+
+module.exports = {
+  projects: [unit, e2e],
   // The suite exercises rate limits (login, OTP, the applications throttle)
   // that are shared per-process state on the one server every spec file
   // talks to — parallel workers would fight over the same counters the way

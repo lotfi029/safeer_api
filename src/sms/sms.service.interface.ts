@@ -9,6 +9,12 @@ export interface SendSmsParams {
   vars: Record<string, string>;
   locale: Locale;
   entity?: { type: string; id: string };
+  /**
+   * C1: variables that must never be stored — an OTP `code`. `sms_log.message`
+   * (and the `log` driver's console line) get them masked; only the text
+   * actually handed to the provider carries the real value.
+   */
+  sensitiveVars?: readonly string[];
 }
 
 export type SmsSendStatus = 'sent' | 'failed' | 'skipped';
@@ -29,6 +35,17 @@ export type SmsAvailability = 'real' | 'log' | 'disabled';
 
 /** Mirrors MailServiceInterface (src/mail/mail.service.interface.ts) — same shape, a different channel. */
 export interface SmsServiceInterface {
-  send(params: SendSmsParams): Promise<SendSmsResult>;
+  /**
+   * C21: queue-and-return, like MailService.send — writes the `sms_log` row
+   * and delivers in the background, so a slow provider never holds up a
+   * request. Never throws.
+   */
+  send(params: SendSmsParams): Promise<void>;
+  /**
+   * One awaited delivery attempt (bounded by the driver's 5 s timeout), for
+   * the one caller that needs the outcome: the OTP request, which falls back
+   * to email unless this comes back `sent` (B1). Never throws.
+   */
+  sendNow(params: SendSmsParams): Promise<SendSmsResult>;
   availability(): Promise<SmsAvailability>;
 }

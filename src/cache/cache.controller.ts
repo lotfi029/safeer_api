@@ -1,6 +1,6 @@
 import { Controller, Delete, Get, Query, Req } from '@nestjs/common';
 import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { asString } from '../common/query/list-params.js';
 import type { RequestContext } from '../common/request-context.js';
 import { CacheService } from './cache.service.js';
@@ -14,7 +14,7 @@ import { CacheService } from './cache.service.js';
  * other settings/operational surface (11-architecture.md §3).
  */
 @Controller('admin/cache')
-@Roles('admin')
+@Area('settings')
 @ApiCookieAuth()
 export class CacheController {
   constructor(private readonly cache: CacheService) {}

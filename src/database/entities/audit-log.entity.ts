@@ -9,7 +9,8 @@ export type AuditAction =
   | 'unpublish'
   | 'login'
   | 'login_failed'
-  | 'upload';
+  | 'upload'
+  | 'export';
 
 /** Append-only: the application account is granted INSERT and SELECT only — no UPDATE or DELETE. */
 @Entity('audit_log')
@@ -28,7 +29,7 @@ export class AuditLog {
 
   @Column({
     type: 'enum',
-    enum: ['create', 'update', 'delete', 'publish', 'unpublish', 'login', 'login_failed', 'upload'] as AuditAction[],
+    enum: ['create', 'update', 'delete', 'publish', 'unpublish', 'login', 'login_failed', 'upload', 'export'] as AuditAction[],
   })
   action: AuditAction;
 

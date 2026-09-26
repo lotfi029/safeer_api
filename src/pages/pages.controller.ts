@@ -11,6 +11,7 @@ import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { Page } from '../database/entities/page.entity.js';
 import { PageSection } from '../database/entities/page-section.entity.js';
 import { toPublicPage, type PublicPage } from './public-page.js';
+import { MarkdownService } from '../common/markdown/markdown.service.js';
 
 /** Public read side of admin/pages + admin/page-sections. */
 @Controller('pages')
@@ -19,6 +20,7 @@ export class PagesController {
   constructor(
     @InjectRepository(Page) private readonly pageRepo: Repository<Page>,
     @InjectRepository(PageSection) private readonly sectionRepo: Repository<PageSection>,
+    private readonly markdown: MarkdownService,
   ) {}
 
   @Public()
@@ -35,6 +37,6 @@ export class PagesController {
       order: { sortOrder: 'ASC' },
       relations: { imageAsset: true },
     });
-    return toPublicPage(page, sections);
+    return toPublicPage(page, sections, (md) => this.markdown.render(md));
   }
 }

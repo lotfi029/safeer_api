@@ -361,6 +361,77 @@ function buildHomeSections(seed) {
   return rows.map((r, i) => ({ page_id: pageRef('home'), sort_order: i, image_asset_id: null, ...r }));
 }
 
+/**
+ * B18 (migration 014): the `about` and `scholarships` pages' sections, from
+ * pAbout() (~line 729-778) and pScholar() (~line 851-913) — each block's
+ * secHead(label, heading, lead) and its buttons, verbatim. The cards and
+ * lists inside the blocks are about_items (vision, mission, goal,
+ * care_pillar, scholarship_step, requirement), served by GET about-items.
+ */
+function buildInnerPageSections() {
+  const none = { primary_button_label_ar: null, primary_button_label_en: null, primary_button_url: null, secondary_button_label_ar: null, secondary_button_label_en: null, secondary_button_url: null };
+  const about = [
+    {
+      section_key: 'intro',
+      label_ar: 'عن الجمعية', label_en: 'About the association',
+      heading_ar: 'نشر تعاليم الإسلام السمحة ورعاية طلابه', heading_en: "Sharing Islam's teachings and caring for its students",
+      body_ar: 'جمعية سفير الدعوية جمعية تهدف إلى نشر الإسلام وتعاليمه السمحة بين الناس من خلال العديد من الخدمات والأنشطة. تقدم الجمعية برامج توعوية وتعليمية تستهدف مختلف الفئات العمرية، وتعقد دورات تدريبية لتعزيز فهم الإسلام وتعاليمه.\n\nكما تنظّم الجمعية محاضرات وندوات دينية، وتهتم بتوزيع الكتب والنشرات التثقيفية التي تشرح المبادئ الإسلامية بشكل مبسّط وواضح.',
+      body_en: 'Safeer Association works to share Islam and its teachings through a range of services and activities. It runs awareness and education programmes for all age groups and holds training courses that deepen understanding of Islam.\n\nIt also organises lectures and seminars, and distributes books and educational material explaining Islamic principles clearly and simply.',
+      ...none,
+      primary_button_label_ar: 'التراخيص والسياسات', primary_button_label_en: 'Licences & policies', primary_button_url: '/documents',
+      secondary_button_label_ar: 'مجلس الإدارة', secondary_button_label_en: 'Board of directors', secondary_button_url: '/board',
+    },
+    // The vision + mission cards (about_items kind vision/mission) under the block heading.
+    { section_key: 'vision_mission', label_ar: 'مهمتنا', label_en: 'Our mission', heading_ar: 'الرؤية والرسالة والأهداف', heading_en: 'Vision, mission and goals', body_ar: null, body_en: null, ...none },
+    // The goals card and the numbered list (about_items kind goal).
+    { section_key: 'goals', label_ar: 'الأهداف', label_en: 'Goals', heading_ar: null, heading_en: null, body_ar: 'خمسة أهداف معلنة تحكم كل برامج الجمعية وتُقاس عليها.', body_en: 'Five stated goals that govern and measure every programme.', ...none },
+    {
+      section_key: 'governance',
+      label_ar: 'الحوكمة', label_en: 'Governance',
+      heading_ar: 'الاجتماعات والمحاضر', heading_en: 'Meetings and minutes',
+      body_ar: 'تُنشر محاضر الاجتماعات كملفات PDF قابلة للتحميل، وتُدار من قسم «المستندات» في لوحة التحكم.',
+      body_en: 'Minutes are published as downloadable PDFs, managed from the Documents section of the dashboard.',
+      ...none,
+    },
+  ];
+  const scholarships = [
+    {
+      section_key: 'hero',
+      label_ar: 'منح الوافدين', label_en: 'Scholarships',
+      heading_ar: 'منح الوافدين للدراسة بالجامعات السعودية', heading_en: 'Scholarships for international students in Saudi universities',
+      body_ar: 'تلعب الجمعية دوراً محورياً في رعاية طلاب المنح الدوليين، عبر دعم شامل يسهّل تكيّفهم ويعزّز تجربتهم الأكاديمية والثقافية.',
+      body_en: 'The association plays a central role in caring for international scholarship students, with support that eases adaptation and enriches their academic and cultural experience.',
+      ...none,
+      primary_button_label_ar: 'ابدأ الطلب الآن', primary_button_label_en: 'Start your application', primary_button_url: '/apply',
+      secondary_button_label_ar: 'تتبّع طلبي', secondary_button_label_en: 'Track my application', secondary_button_url: '/portal/login',
+    },
+    { section_key: 'pillars', label_ar: 'أوجه الرعاية', label_en: 'How we help', heading_ar: 'أربعة أوجه للدعم', heading_en: 'Four kinds of support', body_ar: null, body_en: null, ...none },
+    {
+      section_key: 'steps',
+      label_ar: 'الخطوات', label_en: 'Steps',
+      heading_ar: 'من الطلب إلى القبول', heading_en: 'From application to acceptance',
+      body_ar: 'كل خطوة لها حالة ظاهرة للطالب في بوابته، وحالة مقابلة في لوحة تحكم الجمعية.',
+      body_en: 'Each step has a status visible in the student portal and a matching one in the dashboard.',
+      ...none,
+    },
+    { section_key: 'requirements', label_ar: 'المتطلبات', label_en: 'Requirements', heading_ar: 'ما تحتاجه قبل التقديم', heading_en: 'What to prepare', body_ar: null, body_en: null, ...none },
+    {
+      section_key: 'cta',
+      label_ar: 'دعوة للتسجيل', label_en: 'Call to action',
+      heading_ar: 'جاهز للتقديم؟', heading_en: 'Ready to apply?',
+      body_ar: 'النموذج يحفظ تقدّمك تلقائياً، ويمكنك العودة لإكماله لاحقاً من بوابة الطالب.',
+      body_en: 'The form saves your progress automatically — come back and finish it from the student portal.',
+      ...none,
+      primary_button_label_ar: 'تسجيل طلب منحة', primary_button_label_en: 'Apply for a scholarship', primary_button_url: '/apply',
+      secondary_button_label_ar: 'لديك سؤال؟ تواصل معنا', secondary_button_label_en: 'Questions? Contact us', secondary_button_url: '/contact',
+    },
+  ];
+  return [
+    ...about.map((r, i) => ({ page_id: pageRef('about'), sort_order: i, image_asset_id: null, is_published: 1, ...r })),
+    ...scholarships.map((r, i) => ({ page_id: pageRef('scholarships'), sort_order: i, image_asset_id: null, is_published: 1, ...r })),
+  ];
+}
+
 function buildAboutItems(seed) {
   const rows = [];
   rows.push({ kind: 'vision', icon: 'eye', title_ar: VISION.titleAr, title_en: VISION.titleEn, body_ar: VISION.bodyAr, body_en: VISION.bodyEn, sort_order: 0 });
@@ -464,9 +535,10 @@ function buildMailTemplates() {
     {
       key: 'contact_ack', name_ar: 'تأكيد استلام رسالة التواصل', name_en: 'Contact acknowledgement',
       subject_ar: 'شكرًا لتواصلك مع جمعية سفير الدعوية', subject_en: 'Thank you for contacting Safeer Association',
-      body_ar: 'مرحبًا {{name}}،\n\nشكرًا لتواصلك مع جمعية سفير الدعوية. وصلتنا رسالتك وسيتواصل معك أحد أعضاء الفريق في أقرب وقت ممكن.\n\nمع تحياتنا،\nفريق جمعية سفير',
-      body_en: "Hello {{name}},\n\nThank you for contacting Safeer Da'wah Association. We have received your message, and a member of our team will get back to you as soon as possible.\n\nWith appreciation,\nThe Safeer Association Team",
-      variables: ['name'],
+      // C16 (migration 007): no {{name}} — this goes to an unverified address.
+      body_ar: 'مرحبًا،\n\nشكرًا لتواصلك مع جمعية سفير الدعوية. وصلتنا رسالتك وسيتواصل معك أحد أعضاء الفريق في أقرب وقت ممكن.\n\nمع تحياتنا،\nفريق جمعية سفير',
+      body_en: "Hello,\n\nThank you for contacting Safeer Da'wah Association. We have received your message, and a member of our team will get back to you as soon as possible.\n\nWith appreciation,\nThe Safeer Association Team",
+      variables: [],
     },
     {
       key: 'contact_notify', name_ar: 'إشعار رسالة تواصل جديدة', name_en: 'New contact message notification',
@@ -506,9 +578,9 @@ function buildMailTemplates() {
     {
       key: 'application_status_changed', name_ar: 'تحديث حالة الطلب', name_en: 'Application status update',
       subject_ar: 'تحديث على طلبك {{reference}}: {{status}}', subject_en: 'Update on your application {{reference}}: {{status}}',
-      body_ar: 'مرحبًا {{name}}،\n\nتحدّثت حالة طلبك رقم **{{reference}}** إلى: **{{status}}**.\n\n{{note}}\n\nيمكنك مراجعة التفاصيل كاملة من بوابة الطالب:\n\n[{{link}}]({{link}})',
-      body_en: 'Hello {{name}},\n\nThe status of your application **{{reference}}** has changed to: **{{status}}**.\n\n{{note}}\n\nYou can review the full details from the student portal:\n\n[{{link}}]({{link}})',
-      variables: ['name', 'reference', 'status', 'note', 'link'],
+      body_ar: 'مرحبًا {{name}}،\n\nتحدّثت حالة طلبك رقم **{{reference}}** إلى: **{{status}}**.\n\nيمكنك مراجعة التفاصيل كاملة من بوابة الطالب:\n\n[{{link}}]({{link}})',
+      body_en: 'Hello {{name}},\n\nThe status of your application **{{reference}}** has changed to: **{{status}}**.\n\nYou can review the full details from the student portal:\n\n[{{link}}]({{link}})',
+      variables: ['name', 'reference', 'status', 'link'], // C23 (migration 009): no {{note}}
     },
     {
       key: 'document_rejected', name_ar: 'رفض مستند مرفوع', name_en: 'Uploaded document rejected',
@@ -533,7 +605,8 @@ function buildMailTemplates() {
     },
     {
       key: 'otp_code', name_ar: 'رمز التحقق لمرة واحدة', name_en: 'One-time verification code',
-      subject_ar: 'رمز الدخول إلى بوابة الطالب: {{code}}', subject_en: 'Your student portal sign-in code: {{code}}',
+      // C1 (migration 007): the code never goes in the subject.
+      subject_ar: 'رمز الدخول إلى بوابة الطالب', subject_en: 'Your student portal sign-in code',
       body_ar: 'رمز الدخول إلى بوابة الطالب هو: **{{code}}**\n\nصالح لمدة {{minutes}} دقائق. لا تشارك هذا الرمز مع أحد.\n\nإذا لم تطلب هذا الرمز، تجاهل هذه الرسالة.',
       body_en: 'Your student portal sign-in code is: **{{code}}**\n\nIt is valid for {{minutes}} minutes. Do not share this code with anyone.\n\nIf you did not request it, you can ignore this message.',
       variables: ['code', 'minutes'],
@@ -547,6 +620,38 @@ function buildMailTemplates() {
       body_ar: 'مرحبًا {{name}}،\n\nلديك طلب منحة قائم بالفعل برقم **{{reference}}**. يمكنك متابعته من بوابة الطالب في أي وقت:\n\n[{{link}}]({{link}})',
       body_en: 'Hello {{name}},\n\nYou already have a scholarship application in progress, reference **{{reference}}**. You can continue it from the student portal at any time:\n\n[{{link}}]({{link}})',
       variables: ['name', 'reference', 'link'],
+    },
+    {
+      // migration 009 (C17/C27)
+      key: 'interview_booked', name_ar: "تأكيد موعد المقابلة", name_en: "Interview booked",
+      subject_ar: "تأكيد موعد مقابلتك — {{reference}}", subject_en: "Your interview is booked — {{reference}}",
+      body_ar: "مرحبًا {{name}}،\n\nتم حجز موعد مقابلتك لطلب المنحة رقم **{{reference}}**:\n\n- **التاريخ:** {{date}}\n- **الوقت:** {{time}}\n- **المكان:** {{location}}\n\nيمكنك مراجعة الموعد أو إلغاؤه من بوابة الطالب:\n\n[{{link}}]({{link}})",
+      body_en: "Hello {{name}},\n\nYour interview for scholarship application **{{reference}}** is booked:\n\n- **Date:** {{date}}\n- **Time:** {{time}}\n- **Location:** {{location}}\n\nYou can review or cancel it from the student portal:\n\n[{{link}}]({{link}})",
+      variables: ["name", "reference", "date", "time", "location", "link"],
+    },
+    {
+      // migration 009 (C17/C27)
+      key: 'interview_cancelled', name_ar: "إلغاء موعد المقابلة", name_en: "Interview cancelled",
+      subject_ar: "تم إلغاء موعد مقابلتك — {{reference}}", subject_en: "Your interview was cancelled — {{reference}}",
+      body_ar: "مرحبًا {{name}}،\n\nتم إلغاء موعد مقابلتك لطلب المنحة رقم **{{reference}}** ({{date}}، {{time}}).\n\nيمكنك اختيار موعد جديد من بوابة الطالب:\n\n[{{link}}]({{link}})",
+      body_en: "Hello {{name}},\n\nYour interview for scholarship application **{{reference}}** ({{date}}, {{time}}) was cancelled.\n\nYou can choose a new time from the student portal:\n\n[{{link}}]({{link}})",
+      variables: ["name", "reference", "date", "time", "link"],
+    },
+    {
+      // migration 009 (C17/C27)
+      key: 'interview_updated', name_ar: "تعديل موعد المقابلة", name_en: "Interview changed",
+      subject_ar: "تغيّر موعد مقابلتك — {{reference}}", subject_en: "Your interview has changed — {{reference}}",
+      body_ar: "مرحبًا {{name}}،\n\nتم تعديل موعد مقابلتك لطلب المنحة رقم **{{reference}}**، والموعد الجديد:\n\n- **التاريخ:** {{date}}\n- **الوقت:** {{time}}\n- **المكان:** {{location}}\n\nللمراجعة أو الإلغاء:\n\n[{{link}}]({{link}})",
+      body_en: "Hello {{name}},\n\nYour interview for scholarship application **{{reference}}** has changed. The new details:\n\n- **Date:** {{date}}\n- **Time:** {{time}}\n- **Location:** {{location}}\n\nTo review or cancel it:\n\n[{{link}}]({{link}})",
+      variables: ["name", "reference", "date", "time", "location", "link"],
+    },
+    {
+      // migration 009 (C17/C27)
+      key: 'newsletter_confirm', name_ar: "تأكيد الاشتراك في النشرة", name_en: "Confirm newsletter subscription",
+      subject_ar: "أكّد اشتراكك في نشرة جمعية سفير", subject_en: "Confirm your Safeer newsletter subscription",
+      body_ar: "مرحبًا،\n\nتلقينا طلبًا لاشتراك هذا البريد في النشرة الإخبارية لجمعية سفير الدعوية. لتأكيد الاشتراك اضغط على الرابط التالي:\n\n[{{link}}]({{link}})\n\nإذا لم تطلب ذلك، تجاهل هذه الرسالة ولن يُضاف بريدك.",
+      body_en: "Hello,\n\nWe received a request to subscribe this address to the Safeer Association newsletter. To confirm, follow this link:\n\n[{{link}}]({{link}})\n\nIf you did not ask for this, ignore this message and nothing will be added.",
+      variables: ["link"],
     },
   ];
   return templates.map((t) => ({
@@ -587,6 +692,27 @@ function buildSmsTemplates() {
       body_ar: 'جمعية سفير: لديك طلب قائم برقم {{reference}}. تابعه عبر بوابة الطالب: {{link}}',
       body_en: 'Safeer: you have an application in progress, ref {{reference}}. Continue it: {{link}}',
       variables: ['reference', 'link'],
+    },
+    {
+      // migration 009 (C17)
+      key: 'interview_booked', name_ar: "تأكيد موعد المقابلة", name_en: "Interview booked",
+      body_ar: "جمعية سفير: تم حجز مقابلتك لطلب {{reference}} يوم {{date}} الساعة {{time}}.",
+      body_en: "Safeer: your interview for application {{reference}} is booked for {{date}} at {{time}}.",
+      variables: ["reference", "date", "time"],
+    },
+    {
+      // migration 009 (C17)
+      key: 'interview_cancelled', name_ar: "إلغاء موعد المقابلة", name_en: "Interview cancelled",
+      body_ar: "جمعية سفير: تم إلغاء مقابلتك لطلب {{reference}} ({{date}} {{time}}). اختر موعدًا جديدًا من بوابة الطالب.",
+      body_en: "Safeer: your interview for application {{reference}} ({{date}} {{time}}) was cancelled. Choose a new time in the student portal.",
+      variables: ["reference", "date", "time"],
+    },
+    {
+      // migration 009 (C17)
+      key: 'interview_updated', name_ar: "تعديل موعد المقابلة", name_en: "Interview changed",
+      body_ar: "جمعية سفير: تغيّر موعد مقابلتك لطلب {{reference}} إلى {{date}} الساعة {{time}}.",
+      body_en: "Safeer: your interview for application {{reference}} moved to {{date}} at {{time}}.",
+      variables: ["reference", "date", "time"],
     },
   ];
   return templates.map((t) => ({
@@ -1012,6 +1138,8 @@ async function main() {
   sql002 += insertStatement('pages', ['slug', 'title_ar', 'title_en', 'meta_title_ar', 'meta_title_en', 'meta_description_ar', 'meta_description_en', 'is_published', 'needs_review'], buildPages(seed)) + '\n';
   sql002 += comment('page_sections: the home page\'s 9 sections, in prototype order (partners hidden)') + '\n';
   sql002 += insertStatement('page_sections', ['page_id', 'section_key', 'label_ar', 'label_en', 'heading_ar', 'heading_en', 'body_ar', 'body_en', 'primary_button_label_ar', 'primary_button_label_en', 'primary_button_url', 'secondary_button_label_ar', 'secondary_button_label_en', 'secondary_button_url', 'image_asset_id', 'is_published', 'sort_order'], buildHomeSections(seed)) + '\n';
+  sql002 += comment('page_sections: the about and scholarships pages (B18, migration 014)') + '\n';
+  sql002 += insertStatement('page_sections', ['page_id', 'section_key', 'label_ar', 'label_en', 'heading_ar', 'heading_en', 'body_ar', 'body_en', 'primary_button_label_ar', 'primary_button_label_en', 'primary_button_url', 'secondary_button_label_ar', 'secondary_button_label_en', 'secondary_button_url', 'image_asset_id', 'is_published', 'sort_order'], buildInnerPageSections()) + '\n';
   sql002 += comment('about_items: vision + mission, 5 goals, 4 care pillars, 5 scholarship steps, 4 requirements') + '\n';
   sql002 += insertStatement('about_items', ['kind', 'icon', 'title_ar', 'title_en', 'body_ar', 'body_en', 'is_published', 'sort_order'], buildAboutItems(seed)) + '\n';
   sql002 += insertStatement('stats', ['value', 'label_ar', 'label_en', 'sub_ar', 'sub_en', 'is_published', 'sort_order'], buildStats()) + '\n';

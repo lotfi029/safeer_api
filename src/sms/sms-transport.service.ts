@@ -25,15 +25,26 @@ export interface SmsDeliveryResult {
  * writes to the Nest logger, which is enough for local development and for
  * the smoke suite to read an OTP code back out of `sms_log` directly.
  */
+/**
+ * C21: a provider that doesn't answer within this is treated as a failed
+ * send (and the OTP request falls back to email) instead of holding the
+ * request open indefinitely.
+ */
+export const SMS_TIMEOUT_MS = 5000;
+
 @Injectable()
 export class SmsTransportService {
   private readonly logger = new Logger(SmsTransportService.name);
 
   constructor(@Inject(ENV) private readonly env: Env) {}
 
-  async deliver(settings: SmsSettings, to: string, message: string): Promise<SmsDeliveryResult> {
+  /**
+   * `loggable` is `message` with sensitive variables (an OTP code) masked
+   * (C1) — the `log` driver prints that, never the real text.
+   */
+  async deliver(settings: SmsSettings, to: string, message: string, loggable: string = message): Promise<SmsDeliveryResult> {
     if (settings.driver === 'log') {
-      this.logger.log(`[SMS to ${to}] ${message}`);
+      this.logger.log(`[SMS to ${to}] ${loggable}`);
       return { ok: true };
     }
 
@@ -55,6 +66,7 @@ export class SmsTransportService {
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ to, message, sender: settings.senderName ?? undefined }),
+        signal: AbortSignal.timeout(SMS_TIMEOUT_MS),
       });
       if (!response.ok) {
         return { ok: false, error: `Provider responded with HTTP ${response.status}` };
@@ -102,7 +114,7 @@ export class SmsTransportService {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body,
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(SMS_TIMEOUT_MS),
       });
       const data = (await response.json().catch(() => null)) as
         | { success?: boolean | string; message?: string; errorCode?: string | number }

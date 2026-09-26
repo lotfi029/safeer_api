@@ -1,11 +1,15 @@
-import type { User, UserRole } from '../database/entities/user.entity.js';
+import type { User, UserRole, UserStatus } from '../database/entities/user.entity.js';
 
 export interface PublicUser {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  /** C3: active | disabled | invited — only an admin changes it. */
+  status: UserStatus;
+  /** C12: true while a brute-force lock is running (`lockedUntil` in the future). */
   isLocked: boolean;
+  lockedUntil: Date | null;
   failedLogins: number;
   lastLoginAt: Date | null;
   createdAt: Date;
@@ -19,10 +23,17 @@ export function toPublicUser(user: User): PublicUser {
     name: user.name,
     email: user.email,
     role: user.role,
-    isLocked: user.isLocked,
+    status: user.status,
+    isLocked: isBruteForceLocked(user),
+    lockedUntil: user.lockedUntil,
     failedLogins: user.failedLogins,
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
+}
+
+/** C12: a brute-force lock is in force until `lockedUntil`. */
+export function isBruteForceLocked(user: Pick<User, 'lockedUntil'>, now: Date = new Date()): boolean {
+  return user.lockedUntil !== null && user.lockedUntil > now;
 }

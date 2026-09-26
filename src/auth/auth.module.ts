@@ -11,6 +11,7 @@ import { MailModule } from '../mail/mail.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
+import { RolesController } from './roles.controller.js';
 import { PasswordService } from './password.service.js';
 import { ApplicantSessionService } from './applicant-session.service.js';
 import { SessionGuard } from './guards/session.guard.js';
@@ -25,7 +26,7 @@ import { BootstrapService } from './bootstrap.service.js';
     MailModule,
     UsersModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, RolesController],
   providers: [
     AuthService,
     PasswordService,

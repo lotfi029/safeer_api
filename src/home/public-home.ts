@@ -40,14 +40,15 @@ export interface PublicAboutItem {
   sortOrder: number;
 }
 
-export function toPublicAboutItem(item: AboutItem): PublicAboutItem {
+/** C26: `bodyAr`/`bodyEn` are sanitized HTML, rendered from the stored Markdown (MarkdownService.render). */
+export function toPublicAboutItem(item: AboutItem, render: (markdown: string) => string): PublicAboutItem {
   return {
     id: item.id,
     icon: item.icon,
     titleAr: item.titleAr,
     titleEn: item.titleEn,
-    bodyAr: item.bodyAr,
-    bodyEn: item.bodyEn,
+    bodyAr: item.bodyAr ? render(item.bodyAr) : null,
+    bodyEn: item.bodyEn ? render(item.bodyEn) : null,
     sortOrder: item.sortOrder,
   };
 }

@@ -12,6 +12,10 @@ on:
     branches: [main]
   pull_request:
 
+# C44: the workflow only reads the repository; the token gets nothing more.
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -66,7 +70,7 @@ jobs:
       BOOTSTRAP_ADMIN_PASSWORD: ci-only-password-not-a-secret
       IP_HASH_SALT: ci-only-salt-not-a-secret
       CORS_ORIGINS: http://localhost:4200
-      PUBLIC_BASE_URL: http://localhost:3900
+      FRONTEND_BASE_URL: http://localhost:4200
       CACHE_TTL_SECONDS: '60'
       CACHE_MAX_ENTRIES: '500'
       # B0-5: refused outright if NODE_ENV=production — safe here since
@@ -78,8 +82,10 @@ jobs:
       # left on for parity with a real dev environment.
       ALLOW_DEV_PASSWORD_FIXUP: 'true'
 
+    # C44: third-party actions are pinned to a full commit SHA (the tag
+    # can be moved; the SHA can't). Update both together.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       # Node 22, not 20: jsdom 30 (loaded at module scope by
       # markdown.service.ts), file-type 22 (media.service.ts) and undici 8
@@ -89,7 +95,7 @@ jobs:
       # break surfaces later as "markAsUncloneable is not a function" the
       # first time anything imports jsdom: openapi:check here, and the API
       # boot step right after it. Keep at or above package.json engines.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -109,6 +115,32 @@ jobs:
 
       - run: npm run migrate
 
+      # C44: migrations are idempotent — a second run must apply nothing
+      # (and its checksum pass must accept every file it just applied).
+      - name: Migrate again (must be a no-op)
+        run: npm run migrate | tee migrate-2.log && grep -q 'Nothing to migrate' migrate-2.log
+
+      # C44: the entities match the migrated schema (scripts/check-schema.mjs).
+      - run: npm run schema:check
+
+      # C44: the production path on a fresh database — only the numbered
+      # files, never migrations/dev/, through MIGRATION_DB_USER (required
+      # outside development/test), and again a no-op second run.
+      - name: Migrate a fresh database as production
+        env:
+          NODE_ENV: production
+          DB_NAME: safeer_prod
+          MIGRATION_DB_USER: root
+          MIGRATION_DB_PASSWORD: ''
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u root -e 'CREATE DATABASE safeer_prod CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+          npm run migrate
+          dev_rows=$(mysql -h 127.0.0.1 -P 3306 -u root -N -e "SELECT COUNT(*) FROM safeer_prod.schema_migrations WHERE version = '003_dev_sample.sql'")
+          applications=$(mysql -h 127.0.0.1 -P 3306 -u root -N -e 'SELECT COUNT(*) FROM safeer_prod.applications')
+          test "$dev_rows" = 0 && test "$applications" = 0 || { echo "dev fixtures reached a production migrate"; exit 1; }
+          npm run migrate | tee migrate-prod-2.log && grep -q 'Nothing to migrate' migrate-prod-2.log
+          DB_NAME=safeer_prod NODE_ENV=development npm run schema:check
+
       # Phase 6 (safeer-backend-fix-prompt.md): Jest + supertest-style HTTP
       # tests against a real, dedicated MySQL database and a real running
       # instance of the app — both created and booted in
@@ -122,8 +154,8 @@ jobs:
       # frontend API client depends on it.
       - run: npm run openapi:check
 
-      # B4/B5 sweep (safeer-backend-fr-review.md phase 2): every admin/*
-      # route must be role-gated or on the explicit allow-list — see
+      # B4/B5/B17 sweep: every admin/* route must be gated by its
+      # role-matrix area or be on the explicit allow-list — see
       # scripts/lib/check-admin-roles.mjs.
       - run: npm run check:admin-roles
 

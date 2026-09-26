@@ -6,7 +6,7 @@ import type { Readable } from 'node:stream';
 import { fileTypeFromBuffer } from 'file-type';
 import { MediaAsset, type MediaAssetKind } from '../database/entities/media-asset.entity.js';
 import { MediaVariant } from '../database/entities/media-variant.entity.js';
-import { generateWebpVariants } from './image-pipeline.js';
+import { normalizeOriginal, generateWebpVariants } from './image-pipeline.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { CacheService } from '../cache/cache.service.js';
@@ -23,7 +23,9 @@ import { PUBLIC_STORAGE_DRIVER, type StorageDriver } from '../storage/storage-dr
  * `partners`, `documents`. 'home' stays too — every one of these also feeds
  * the home aggregate via `extraPurgeTags`.
  */
-const ASSET_PUBLIC_MEMO_TAGS: string[] = ['home', 'pages', 'board_members', 'news', 'partners', 'documents'];
+// C25: + 'doc_categories' — a document is only public while its category is
+// published too, so unpublishing a category must drop the memo.
+export const ASSET_PUBLIC_MEMO_TAGS: string[] = ['home', 'pages', 'board_members', 'news', 'partners', 'documents', 'doc_categories'];
 
 // FR-F-02 governs (your decision) — 20 MB is the outer multipart body guard
 // (main.ts / multer limits); these are the real per-kind limits checked
@@ -93,82 +95,93 @@ export class MediaService {
       return { asset: existing, wasExisting: true };
     }
 
-    const publicId = randomUUID();
-    const now = new Date();
-    const dir = `assets/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-    const ext = detected!.ext;
-    const storageKey = `${dir}/${publicId}.${ext}`;
-    await this.driver.put(storageKey, buffer);
-
+    // C7: an image original is re-encoded (EXIF/GPS stripped, orientation
+    // applied) before anything is stored; the checksum above stays the hash
+    // of the uploaded bytes, so re-uploading the same photo still dedups.
+    let body = buffer;
     let widthPx: number | null = null;
     let heightPx: number | null = null;
-    const variantRows: { label: 'thumb' | 'card' | 'full'; storageKey: string; widthPx: number; sizeBytes: number }[] = [];
-
+    let variants: Awaited<ReturnType<typeof generateWebpVariants>>['variants'] = [];
     if (kind === 'image') {
-      let pipelineResult: Awaited<ReturnType<typeof generateWebpVariants>>;
       try {
-        pipelineResult = await generateWebpVariants(buffer);
+        const normalized = await normalizeOriginal(buffer, detected!.mime);
+        if (normalized.width > MAX_DIMENSION_PX || normalized.height > MAX_DIMENSION_PX) {
+          throw new ProblemException(422, ErrorCode.VALIDATION_FAILED, `Image dimensions exceed the ${MAX_DIMENSION_PX}px limit per side`);
+        }
+        body = normalized.buffer;
+        widthPx = normalized.width || null;
+        heightPx = normalized.height || null;
+        variants = (await generateWebpVariants(body)).variants;
       } catch (err) {
+        if (err instanceof ProblemException) throw err;
         // H4: sharp's own limitInputPixels guard (image-pipeline.ts) throws
-        // a plain Error with this exact message. Surfaced as a typed 422 —
-        // an editor scanning a poster at high DPI needs to know to
-        // downscale, not receive a generic 500. The original was already
-        // written to disk above; clean it up so a rejected upload doesn't
-        // orphan it.
+        // a plain Error with this exact message — a typed 422 so an editor
+        // knows to downscale.
         if (err instanceof Error && err.message === 'Input image exceeds pixel limit') {
-          await this.deleteFile(storageKey);
           throw new ProblemException(
             422,
             ErrorCode.VALIDATION_FAILED,
             'Image is too large to process (over the 50-megapixel limit) — please downscale it and try again.',
           );
         }
-        throw err;
+        // C38: anything else sharp can't decode is the file's fault, not a 500.
+        throw new ProblemException(422, ErrorCode.VALIDATION_FAILED, 'The image could not be decoded — it may be corrupt or truncated');
       }
+    }
 
-      const { width, height, variants } = pipelineResult;
+    const publicId = randomUUID();
+    const now = new Date();
+    const dir = `assets/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const storageKey = `${dir}/${publicId}.${detected!.ext}`;
+    const written: string[] = [];
 
-      if (width > MAX_DIMENSION_PX || height > MAX_DIMENSION_PX) {
-        await this.deleteFile(storageKey);
-        throw new ProblemException(422, ErrorCode.VALIDATION_FAILED, `Image dimensions exceed the ${MAX_DIMENSION_PX}px limit per side`);
-      }
-
-      widthPx = width || null;
-      heightPx = height || null;
+    try {
+      await this.driver.put(storageKey, body);
+      written.push(storageKey);
+      const variantRows: { label: 'thumb' | 'card' | 'full'; storageKey: string; widthPx: number; sizeBytes: number }[] = [];
       for (const v of variants) {
         const variantKey = `${dir}/${publicId}-${v.label}.webp`;
         await this.driver.put(variantKey, v.buffer);
+        written.push(variantKey);
         variantRows.push({ label: v.label, storageKey: variantKey, widthPx: v.width, sizeBytes: v.buffer.length });
       }
+
+      const asset = await this.assetRepo.manager.transaction(async (manager) => {
+        const saved = await manager.save(
+          manager.create(MediaAsset, {
+            publicId,
+            kind,
+            mimeType: detected!.mime,
+            sizeBytes: body.length,
+            originalName,
+            storageKey,
+            checksumSha256: checksum,
+            widthPx,
+            heightPx,
+            // I-2: a resolver-downloaded cover must not land as a bare, alt-less
+            // image — passing the provider's title here closes that gap.
+            altAr,
+            altEn: null,
+            uploadedBy,
+          }),
+        );
+        for (const v of variantRows) {
+          await manager.save(manager.create(MediaVariant, { assetId: saved.id, ...v }));
+        }
+        return saved;
+      });
+      return { asset, wasExisting: false };
+    } catch (err) {
+      // C38: a failed write or save must not orphan what was already stored.
+      await Promise.all(written.map((key) => this.deleteFile(key)));
+      // Two identical uploads racing: the loser's insert hits
+      // uq_assets_checksum — hand back the winner's row, as a normal dedup would.
+      if ((err as { code?: string }).code === 'ER_DUP_ENTRY') {
+        const winner = await this.assetRepo.findOne({ where: { checksumSha256: checksum } });
+        if (winner) return { asset: winner, wasExisting: true };
+      }
+      throw err;
     }
-
-    const asset = await this.assetRepo.save(
-      this.assetRepo.create({
-        publicId,
-        kind,
-        mimeType: detected!.mime,
-        sizeBytes: buffer.length,
-        originalName,
-        storageKey,
-        checksumSha256: checksum,
-        widthPx,
-        heightPx,
-        // I-2: a resolver-downloaded cover must not land as a bare, alt-less
-        // image — that would satisfy `assertAltTextReady`'s check by simply
-        // never being attached, since FR-F-03 blocks it at attach time, not
-        // upload time; passing the provider's title here closes that gap.
-        altAr,
-        altEn: null,
-        uploadedBy,
-      }),
-    );
-
-    for (const v of variantRows) {
-      await this.variantRepo.save(this.variantRepo.create({ assetId: asset.id, ...v }));
-    }
-
-    return { asset, wasExisting: false };
   }
 
   async findByPublicId(publicId: string): Promise<MediaAsset | null> {
@@ -234,13 +247,20 @@ export class MediaService {
    * asset, publishes the owning row, and requires the very next anonymous
    * fetch to see a fresh `true`.
    */
+  /** C41: whether post `postId` shows this asset (its cover) — what a post preview token may unlock on /files. */
+  async isUsedByPost(assetId: string, postId: string): Promise<boolean> {
+    const rows: unknown[] = await this.dataSource.query('SELECT 1 FROM posts WHERE id = ? AND cover_asset_id = ? LIMIT 1', [postId, assetId]);
+    return rows.length > 0;
+  }
+
   async isPubliclyReadable(assetId: string): Promise<boolean> {
     const key = `asset-public:${assetId}`;
     const memoised = this.cache.getMemo(key);
     if (memoised !== undefined) return memoised;
 
+    const version = this.cache.versionOf(ASSET_PUBLIC_MEMO_TAGS); // C31
     const isPublic = await this.queryIsPubliclyReadable(assetId);
-    this.cache.setMemo(key, isPublic, ASSET_PUBLIC_MEMO_TAGS);
+    this.cache.setMemo(key, isPublic, ASSET_PUBLIC_MEMO_TAGS, version);
     return isPublic;
   }
 
@@ -264,7 +284,8 @@ export class MediaService {
          UNION ALL SELECT 1 FROM board_members WHERE photo_asset_id = ? AND is_published = 1
          UNION ALL SELECT 1 FROM posts WHERE cover_asset_id = ? AND is_published = 1
          UNION ALL SELECT 1 FROM partners WHERE logo_asset_id = ? AND is_published = 1
-         UNION ALL SELECT 1 FROM documents WHERE asset_id = ? AND is_published = 1
+         UNION ALL SELECT 1 FROM documents d JOIN doc_categories dc ON dc.id = d.category_id
+           WHERE d.asset_id = ? AND d.is_published = 1 AND dc.is_published = 1
        ) AS isPublic`,
       [assetId, assetId, assetId, assetId, assetId],
     );

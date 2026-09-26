@@ -76,18 +76,19 @@ reason). See the [README](../../README.md)'s environment table for what each
 one means; this is the production-specific subset to double-check:
 
 - [ ] `NODE_ENV=production`
+- [ ] HTTPS on both the API and the frontend. Outside development/test the session cookies are `Secure` (C32), so over plain HTTP (a staging site included) nobody can sign in.
 - [ ] `PORT` — whatever Hostinger's Node.js app config expects the process to listen on.
 - [ ] `DB_HOST=127.0.0.1`, `DB_PORT=3306`
 - [ ] `DB_USER` / `DB_PASSWORD` / `DB_NAME` — the *running* app's account: the least-privilege one `scripts/create-app-db-user.sql` creates (bound to `127.0.0.1`).
 - [ ] `MIGRATION_DB_USER` / `MIGRATION_DB_PASSWORD` — the DDL-capable account from the hosting panel's MariaDB screen, used only by `npm run migrate`. **Required** when `NODE_ENV` is `production`/`staging`: the runner refuses to fall back to `DB_USER` there.
-- [ ] `APP_ENCRYPTION_KEY` — generate once with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` and treat it as permanent (rotating it makes every already-stored SMTP password / SMS provider token unreadable).
+- [ ] `APP_ENCRYPTION_KEY` — generate once with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` and treat it as permanent (rotating it makes every already-stored SMTP password / SMS provider token and applicant ID number unreadable). Keep a copy outside the server (see *Backups*).
 - [ ] `STORAGE_DRIVER` — `local` (default) or `s3` (see "S3 storage mode" below).
 - [ ] `STORAGE_ROOT` — with `local`: an absolute path outside the deploy directory (see above).
 - [ ] `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_PUBLIC`, `S3_BUCKET_PRIVATE`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_SIGNED_URL_TTL_SECONDS` — only with `STORAGE_DRIVER=s3`.
 - [ ] `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` — the real first admin's credentials, not a placeholder; change the password immediately after first login if you ever need to hand this value to someone else during setup.
 - [ ] `IP_HASH_SALT` — a real random value (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`), not the CI placeholder.
 - [ ] `CORS_ORIGINS` — the real frontend origin(s), comma-separated.
-- [ ] `PUBLIC_BASE_URL` — the API's own public URL (used to build links inside invite/reset/portal emails).
+- [ ] `FRONTEND_BASE_URL` — the public frontend's origin (e.g. `https://<your-domain>`). Every invite, password-reset, portal and inbox link in mail/SMS is built as `${FRONTEND_BASE_URL}/{locale}/…`; the API refuses to boot without it in production/staging. It replaces the old `PUBLIC_BASE_URL`, which can be removed.
 - [ ] `CACHE_TTL_SECONDS` / `CACHE_MAX_ENTRIES` — the defaults (60 / 500) are reasonable; only change them with the in-process-cache caveat below in mind.
 - [ ] `ALLOW_DEV_PASSWORD_FIXUP` — **must be `false` (or unset)**. The env schema refuses to boot at all if this is `true` while `NODE_ENV=production`, as a hard backstop, but don't rely on that — it should never be set here in the first place.
 
@@ -121,6 +122,9 @@ raising `instances`.
    `migrations/dev/003_dev_sample.sql` is **not** applied — no sample
    applications, no sample contact messages, no placeholder media. That's
    intentional; nothing in `002_seed.sql` depends on the dev sample existing.
+   Then run `npm run schema:check` (same env): it must print
+   `Schema matches the entities`. CI runs this same production path on a
+   fresh database on every push.
 5. Run `scripts/create-app-db-user.sql` against the database as a
    privileged user, change its placeholder password, and set
    `DB_USER`/`DB_PASSWORD` to that least-privilege account for the
@@ -161,6 +165,20 @@ Swagger UI (`/api/docs`) is disabled in production on purpose (see
 [`ARCHITECTURE.md`](ARCHITECTURE.md)) — use `openapi.json` (committed at the repo root) against an
 API client or Postman/Insomnia instead if you need to explore routes
 interactively without a staging deployment.
+
+## One-off: strip EXIF from media uploaded before C7
+
+Uploads now store image originals re-encoded, with EXIF/GPS removed and the
+orientation applied. Assets uploaded before that change still carry their
+original metadata. After deploying, run once (dry run first):
+
+```bash
+npm run media:reprocess              # lists what would change
+npm run media:reprocess -- --apply   # rewrites originals + variants, updates sizes
+```
+
+It works through `STORAGE_DRIVER` (local disk or the S3 public bucket) and
+skips rows whose file is missing.
 
 ## UTC
 
@@ -235,6 +253,14 @@ in `admin/sms/settings` (`PUT /api/v1/admin/sms/settings`, admin only):
 - The seeded default is `driver: 'log'`, which writes `sms_log` and sends
   nothing. With `log` in production, OTP requests fall back to email.
 - `driver: 'http'` remains for a generic JSON gateway (URL + bearer token).
+- Every provider call has a 5-second timeout. Notification SMS are queued
+  and sent in the background (`sms_log` shows `queued` → `sent`/`failed`);
+  only the OTP request waits for the result, and falls back to email if the
+  SMS isn't sent. SMS always go to the applicant's E.164 number.
+- OTP codes are never stored: `sms_log.message` and `mail_log.subject`
+  hold `••••••` in their place, and no OTP mail payload is kept for retries.
+  (In development/test only, `GET /api/v1/__dev/otp/:applicationId` returns
+  the last code for the smoke and Jest suites; the route is a 404 elsewhere.)
 
 ## S3 storage mode
 
@@ -250,33 +276,105 @@ endpoint instead of `STORAGE_ROOT`:
   `S3_SIGNED_URL_TTL_SECONDS` (default 300).
 - Every `S3_*` variable is required at boot when `STORAGE_DRIVER=s3`
   (`src/config/env.ts`).
+- `GET /health/ready` checks both buckets with a `HeadBucket` (local mode:
+  that `STORAGE_ROOT` is writable), so wrong credentials or a missing bucket
+  show up as `storage: down` before the first upload fails.
+- The access key needs `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` and
+  `s3:ListBucket` (for `HeadBucket`) on both buckets, nothing else. A delete
+  that fails (for example, a missing permission) is logged and never fails the
+  request that triggered it. Watch the log for `Could not delete s3://…`.
 
 ## Backups
 
-The recommended baseline for a first production deployment is a
-cron-scheduled `mysqldump` for the database plus `npm run backup:storage`
-for uploaded files, e.g. via Hostinger's cron job feature or SSH's own
-crontab. Database:
+A cron-scheduled `mysqldump` for the database plus `npm run backup:storage`
+for uploaded files, via Hostinger's cron job feature or SSH's own crontab.
+All times below are **server time**; keep the host on UTC (see *UTC*).
+
+### Database (C28)
+
+Keep the credentials out of the command line (and so out of `ps` and the
+cron log) in `~/.my.cnf`, readable only by you:
+
+```ini
+# ~/.my.cnf   (chmod 600 ~/.my.cnf)
+[mysqldump]
+host=127.0.0.1
+user=<backup_user>          # SELECT, LOCK TABLES, SHOW VIEW, TRIGGER on <db_name>
+password=<backup_password>
+```
 
 ```bash
-# Daily at 03:00 server time, keeping 14 days of dumps.
-0 3 * * * mysqldump -h 127.0.0.1 -u <db_user> -p'<db_password>' <db_name> \
+# Daily at 03:30 — after the 03:00 maintenance job (retention purge) — keeping 14 days.
+30 3 * * * mysqldump --single-transaction --quick --routines --triggers --default-character-set=utf8mb4 <db_name> \
   | gzip > /home/<hostinger-username>/backups/safeer-$(date +\%Y\%m\%d).sql.gz \
   && find /home/<hostinger-username>/backups -name 'safeer-*.sql.gz' -mtime +14 -delete
 ```
 
-Uploaded files (`STORAGE_DRIVER=local`) — `scripts/backup-storage.mjs`
-writes a dated `safeer-storage-<timestamp>.tar.gz` of `STORAGE_ROOT`:
+`--single-transaction` takes a consistent InnoDB snapshot without locking
+the tables the app is writing to. `--quick` streams rows instead of
+buffering whole tables in memory.
+
+**Offsite, encrypted copy.** A backup that lives on the same server doesn't
+survive losing that server. Copy each dump elsewhere, encrypted, e.g. with
+`age` or `gpg --symmetric` before upload. The dump holds applicant PII: names,
+phone numbers, e-mail addresses. The ID number column is already AES-256-GCM
+encrypted with `APP_ENCRYPTION_KEY` (C28), but the rest is plain text.
+
+**`APP_ENCRYPTION_KEY` is part of the backup.** Without it, the restored
+ID numbers, SMTP password and SMS token can't be decrypted. Store the key
+separately from the dumps, e.g. in the association's password manager, never
+in the same archive.
+
+**Test the restore** at least once after setting this up, and after any
+schema change of note: restore into a scratch database, point a local
+checkout at it with the production `APP_ENCRYPTION_KEY`, and open an
+application in the admin.
 
 ```bash
-# Daily at 03:15 server time, keeping 14 days of archives.
-15 3 * * * cd /path/to/safeer_api && NODE_ENV=production node scripts/backup-storage.mjs /home/<hostinger-username>/backups \
+mysql -e 'CREATE DATABASE safeer_restore_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+gunzip -c safeer-YYYYMMDD.sql.gz | mysql safeer_restore_test
+```
+
+### Uploaded files
+
+`STORAGE_DRIVER=local`: `scripts/backup-storage.mjs` writes a dated
+`safeer-storage-<timestamp>.tar.gz` of `STORAGE_ROOT`:
+
+```bash
+# Daily at 03:45, keeping 14 days of archives.
+45 3 * * * cd /path/to/safeer_api && NODE_ENV=production node scripts/backup-storage.mjs /home/<hostinger-username>/backups \
   >> /home/<hostinger-username>/logs/safeer-storage-backup.log 2>&1 \
   && find /home/<hostinger-username>/backups -name 'safeer-storage-*.tar.gz' -mtime +14 -delete
 ```
 
-With `STORAGE_DRIVER=s3` the script prints a message and does nothing: use
+The archive holds applicants' private documents, so it gets the same
+encrypted offsite copy as the dump.
+
+With `STORAGE_DRIVER=s3`, the script prints a message and does nothing. Use
 the provider's own versioning or replication for both buckets.
+
+## Data retention (C27)
+
+`MaintenanceService` runs nightly at 03:00 (server time) inside the app
+process. Nothing extra needs scheduling. It deletes:
+
+| Data | Kept for |
+|---|---|
+| Expired staff/applicant sessions, spent auth tokens and OTPs | until expiry |
+| `mail_log` | 90 days (a reply's delivery status is first copied onto `message_replies`) |
+| `sms_log` | 90 days |
+| Contact messages | 24 months |
+| Draft applications nobody touched | 180 days (their uploaded files are deleted too) |
+| Newsletter rows unsubscribed, or never confirmed | 30 days |
+
+Submitted applications are never deleted by age. When an applicant asks
+for their data to be removed, an admin uses `DELETE admin/applications/:id`.
+That anonymises the row (the reference and status stay, for the figures)
+and deletes its documents and their files, notes, events and mail/SMS logs.
+The action is audited.
+
+Backups keep deleted data for their own 14 days, which the privacy notice
+should mention.
 
 ## Rollback
 
@@ -293,8 +391,8 @@ the provider's own versioning or replication for both buckets.
   code against it will leave the schema out of sync — always roll code and
   database back together, never one without the other.
 - **A bad `APP_ENCRYPTION_KEY` change**: this key is permanent by design
-  (rotating it makes every stored SMTP password / SMS provider token
-  unreadable, not just newly-written ones). If it's ever changed by
+  (rotating it makes every stored SMTP password / SMS provider token, and
+  every applicant ID number (C28), unreadable, not just newly-written ones). If it's ever changed by
   mistake, the fix is re-entering the SMTP password and SMS provider token
   through `admin/mail/settings`/`admin/sms/settings` after rolling the key
   back — there is no way to recover a secret encrypted under a key that's

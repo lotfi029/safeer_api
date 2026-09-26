@@ -3,7 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
 import { ContactService } from './contact.service.js';
-import { ContactDto, NewsletterDto } from './dto/contact.dto.js';
+import { ContactDto, NewsletterDto, NewsletterTokenDto } from './dto/contact.dto.js';
 
 @Controller()
 export class ContactController {
@@ -22,5 +22,21 @@ export class ContactController {
   @Post('newsletter')
   subscribe(@Body() dto: NewsletterDto, @Req() req: RequestContext) {
     return this.contactService.subscribe(dto, req.ipHash ?? null, req.locale);
+  }
+
+  /** C27: double opt-in — the link from the `newsletter_confirm` mail. */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 3_600_000 } })
+  @Post('newsletter/confirm')
+  confirm(@Body() dto: NewsletterTokenDto) {
+    return this.contactService.confirmSubscription(dto.email, dto.token);
+  }
+
+  /** C27: the signed unsubscribe link carried by newsletter mail. */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 3_600_000 } })
+  @Post('newsletter/unsubscribe')
+  unsubscribe(@Body() dto: NewsletterTokenDto) {
+    return this.contactService.unsubscribe(dto.email, dto.token);
   }
 }

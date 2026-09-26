@@ -1,13 +1,13 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { createReadStream } from 'node:fs';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { constants as fsConstants, createReadStream } from 'node:fs';
+import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
 import type { Readable } from 'node:stream';
 import path from 'node:path';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
-import type { StorageDriver } from './storage-driver.interface.js';
+import { StorageObjectNotFoundError, type StorageDriver } from './storage-driver.interface.js';
 
 /**
  * `STORAGE_DRIVER=local` (the default) — everything under `STORAGE_ROOT`,
@@ -18,6 +18,8 @@ import type { StorageDriver } from './storage-driver.interface.js';
  */
 @Injectable()
 export class LocalStorageDriver implements StorageDriver {
+  private readonly logger = new Logger(LocalStorageDriver.name);
+
   constructor(@Inject(ENV) private readonly env: Env) {}
 
   async put(key: string, buffer: Buffer): Promise<void> {
@@ -26,15 +28,33 @@ export class LocalStorageDriver implements StorageDriver {
     await writeFile(resolved, buffer);
   }
 
+  /** Resolves once the file is open, so a missing file rejects here (like S3) instead of failing later on the stream. */
   async getStream(key: string): Promise<Readable> {
-    return createReadStream(this.resolve(key));
+    const stream = createReadStream(this.resolve(key));
+    await new Promise<void>((resolve, reject) => {
+      stream.once('open', () => resolve());
+      stream.once('error', (err: NodeJS.ErrnoException) => reject(err.code === 'ENOENT' ? new StorageObjectNotFoundError(key) : err));
+    });
+    return stream;
   }
 
   async remove(key: string): Promise<void> {
     try {
       await unlink(this.resolve(key));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return; // already gone
+      this.logger.error(`Could not delete stored file ${key}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /** C30: STORAGE_ROOT exists (or can be created) and is writable — an access check, no probe file. */
+  async healthCheck(): Promise<boolean> {
+    try {
+      await mkdir(this.env.STORAGE_ROOT, { recursive: true });
+      await access(this.env.STORAGE_ROOT, fsConstants.W_OK);
+      return true;
     } catch {
-      // Already gone, or never written — not fatal to the delete itself.
+      return false;
     }
   }
 

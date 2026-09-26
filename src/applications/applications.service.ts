@@ -15,6 +15,7 @@ import { ErrorCode } from '../common/problem-details/error-codes.js';
 import type { RequestContext } from '../common/request-context.js';
 import type { CreateApplicationDto } from './dto/create-application.dto.js';
 import { normalizePhone } from '../common/phone.js';
+import { portalLoginUrl } from '../common/links/frontend-url.js';
 
 export interface StartApplicationResult {
   reference: string;
@@ -76,7 +77,7 @@ export class ApplicationsService {
       const settings = await manager.findOne(SiteSettings, { where: { id: '1' } });
       const prefix = settings?.applicationRefPrefix ?? DEFAULT_REF_PREFIX;
 
-      const year = new Date().getFullYear();
+      const year = new Date().getUTCFullYear(); // C9: the reference year is the UTC year
       const counterKey = `application:${year}`;
 
       let counter = await manager
@@ -145,13 +146,6 @@ export class ApplicationsService {
       return { kind: 'created', application, token, csrfToken };
     });
 
-    // Best-effort link to the (Angular) portal's continue-application
-    // screen — no dedicated portal front-end route exists to point at yet
-    // (there is no Safeer front-end in this repo), so this mirrors
-    // AuthService's own admin-side links (`${PUBLIC_BASE_URL}/admin/...`):
-    // a plausible path a later front-end phase is expected to serve.
-    const link = `${this.env.PUBLIC_BASE_URL}/portal`;
-
     if (outcome.kind === 'duplicate') {
       // B2: notify the *existing* application's own stored contact
       // details — never the newly submitted email/phone, so this can't be
@@ -159,6 +153,7 @@ export class ApplicationsService {
       // control. Non-enumerating wording: the 409 never says which of
       // email/phone matched, or reveals the existing reference.
       const { existing } = outcome;
+      const link = portalLoginUrl(this.env, existing.locale);
       await this.mailService.send({
         key: 'application_resume',
         to: existing.email ?? '',
@@ -166,10 +161,11 @@ export class ApplicationsService {
         locale: existing.locale,
         entity: { type: 'applications', id: existing.id },
       });
-      if (existing.phone && (await this.smsService.availability()) === 'real') {
+      const existingPhone = existing.phoneE164 ?? existing.phone;
+      if (existingPhone && (await this.smsService.availability()) === 'real') {
         await this.smsService.send({
           key: 'application_resume',
-          to: existing.phone,
+          to: existingPhone,
           vars: { reference: existing.reference, link },
           locale: existing.locale,
           entity: { type: 'applications', id: existing.id },
@@ -184,6 +180,7 @@ export class ApplicationsService {
     }
 
     const { application, token, csrfToken } = outcome;
+    const link = portalLoginUrl(this.env, application.locale);
     await this.mailService.send({
       key: 'application_started',
       to: application.email ?? '',

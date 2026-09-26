@@ -1,6 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import { Application, type ApplicationStatus } from '../database/entities/application.entity.js';
 import { ApplicationDocument, type ApplicationDocType } from '../database/entities/application-document.entity.js';
 import { ApplicationNote } from '../database/entities/application-note.entity.js';
@@ -21,6 +21,14 @@ import { assertRequestDocumentsAllowed, assertStatusTransition } from './transit
 import type { UpdateApplicationAdminDto } from './dto/update-application.dto.js';
 import type { BulkActionDto } from './dto/bulk-action.dto.js';
 import type { ReviewDocumentDto } from './dto/review-document.dto.js';
+import { portalLoginUrl } from '../common/links/frontend-url.js';
+import { toAdminDocument, type AdminApplicationDocument } from '../portal/public-document.js';
+import { isBruteForceLocked } from '../users/public-user.js';
+import { docTypeLabel, docTypeList, statusLabel } from '../common/labels.js';
+import { PrivateFileStore } from '../storage/private-file-store.service.js';
+
+/** C34: a document can only be reviewed while its application is in the review pipeline. */
+const UNREVIEWABLE_STATUSES: ApplicationStatus[] = ['draft', 'accepted', 'rejected'];
 
 const STATUS_VALUES: ApplicationStatus[] = ['draft', 'new', 'under_review', 'docs_missing', 'interview', 'accepted', 'rejected'];
 
@@ -80,6 +88,8 @@ function fullName(a: Pick<Application, 'firstName' | 'middleName' | 'lastName'>)
  */
 @Injectable()
 export class AdminApplicationsService {
+  private readonly logger = new Logger(AdminApplicationsService.name);
+
   constructor(
     @InjectRepository(Application) private readonly applicationRepo: Repository<Application>,
     @InjectRepository(ApplicationDocument) private readonly documentRepo: Repository<ApplicationDocument>,
@@ -90,6 +100,7 @@ export class AdminApplicationsService {
     @Inject(MAIL_SERVICE) private readonly mailService: MailServiceInterface,
     @Inject(SMS_SERVICE) private readonly smsService: SmsServiceInterface,
     @Inject(ENV) private readonly env: Env,
+    private readonly fileStore: PrivateFileStore,
   ) {}
 
   // -------------------------------------------------------------------
@@ -158,24 +169,42 @@ export class AdminApplicationsService {
     return result;
   }
 
-  async exportCsv(query: Record<string, unknown>): Promise<string> {
+  /**
+   * C36: capped at EXPORT_MAX_ROWS, but never silently — `truncated` says
+   * whether more rows matched (the controller sends it as `X-Truncated`),
+   * and the export is audited with its filters and row count.
+   */
+  async exportCsv(query: Record<string, unknown>, req: RequestContext): Promise<{ csv: string; rows: number; truncated: boolean }> {
     const qb = this.buildFilteredQuery(query);
     qb.leftJoinAndSelect('a.assignedReviewer', 'reviewer')
       .orderBy('a.createdAt', 'DESC')
       .addOrderBy('a.id', 'DESC')
-      .take(EXPORT_MAX_ROWS);
-    const rows = await qb.getMany();
+      .take(EXPORT_MAX_ROWS + 1);
+    const fetched = await qb.getMany();
+    const truncated = fetched.length > EXPORT_MAX_ROWS;
+    const rows = truncated ? fetched.slice(0, EXPORT_MAX_ROWS) : fetched;
 
-    return toCsvWithBom(rows, [
+    const filters = Object.fromEntries(['status', 'q', 'reviewerId'].map((k) => [k, readString(query, k) ?? null]));
+    req.auditContext = {
+      action: 'export',
+      entityType: 'applications',
+      entityLabel: `applications CSV export (${rows.length} row(s)${truncated ? ', truncated' : ''})`,
+      after: { filters, rows: rows.length, truncated },
+    };
+
+    const csv = toCsvWithBom(rows, [
       { header: 'Reference', value: (a) => a.reference },
       { header: 'Name', value: (a) => fullName(a) },
       { header: 'Nationality', value: (a) => a.nationality },
+      // C28: the ID number never leaves in full in an export — last 4 digits only.
+      { header: 'ID (last 4)', value: (a) => (a.idNumber ? `••••${a.idNumber.slice(-4)}` : '') },
       { header: 'University', value: (a) => a.university },
       { header: 'Degree', value: (a) => a.degreeLevel },
       { header: 'Status', value: (a) => a.status },
       { header: 'Submitted', value: (a) => (a.submittedAt ? a.submittedAt.toISOString() : '') },
       { header: 'Assigned reviewer', value: (a) => a.assignedReviewer?.name ?? '' },
     ]);
+    return { csv, rows: rows.length, truncated };
   }
 
   private buildFilteredQuery(query: Record<string, unknown>) {
@@ -269,7 +298,7 @@ export class AdminApplicationsService {
       assignedReviewer: application.assignedReviewer
         ? { id: application.assignedReviewer.id, name: application.assignedReviewer.name, email: application.assignedReviewer.email }
         : null,
-      documents,
+      documents: documents.map(toAdminDocument),
       notes: notes.map((n) => ({ id: n.id, body: n.body, authorId: n.authorId, authorName: n.author?.name ?? null, createdAt: n.createdAt })),
       events: events.map((e) => ({
         id: e.id,
@@ -297,14 +326,15 @@ export class AdminApplicationsService {
     const application = await this.findOrNotFound(id);
     const before = { status: application.status, assignedReviewerId: application.assignedReviewerId };
 
+    let current: Application = application;
     if (dto.status !== undefined) {
-      await this.applyStatusChange(application, dto.status, req.user!.id);
+      current = await this.applyStatusChange(id, dto.status, req.user!.id);
     }
     if (dto.assignedReviewerId !== undefined) {
-      await this.applyAssignReviewer(application, dto.assignedReviewerId, req.user!.id);
+      current = await this.applyAssignReviewer(id, dto.assignedReviewerId, req.user!.id);
     }
 
-    const after = { status: application.status, assignedReviewerId: application.assignedReviewerId };
+    const after = { status: current.status, assignedReviewerId: current.assignedReviewerId };
     // Privacy-conscious diff (messages.service.ts / submissions.controller.ts's own pattern): before/after
     // are limited to exactly {status, assignedReviewerId} — never the applicant's name/email/phone, even
     // though this write touches the `applications` row that holds them.
@@ -325,40 +355,77 @@ export class AdminApplicationsService {
    * place `STATUS_CHANGED` is written and `application_status_changed`
    * mail/SMS is sent, so the two call sites can never drift on what a
    * "status change" means.
+   *
+   * C6: the transition is checked against the row as locked
+   * (`pessimistic_write`) inside the transaction, so of two conflicting
+   * changes racing each other the second sees the first's committed status
+   * and fails the transition check — the applicant can never be told both
+   * "accepted" and "rejected". Notifications go out only after commit.
    */
-  private async applyStatusChange(application: Application, target: ApplicationStatus, actorId: string): Promise<void> {
-    assertStatusTransition(application.status, target);
-    const from = application.status;
-    application.status = target;
-    if (target === 'accepted' || target === 'rejected') {
-      application.decidedAt = new Date();
+  private async applyStatusChange(applicationId: string, target: ApplicationStatus, actorId: string): Promise<Application> {
+    const application = await this.applicationRepo.manager.transaction(async (manager) => {
+      const locked = await this.lockApplication(manager, applicationId);
+      assertStatusTransition(locked.status, target);
+      const from = locked.status;
+      locked.status = target;
+      if (target === 'accepted' || target === 'rejected') {
+        locked.decidedAt = new Date();
+      }
+      await manager.save(locked);
+      await manager.save(
+        manager.create(ApplicationEvent, {
+          applicationId,
+          type: 'STATUS_CHANGED',
+          actorId,
+          visibleToApplicant: true,
+          data: { from, to: target },
+        }),
+      );
+      return locked;
+    });
+
+    await this.afterCommit(() => this.notifyStatusChange(application, target));
+    return application;
+  }
+
+  /** C6: the application row under `pessimistic_write`, or 404. */
+  private async lockApplication(manager: EntityManager, applicationId: string): Promise<Application> {
+    const application = await manager
+      .createQueryBuilder(Application, 'a')
+      .setLock('pessimistic_write')
+      .where('a.id = :id', { id: applicationId })
+      .getOne();
+    if (!application) {
+      throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Application not found');
     }
-    await this.applicationRepo.save(application);
+    return application;
+  }
 
-    await this.eventRepo.save(
-      this.eventRepo.create({
-        applicationId: application.id,
-        type: 'STATUS_CHANGED',
-        actorId,
-        visibleToApplicant: true,
-        data: { from, to: target },
-      }),
-    );
-
-    await this.notifyStatusChange(application, target);
+  /**
+   * C6: a notification failure after commit is logged, never turned into a
+   * 500 (the change it reports has already happened) and never marks a
+   * bulk item as failed.
+   */
+  private async afterCommit(notify: () => Promise<void>): Promise<void> {
+    try {
+      await notify();
+    } catch (err) {
+      this.logger.error('Post-commit notification failed', err instanceof Error ? err.stack : String(err));
+    }
   }
 
   /** `site_settings.notify_email_on_status_change` / `notify_sms_on_status_change` gate this — unlike request-documents/document-reject, a generic status change is opt-out-able. */
   private async notifyStatusChange(application: Application, status: ApplicationStatus): Promise<void> {
     const settings = await this.settingsRepo.findOne({ where: { id: '1' } });
-    const link = `${this.env.PUBLIC_BASE_URL}/portal`;
+    const link = portalLoginUrl(this.env, application.locale);
     const name = fullName(application);
 
     if (settings?.notifyEmailOnStatusChange) {
       await this.mailService.send({
         key: 'application_status_changed',
         to: application.email ?? '',
-        vars: { name, reference: application.reference, status, note: '', link },
+        // C23: a label in the applicant's language, never the raw code; no empty {{note}}.
+        vars: { name, reference: application.reference, status: statusLabel(status, application.locale), link },
         locale: application.locale,
         entity: { type: 'applications', id: application.id },
       });
@@ -366,8 +433,8 @@ export class AdminApplicationsService {
     if (settings?.notifySmsOnStatusChange) {
       await this.smsService.send({
         key: 'application_status_changed',
-        to: application.phone ?? '',
-        vars: { reference: application.reference, status },
+        to: application.phoneE164 ?? application.phone ?? '',
+        vars: { reference: application.reference, status: statusLabel(status, application.locale) },
         locale: application.locale,
         entity: { type: 'applications', id: application.id },
       });
@@ -383,40 +450,46 @@ export class AdminApplicationsService {
    */
   /** `GET admin/applications/assignees` (B7) — every account `applyAssignReviewer` would actually accept, for the reviewer picker. */
   async listAssignees(): Promise<{ id: string; name: string; email: string; role: 'admin' | 'reviewer' }[]> {
-    const users = await this.userRepo.find({
-      where: { role: In(['admin', 'reviewer']), isLocked: false },
-      order: { name: 'ASC' },
-    });
+    const users = (
+      await this.userRepo.find({
+        where: { role: In(['admin', 'reviewer']), status: 'active' },
+        order: { name: 'ASC' },
+      })
+    ).filter((u) => !isBruteForceLocked(u));
     return users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role as 'admin' | 'reviewer' }));
   }
 
-  private async applyAssignReviewer(application: Application, reviewerId: string | null, actorId: string): Promise<void> {
+  private async applyAssignReviewer(applicationId: string, reviewerId: string | null, actorId: string): Promise<Application> {
     if (reviewerId !== null) {
       const reviewer = await this.userRepo.findOne({ where: { id: reviewerId } });
       if (!reviewer) {
         throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Reviewer not found');
       }
-      if (!['admin', 'reviewer'].includes(reviewer.role) || reviewer.isLocked) {
+      // B7 with C3's status model: an active admin/reviewer, not inside a brute-force lock.
+      if (!['admin', 'reviewer'].includes(reviewer.role) || reviewer.status !== 'active' || isBruteForceLocked(reviewer)) {
         throw new ProblemException(
           422,
           ErrorCode.INVALID_ASSIGNEE,
-          'Applications can only be assigned to an admin or reviewer account that is not locked',
+          'Applications can only be assigned to an active admin or reviewer account that is not locked',
         );
       }
     }
-    application.assignedReviewerId = reviewerId;
-    await this.applicationRepo.save(application);
-
-    await this.eventRepo.save(
-      this.eventRepo.create({
-        applicationId: application.id,
-        type: 'REVIEWER_ASSIGNED',
-        actorId,
-        // Internal bookkeeping, not something the applicant reads about.
-        visibleToApplicant: false,
-        data: { reviewerId },
-      }),
-    );
+    return this.applicationRepo.manager.transaction(async (manager) => {
+      const locked = await this.lockApplication(manager, applicationId);
+      locked.assignedReviewerId = reviewerId;
+      await manager.save(locked);
+      await manager.save(
+        manager.create(ApplicationEvent, {
+          applicationId,
+          type: 'REVIEWER_ASSIGNED',
+          actorId,
+          // Internal bookkeeping, not something the applicant reads about.
+          visibleToApplicant: false,
+          data: { reviewerId },
+        }),
+      );
+      return locked;
+    });
   }
 
   // -------------------------------------------------------------------
@@ -434,18 +507,14 @@ export class AdminApplicationsService {
 
     for (const id of dto.ids) {
       try {
-        const application = await this.applicationRepo.findOne({ where: { id } });
-        if (!application) {
-          throw new ProblemException(404, ErrorCode.NOT_FOUND, `Application ${id} not found`);
-        }
-
+        // Each id is its own transaction (C6) — one failing never rolls back another.
         if (dto.action === 'assign') {
           // `bulkActionSchema`'s `superRefine` already guarantees this is present for `action: 'assign'`.
-          await this.applyAssignReviewer(application, dto.reviewerId ?? null, req.user!.id);
+          await this.applyAssignReviewer(id, dto.reviewerId ?? null, req.user!.id);
         } else if (dto.action === 'status') {
-          await this.applyStatusChange(application, dto.status!, req.user!.id);
+          await this.applyStatusChange(id, dto.status!, req.user!.id);
         } else {
-          await this.requestDocuments(application, dto.docTypes! as ApplicationDocType[], dto.message ?? null, req.user!.id);
+          await this.requestDocuments(id, dto.docTypes! as ApplicationDocType[], dto.message ?? null, req.user!.id);
         }
         results.push({ id, ok: true });
       } catch (err) {
@@ -476,42 +545,55 @@ export class AdminApplicationsService {
    * for missing documents must reach the applicant regardless of the
    * association's general status-change notification preference.
    */
-  async requestDocuments(application: Application, docTypes: ApplicationDocType[], message: string | null, actorId: string): Promise<void> {
-    assertRequestDocumentsAllowed(application.status);
-    application.status = 'docs_missing';
-    await this.applicationRepo.save(application);
-
-    await this.eventRepo.save(
-      this.eventRepo.create({
-        applicationId: application.id,
-        type: 'DOCS_REQUESTED',
-        actorId,
-        visibleToApplicant: true,
-        data: { docTypes, message },
-      }),
-    );
-
-    const link = `${this.env.PUBLIC_BASE_URL}/portal`;
-    await this.mailService.send({
-      key: 'documents_requested',
-      to: application.email ?? '',
-      vars: { name: fullName(application), reference: application.reference, docTypes: docTypes.join(', '), message: message ?? '', link },
-      locale: application.locale,
-      entity: { type: 'applications', id: application.id },
+  async requestDocuments(applicationId: string, docTypes: ApplicationDocType[], message: string | null, actorId: string): Promise<Application> {
+    // C6: same locking discipline as applyStatusChange.
+    const application = await this.applicationRepo.manager.transaction(async (manager) => {
+      const locked = await this.lockApplication(manager, applicationId);
+      assertRequestDocumentsAllowed(locked.status);
+      locked.status = 'docs_missing';
+      await manager.save(locked);
+      await manager.save(
+        manager.create(ApplicationEvent, {
+          applicationId,
+          type: 'DOCS_REQUESTED',
+          actorId,
+          visibleToApplicant: true,
+          data: { docTypes, message },
+        }),
+      );
+      return locked;
     });
-    await this.smsService.send({
-      key: 'documents_requested',
-      to: application.phone ?? '',
-      vars: { reference: application.reference },
-      locale: application.locale,
-      entity: { type: 'applications', id: application.id },
+
+    await this.afterCommit(async () => {
+      const link = portalLoginUrl(this.env, application.locale);
+      await this.mailService.send({
+        key: 'documents_requested',
+        to: application.email ?? '',
+        vars: {
+          name: fullName(application),
+          reference: application.reference,
+          docTypes: docTypeList(docTypes, application.locale),
+          message: message ?? '',
+          link,
+        },
+        locale: application.locale,
+        entity: { type: 'applications', id: application.id },
+      });
+      await this.smsService.send({
+        key: 'documents_requested',
+        to: application.phoneE164 ?? application.phone ?? '',
+        vars: { reference: application.reference },
+        locale: application.locale,
+        entity: { type: 'applications', id: application.id },
+      });
     });
+    return application;
   }
 
   async requestDocumentsForOne(id: string, docTypes: ApplicationDocType[], message: string | null, req: RequestContext) {
     const application = await this.findOrNotFound(id);
     const before = { status: application.status };
-    await this.requestDocuments(application, docTypes, message, req.user!.id);
+    const updated = await this.requestDocuments(id, docTypes, message, req.user!.id);
 
     req.auditContext = {
       action: 'update',
@@ -519,7 +601,7 @@ export class AdminApplicationsService {
       entityId: id,
       entityLabel: `application ${application.reference}`,
       before,
-      after: { status: application.status },
+      after: { status: updated.status },
     };
 
     return this.getDetail(id);
@@ -533,41 +615,74 @@ export class AdminApplicationsService {
    * template is seeded, unlike `application_status_changed`/
    * `documents_requested` which have both) is sent only on rejection.
    */
-  async reviewDocument(applicationId: string, docId: string, dto: ReviewDocumentDto, req: RequestContext): Promise<ApplicationDocument> {
+  async reviewDocument(applicationId: string, docId: string, dto: ReviewDocumentDto, req: RequestContext): Promise<AdminApplicationDocument> {
     if (dto.status === 'rejected' && !dto.reason) {
       throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, 'reason is required when rejecting a document');
     }
 
-    const doc = await this.findDocumentOrNotFound(applicationId, docId);
-    const application = await this.findOrNotFound(applicationId);
-    const before = { status: doc.status, rejectionReason: doc.rejectionReason };
+    // C6: the application and the document are locked together, so a review
+    // can't interleave with the applicant replacing the same document or a
+    // status change. C34: a replaced (superseded) document, or one on an
+    // application that is still a draft or already decided, isn't reviewable.
+    const { application, doc, before, saved } = await this.applicationRepo.manager.transaction(async (manager) => {
+      const lockedApplication = await this.lockApplication(manager, applicationId);
+      const lockedDoc = await manager
+        .createQueryBuilder(ApplicationDocument, 'd')
+        .setLock('pessimistic_write')
+        .where('d.id = :docId', { docId })
+        .andWhere('d.application_id = :applicationId', { applicationId })
+        .getOne();
+      if (!lockedDoc) {
+        throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Document not found');
+      }
+      if (lockedDoc.supersededAt) {
+        throw new ProblemException(409, ErrorCode.DOCUMENT_NOT_REVIEWABLE, 'This document has been replaced by a newer upload');
+      }
+      if (UNREVIEWABLE_STATUSES.includes(lockedApplication.status)) {
+        throw new ProblemException(
+          409,
+          ErrorCode.DOCUMENT_NOT_REVIEWABLE,
+          `Documents can't be reviewed while the application is ${lockedApplication.status}`,
+        );
+      }
 
-    doc.status = dto.status;
-    doc.rejectionReason = dto.status === 'rejected' ? (dto.reason ?? null) : null;
-    doc.reviewedBy = req.user!.id;
-    doc.reviewedAt = new Date();
-    const saved = await this.documentRepo.save(doc);
+      const beforeReview = { status: lockedDoc.status, rejectionReason: lockedDoc.rejectionReason };
+      lockedDoc.status = dto.status;
+      lockedDoc.rejectionReason = dto.status === 'rejected' ? (dto.reason ?? null) : null;
+      lockedDoc.reviewedBy = req.user!.id;
+      lockedDoc.reviewedAt = new Date();
+      const savedDoc = await manager.save(lockedDoc);
 
-    await this.eventRepo.save(
-      this.eventRepo.create({
-        applicationId,
-        type: dto.status === 'rejected' ? 'DOCUMENT_REJECTED' : 'DOCUMENT_ACCEPTED',
-        actorId: req.user!.id,
-        // Only a rejection is actionable enough to surface on the applicant's own timeline/notifications feed
-        // (they also get the document_rejected mail below); an acceptance is a quiet, internal-only milestone.
-        visibleToApplicant: dto.status === 'rejected',
-        data: { docType: doc.docType, reason: saved.rejectionReason },
-      }),
-    );
+      await manager.save(
+        manager.create(ApplicationEvent, {
+          applicationId,
+          type: dto.status === 'rejected' ? 'DOCUMENT_REJECTED' : 'DOCUMENT_ACCEPTED',
+          actorId: req.user!.id,
+          // Only a rejection is actionable enough to surface on the applicant's own timeline/notifications feed
+          // (they also get the document_rejected mail below); an acceptance is a quiet, internal-only milestone.
+          visibleToApplicant: dto.status === 'rejected',
+          data: { docType: lockedDoc.docType, reason: savedDoc.rejectionReason },
+        }),
+      );
+      return { application: lockedApplication, doc: lockedDoc, before: beforeReview, saved: savedDoc };
+    });
 
     if (dto.status === 'rejected') {
-      const link = `${this.env.PUBLIC_BASE_URL}/portal`;
-      await this.mailService.send({
-        key: 'document_rejected',
-        to: application.email ?? '',
-        vars: { name: fullName(application), reference: application.reference, docType: doc.docType, reason: saved.rejectionReason ?? '', link },
-        locale: application.locale,
-        entity: { type: 'applications', id: applicationId },
+      await this.afterCommit(async () => {
+        const link = portalLoginUrl(this.env, application.locale);
+        await this.mailService.send({
+          key: 'document_rejected',
+          to: application.email ?? '',
+          vars: {
+            name: fullName(application),
+            reference: application.reference,
+            docType: docTypeLabel(doc.docType, application.locale),
+            reason: saved.rejectionReason ?? '',
+            link,
+          },
+          locale: application.locale,
+          entity: { type: 'applications', id: applicationId },
+        });
       });
     }
 
@@ -580,11 +695,57 @@ export class AdminApplicationsService {
       after: { status: saved.status, rejectionReason: saved.rejectionReason },
     };
 
-    return saved;
+    return toAdminDocument(saved);
   }
 
   async getDocumentForStream(applicationId: string, docId: string): Promise<ApplicationDocument> {
     return this.findDocumentOrNotFound(applicationId, docId);
+  }
+
+  // -------------------------------------------------------------------
+  // Anonymise (C27)
+  // -------------------------------------------------------------------
+
+  async anonymise(id: string, req: RequestContext): Promise<{ anonymized: true; reference: string }> {
+    const { reference, storageKeys } = await this.applicationRepo.manager.transaction(async (manager) => {
+      const application = await this.lockApplication(manager, id);
+      const files: Array<{ storage_key: string }> = await manager.query(
+        'SELECT storage_key FROM application_documents WHERE application_id = ?',
+        [id],
+      );
+      await manager.query('DELETE FROM application_documents WHERE application_id = ?', [id]);
+      await manager.query('DELETE FROM application_notes WHERE application_id = ?', [id]);
+      await manager.query('DELETE FROM application_events WHERE application_id = ?', [id]);
+      await manager.query('DELETE FROM applicant_sessions WHERE application_id = ?', [id]);
+      await manager.query('DELETE FROM applicant_otps WHERE application_id = ?', [id]);
+      await manager.query('UPDATE interview_slots SET application_id = NULL WHERE application_id = ?', [id]);
+      await manager.query("DELETE FROM mail_log WHERE entity_type = 'applications' AND entity_id = ?", [id]);
+      await manager.query("DELETE FROM sms_log WHERE entity_type = 'applications' AND entity_id = ?", [id]);
+      await manager.query(
+        `UPDATE applications
+            SET first_name = NULL, middle_name = NULL, last_name = NULL, birth_date = NULL,
+                phone = NULL, phone_e164 = NULL, nationality = NULL, id_number_encrypted = NULL, email = NULL,
+                current_job = NULL, gender = NULL, university = NULL, major = NULL, scholarship_note = NULL,
+                anonymized_at = COALESCE(anonymized_at, UTC_TIMESTAMP(3))
+          WHERE id = ?`,
+        [id],
+      );
+      return { reference: application.reference, storageKeys: files.map((f) => f.storage_key) };
+    });
+
+    // Files go after the commit: a rolled-back anonymisation must not have deleted them.
+    for (const key of storageKeys) {
+      await this.fileStore.remove(key);
+    }
+
+    req.auditContext = {
+      action: 'delete',
+      entityType: 'applications',
+      entityId: id,
+      entityLabel: `anonymised application ${reference}`,
+      after: { anonymized: true, filesDeleted: storageKeys.length },
+    };
+    return { anonymized: true, reference };
   }
 
   // -------------------------------------------------------------------
