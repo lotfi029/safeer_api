@@ -88,6 +88,7 @@ Project documentation lives in [`docs/`](docs/):
 - [`docs/backend/DEPLOYMENT-HOSTINGER.md`](docs/backend/DEPLOYMENT-HOSTINGER.md) — production deployment, env checklist, SMS/S3 setup, migrations, backups.
 - [`docs/backend/KNOWN-ISSUES.md`](docs/backend/KNOWN-ISSUES.md) — out-of-scope items and gotchas.
 - [`docs/backend/API-CHANGES.md`](docs/backend/API-CHANGES.md) — contract changes the frontend has to follow (fix plan).
+- [`docs/backend/FIX-PLAN-STATUS.md`](docs/backend/FIX-PLAN-STATUS.md) — every B/C item: fix, commit, test.
 - [`docs/safeer-design-spec.md`](docs/safeer-design-spec.md), [`docs/safeer-implementation-prompt.md`](docs/safeer-implementation-prompt.md) — the product spec and build brief.
 - [`docs/safeer-backend-fr-review.md`](docs/safeer-backend-fr-review.md), [`docs/safeer-backend-fix-prompt.md`](docs/safeer-backend-fix-prompt.md) — the review and the current fix plan.
 - [`docs/prototype/safeer-prototype.html`](docs/prototype/safeer-prototype.html) — the clickable prototype `npm run seed` reads.

@@ -7,7 +7,7 @@ Backend for جمعية سفير الدعوية: NestJS 11 + TypeORM + MySQL/Mari
 - `docs/safeer-implementation-prompt.md` — the original build brief (data model, roles, rules)
 - `docs/safeer-backend-fr-review.md` — FR review of this repo: gaps B1–B15
 - `docs/safeer-backend-fix-prompt.md` — **the current task list** (phases 0–7, items B1–B19 and C1–C47)
-- `docs/backend/` — `ARCHITECTURE.md` (role matrix, sessions, UTC), `DEPLOYMENT-HOSTINGER.md`, `KNOWN-ISSUES.md`, `API-CHANGES.md` (contract changes for the frontend)
+- `docs/backend/` — `ARCHITECTURE.md` (role matrix, sessions, UTC), `DEPLOYMENT-HOSTINGER.md`, `KNOWN-ISSUES.md`, `API-CHANGES.md` (contract changes for the frontend), `FIX-PLAN-STATUS.md` (item → fix → commit → test)
 - `docs/safeer-backend-code-review.md` — the deep code review (C1–C47) the fix prompt refers to
 - `README.md` — setup, env vars, scripts
 
