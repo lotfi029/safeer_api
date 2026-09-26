@@ -29,6 +29,10 @@ export class MessageReply {
   @Column({ name: 'mail_log_id', type: 'bigint', unsigned: true, nullable: true })
   mailLogId: string | null;
 
+  /** C46: the delivery outcome, copied from mail_log before its 90-day purge nulls `mailLogId`. */
+  @Column({ name: 'delivery_status', type: 'enum', enum: ['queued', 'sent', 'failed', 'skipped'], nullable: true })
+  deliveryStatus: 'queued' | 'sent' | 'failed' | 'skipped' | null;
+
   @ManyToOne(() => MailLog, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'mail_log_id', foreignKeyConstraintName: 'fk_reply_maillog' })
   mailLog?: MailLog | null;

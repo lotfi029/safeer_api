@@ -3,7 +3,7 @@ import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLog } from '../database/entities/audit-log.entity.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { asString, readPageLimit } from '../common/query/list-params.js';
 
 const DEFAULT_LIMIT = 50;
@@ -14,7 +14,7 @@ const MAX_LIMIT = 200;
 // editor-appropriate subset, so this is class-level admin-only, matching
 // users.controller.ts.
 @Controller('admin/audit')
-@Roles('admin')
+@Area('audit')
 @ApiCookieAuth()
 export class AuditController {
   constructor(@InjectRepository(AuditLog) private readonly auditRepo: Repository<AuditLog>) {}

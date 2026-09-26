@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { Application } from '../database/entities/application.entity.js';
 import { ApplicationDocument, type ApplicationDocType } from '../database/entities/application-document.entity.js';
 import { ApplicationEvent } from '../database/entities/application-event.entity.js';
@@ -8,8 +8,14 @@ import { PrivateFileStore } from '../storage/private-file-store.service.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { computeCompleteness, type Completeness } from './portal-documents.util.js';
+import { toPublicDocument, type PublicApplicationDocument } from './public-document.js';
+import { decodeUploadName } from '../common/http/filenames.js';
 
 const DOC_TYPES: ApplicationDocType[] = ['id_copy', 'certificate', 'admission_letter', 'other'];
+
+/** C18: per-application upload quota — every upload counts, including ones later replaced. */
+export const MAX_UPLOADS_PER_APPLICATION = 30;
+export const MAX_UPLOAD_BYTES_PER_APPLICATION = 50 * 1024 * 1024;
 
 @Injectable()
 export class PortalDocumentsService {
@@ -20,12 +26,12 @@ export class PortalDocumentsService {
     private readonly fileStore: PrivateFileStore,
   ) {}
 
-  async list(applicationId: string): Promise<{ documents: ApplicationDocument[]; completeness: Completeness }> {
+  async list(applicationId: string): Promise<{ documents: PublicApplicationDocument[]; completeness: Completeness }> {
     const [documents, completeness] = await Promise.all([
       this.documentRepo.find({ where: { applicationId, supersededAt: IsNull() }, order: { createdAt: 'ASC' } }),
       computeCompleteness(this.documentRepo, applicationId),
     ]);
-    return { documents, completeness };
+    return { documents: documents.map(toPublicDocument), completeness };
   }
 
   /**
@@ -62,46 +68,58 @@ export class PortalDocumentsService {
    * whether a fresh upload is good enough is still a judgment call for
    * admin review, never something this endpoint decides unilaterally.
    */
-  async upload(applicationId: string, docType: string, file: Express.Multer.File): Promise<ApplicationDocument> {
+  async upload(applicationId: string, docType: string, file: Express.Multer.File): Promise<PublicApplicationDocument> {
     if (!DOC_TYPES.includes(docType as ApplicationDocType)) {
       throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, `docType must be one of: ${DOC_TYPES.join(', ')}`);
     }
     if (!file?.buffer?.length) {
       throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, 'A file is required — send it as the multipart field "file"');
     }
+    const type = docType as ApplicationDocType;
+    const originalName = decodeUploadName(file.originalname); // C19
 
-    const application = await this.applicationRepo.findOne({ where: { id: applicationId } });
-    if (!application) {
+    // A cheap pre-check before any bytes are written, so a locked
+    // application or a spent quota never costs a disk/bucket write. The
+    // authoritative check repeats below under the row lock.
+    const pre = await this.applicationRepo.findOne({ where: { id: applicationId } });
+    if (!pre) {
       throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Application not found');
     }
-
-    const existingBefore = await this.documentRepo.findOne({
-      where: { applicationId, docType: docType as ApplicationDocType, supersededAt: IsNull() },
-    });
-    const neededTypes =
-      application.status === 'docs_missing' ? await this.neededResubmissionTypes(applicationId) : null;
-    this.assertUploadAllowed(application.status, docType as ApplicationDocType, existingBefore, neededTypes);
+    await this.checkUploadAllowed(this.applicationRepo.manager, pre.status, applicationId, type, file.buffer.length);
 
     const before = await computeCompleteness(this.documentRepo, applicationId);
-    const stored = await this.fileStore.store(file.buffer, file.originalname, applicationId);
+    const stored = await this.fileStore.store(file.buffer, originalName, applicationId);
 
     let saved: ApplicationDocument;
+    let superseded: ApplicationDocument | null;
+    let neededTypes: ApplicationDocType[] | null;
     try {
-      saved = await this.documentRepo.manager.transaction(async (manager) => {
+      ({ saved, superseded, neededTypes } = await this.documentRepo.manager.transaction(async (manager) => {
+        // B3: the status/lock/quota rules are checked against the row as it
+        // is *now*, under pessimistic_write — a staff status change or a
+        // parallel upload can't slip in between the check and the write.
+        const application = await manager
+          .createQueryBuilder(Application, 'a')
+          .setLock('pessimistic_write')
+          .where('a.id = :id', { id: applicationId })
+          .getOne();
+        if (!application) {
+          throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Application not found');
+        }
+        const needed = await this.checkUploadAllowed(manager, application.status, applicationId, type, file.buffer.length);
+
         const docRepo = manager.getRepository(ApplicationDocument);
-        const existing = await docRepo.findOne({
-          where: { applicationId, docType: docType as ApplicationDocType, supersededAt: IsNull() },
-        });
+        const existing = await docRepo.findOne({ where: { applicationId, docType: type, supersededAt: IsNull() } });
         if (existing) {
           existing.supersededAt = new Date();
           await docRepo.save(existing);
         }
 
-        return docRepo.save(
+        const created = await docRepo.save(
           docRepo.create({
             applicationId,
-            docType: docType as ApplicationDocType,
-            originalName: file.originalname.slice(0, 255),
+            docType: type,
+            originalName,
             storageKey: stored.storageKey,
             mime: stored.mime,
             sizeBytes: stored.sizeBytes,
@@ -109,13 +127,19 @@ export class PortalDocumentsService {
             status: 'under_review',
           }),
         );
-      });
+        return { saved: created, superseded: existing, neededTypes: needed };
+      }));
     } catch (err) {
-      // The file was already written to disk before the transaction ran —
-      // a DB-side failure must not leave it orphaned with no row pointing
-      // at it (B3).
+      // The file was already written before the transaction ran — a
+      // refused or failed write must not leave it orphaned (B3).
       await this.fileStore.remove(stored.storageKey);
       throw err;
+    }
+
+    // C18: the replaced upload's bytes go once the new row is committed —
+    // its row stays (history, and it still counts towards the quota).
+    if (superseded) {
+      await this.fileStore.remove(superseded.storageKey);
     }
 
     const after = await computeCompleteness(this.documentRepo, applicationId);
@@ -135,7 +159,42 @@ export class PortalDocumentsService {
       await this.maybeRecordResubmission(applicationId, neededTypes);
     }
 
-    return saved;
+    return toPublicDocument(saved);
+  }
+
+  /**
+   * B3 + C18 in one place, run twice per upload (a cheap pre-check before
+   * the file is stored, then under the application row lock): the status
+   * rules (`assertUploadAllowed`) and the per-application quota —
+   * MAX_UPLOADS_PER_APPLICATION rows (superseded ones included, so
+   * re-uploading the same slot over and over still runs out) and
+   * MAX_UPLOAD_BYTES_PER_APPLICATION bytes across them. Returns the
+   * `docs_missing` resubmission types (null otherwise).
+   */
+  private async checkUploadAllowed(
+    manager: EntityManager,
+    status: Application['status'],
+    applicationId: string,
+    docType: ApplicationDocType,
+    incomingBytes: number,
+  ): Promise<ApplicationDocType[] | null> {
+    const docRepo = manager.getRepository(ApplicationDocument);
+    const existing = await docRepo.findOne({ where: { applicationId, docType, supersededAt: IsNull() } });
+    const neededTypes = status === 'docs_missing' ? await this.neededResubmissionTypes(applicationId, manager) : null;
+    this.assertUploadAllowed(status, docType, existing, neededTypes);
+
+    const [usage]: Array<{ files: number | string; bytes: number | string | null }> = await manager.query(
+      'SELECT COUNT(*) AS files, COALESCE(SUM(size_bytes), 0) AS bytes FROM application_documents WHERE application_id = ?',
+      [applicationId],
+    );
+    if (Number(usage.files) + 1 > MAX_UPLOADS_PER_APPLICATION || Number(usage.bytes) + incomingBytes > MAX_UPLOAD_BYTES_PER_APPLICATION) {
+      throw new ProblemException(
+        409,
+        ErrorCode.QUOTA_EXCEEDED,
+        `This application has reached its upload limit (${MAX_UPLOADS_PER_APPLICATION} files / ${MAX_UPLOAD_BYTES_PER_APPLICATION / (1024 * 1024)} MB)`,
+      );
+    }
+    return neededTypes;
   }
 
   /**
@@ -145,10 +204,10 @@ export class PortalDocumentsService {
    * now — a caseworker rejecting one document type outright, without a
    * separate request-documents call, still needs a fresh copy the same way.
    */
-  private async neededResubmissionTypes(applicationId: string): Promise<ApplicationDocType[]> {
+  private async neededResubmissionTypes(applicationId: string, manager: EntityManager = this.documentRepo.manager): Promise<ApplicationDocType[]> {
     const [lastRequest, current] = await Promise.all([
-      this.eventRepo.findOne({ where: { applicationId, type: 'DOCS_REQUESTED' }, order: { createdAt: 'DESC' } }),
-      this.documentRepo.find({ where: { applicationId, supersededAt: IsNull() } }),
+      manager.getRepository(ApplicationEvent).findOne({ where: { applicationId, type: 'DOCS_REQUESTED' }, order: { createdAt: 'DESC' } }),
+      manager.getRepository(ApplicationDocument).find({ where: { applicationId, supersededAt: IsNull() } }),
     ]);
     const requested = ((lastRequest?.data as { docTypes?: ApplicationDocType[] } | null)?.docTypes ?? []).filter((t) =>
       DOC_TYPES.includes(t),

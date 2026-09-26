@@ -164,7 +164,10 @@ export class SessionGuard implements CanActivate {
       .andWhere('s.revoked_at IS NULL')
       .andWhere('s.expires_at > NOW()')
       .andWhere('s.last_seen_at > (NOW() - INTERVAL :idleHours HOUR)', { idleHours: this.env.SESSION_IDLE_HOURS })
-      .andWhere('u.is_locked = 0')
+      // C3: only an active account holds a session (a disable also revokes
+      // sessions — this is the defence in depth). A C12 brute-force lock
+      // deliberately doesn't end sessions, so it isn't checked here.
+      .andWhere("u.status = 'active'")
       .getOne();
 
     if (!row?.user) {

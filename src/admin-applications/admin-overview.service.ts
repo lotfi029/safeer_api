@@ -8,6 +8,7 @@ import { Post } from '../database/entities/post.entity.js';
 import { Page } from '../database/entities/page.entity.js';
 import { MessagesService } from '../messages/messages.service.js';
 import type { UserRole } from '../database/entities/user.entity.js';
+import { User } from '../database/entities/user.entity.js';
 
 const RECENT_AUDIT_LIMIT = 20;
 const SERIES_MONTHS = 6;
@@ -19,13 +20,14 @@ interface MonthBucket {
   end: Date; // exclusive
 }
 
+/** UTC calendar months (C9: every stored timestamp is UTC, so the buckets are too). */
 function lastNMonths(n: number): MonthBucket[] {
   const now = new Date();
   const buckets: MonthBucket[] = [];
   for (let i = n - 1; i >= 0; i--) {
-    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-    buckets.push({ month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`, start, end });
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i + 1, 1));
+    buckets.push({ month: `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}`, start, end });
   }
   return buckets;
 }
@@ -39,7 +41,7 @@ function lastNMonths(n: number): MonthBucket[] {
  *   are omitted for `editor`.
  * - messages-related blocks (the unread-messages stat card and sidebar
  *   badge) are omitted for `reviewer`.
- * - B6 (safeer-backend-fr-review.md): `recentAuditLog` is admin-only —
+ * - B6/C20: `recentAuditLog` is admin-only, and never carries `diff` or IP hashes —
  *   every other role gets an empty array. The feed includes application
  *   references, status changes, and reviewer/user actions across every
  *   collection, which is more than editor/reviewer/support's own areas
@@ -59,7 +61,9 @@ export class AdminOverviewService {
   ) {}
 
   async get(role: UserRole) {
-    const includeApplications = role !== 'editor';
+    // C20: application figures and applicant names only for the roles that
+    // own the applications area (the same matrix @Roles applies to it).
+    const includeApplications = role === 'admin' || role === 'reviewer';
     const includeMessages = role !== 'reviewer';
 
     const [applicationsBlock, messagesBlock, contentAlerts, recentAuditLog] = await Promise.all([
@@ -156,10 +160,33 @@ export class AdminOverviewService {
     };
   }
 
-  private async recentAuditLog(): Promise<Partial<AuditLog>[]> {
-    return this.auditRepo.find({
-      order: { createdAt: 'DESC' },
-      take: RECENT_AUDIT_LIMIT,
-    });
+  /**
+   * C20: admin-only (see get()), and a summary, not the raw rows: no
+   * before/after `diff` (it can hold personal data) and no IP hash — the
+   * full row stays in `GET admin/audit`.
+   */
+  private async recentAuditLog(): Promise<RecentAuditEntry[]> {
+    const rows = await this.auditRepo
+      .createQueryBuilder('l')
+      .leftJoin(User, 'u', 'u.id = l.actor_id')
+      .select(['l.id AS id', 'l.action AS action', 'l.entity_type AS entityType', 'l.entity_id AS entityId', 'l.entity_label AS entityLabel', 'l.created_at AS createdAt'])
+      .addSelect('l.actor_id', 'actorId')
+      .addSelect('u.name', 'actorName')
+      .orderBy('l.created_at', 'DESC')
+      .addOrderBy('l.id', 'DESC')
+      .limit(RECENT_AUDIT_LIMIT)
+      .getRawMany<RecentAuditEntry>();
+    return rows.map((r) => ({ ...r, id: String(r.id), actorId: r.actorId === null ? null : String(r.actorId), entityId: r.entityId === null ? null : String(r.entityId) }));
   }
+}
+
+export interface RecentAuditEntry {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityLabel: string | null;
+  actorId: string | null;
+  actorName: string | null;
+  createdAt: Date;
 }

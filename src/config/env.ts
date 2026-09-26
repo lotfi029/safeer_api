@@ -13,6 +13,9 @@ function boolFromString(defaultValue: 'true' | 'false') {
     .transform((v) => v === 'true');
 }
 
+/** The local Next.js dev server — FRONTEND_BASE_URL's default outside staging/production. */
+const DEV_FRONTEND_BASE_URL = 'http://localhost:4200';
+
 const envSchema = z.object({
   // No default (B0-1): two security behaviours key off this — the session
   // cookie's `secure` flag (auth.controller.ts) and the dev password fixup
@@ -82,7 +85,17 @@ const envSchema = z.object({
 
   IP_HASH_SALT: z.string().min(1),
   CORS_ORIGINS: z.string().min(1),
-  PUBLIC_BASE_URL: z.string().url(),
+  // C2: the public frontend (Next.js) origin. Every link that goes out in a
+  // mail or SMS points at a locale-prefixed page there (src/common/frontend-url.ts),
+  // never at this API. Required in staging/production (the superRefine
+  // below); development/test default to the local frontend. Replaces the
+  // old PUBLIC_BASE_URL, which pointed at the API and made every emailed
+  // link a 404.
+  FRONTEND_BASE_URL: z
+    .string()
+    .url()
+    .refine((u) => /^https?:\/\//.test(u), 'FRONTEND_BASE_URL must be an http(s) URL')
+    .optional(),
 
   CACHE_TTL_SECONDS: z.coerce.number().positive().default(60),
   CACHE_MAX_ENTRIES: z.coerce.number().positive().default(500),
@@ -103,6 +116,13 @@ const envSchema = z.object({
    */
   ALLOW_DEV_PASSWORD_FIXUP: boolFromString('false'),
 }).superRefine((v, ctx) => {
+  if ((v.NODE_ENV === 'production' || v.NODE_ENV === 'staging') && !v.FRONTEND_BASE_URL) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['FRONTEND_BASE_URL'],
+      message: `FRONTEND_BASE_URL is required when NODE_ENV=${v.NODE_ENV}`,
+    });
+  }
   if (v.NODE_ENV === 'production' && v.ALLOW_DEV_PASSWORD_FIXUP) {
     ctx.addIssue({
       code: 'custom',
@@ -125,17 +145,25 @@ const envSchema = z.object({
       }
     }
   }
-});
+}).transform((v) => ({
+  ...v,
+  FRONTEND_BASE_URL: (v.FRONTEND_BASE_URL ?? DEV_FRONTEND_BASE_URL).replace(/\/+$/, ''),
+}));
 
 export type Env = z.infer<typeof envSchema>;
 
 let cached: Env | undefined;
 
+/** Validates without caching or exiting — for tests and tooling. */
+export function validateEnv(source: NodeJS.ProcessEnv) {
+  return envSchema.safeParse(source);
+}
+
 /** Parses and validates process.env once. Exits the process on failure. */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   if (cached) return cached;
 
-  const result = envSchema.safeParse(source);
+  const result = validateEnv(source);
   if (!result.success) {
     // eslint-disable-next-line no-console
     console.error('Invalid environment configuration:');
@@ -154,4 +182,11 @@ export function corsOrigins(env: Env): string[] {
   return env.CORS_ORIGINS.split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/** The local environments (scripts/lib/node-env.mjs DEV_ENVS): dev-only hooks, plain-HTTP cookies. */
+export const DEV_ENVS: ReadonlyArray<Env['NODE_ENV']> = ['development', 'test'];
+
+export function isDevEnv(env: Pick<Env, 'NODE_ENV'>): boolean {
+  return DEV_ENVS.includes(env.NODE_ENV);
 }

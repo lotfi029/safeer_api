@@ -14,6 +14,10 @@ export class NewsletterSubscriber {
   @Column({ type: 'enum', enum: ['ar', 'en'] as Locale[], default: 'ar' })
   locale: Locale;
 
+  /** C27: set when the subscriber follows the emailed confirmation link (double opt-in). */
+  @Column({ name: 'confirmed_at', type: 'datetime', precision: 3, nullable: true })
+  confirmedAt: Date | null;
+
   @Column({ name: 'ip_hash', type: 'char', length: 64, nullable: true })
   ipHash: string | null;
 

@@ -14,6 +14,7 @@ import {
 import { User } from './user.entity.js';
 import type { Locale } from '../../common/request-context.js';
 import { normalizePhone } from '../../common/phone.js';
+import { encryptedString } from '../encrypted-column.js';
 
 export type ApplicationStatus = 'draft' | 'new' | 'under_review' | 'docs_missing' | 'interview' | 'accepted' | 'rejected';
 export type ApplicationGender = 'male' | 'female';
@@ -39,6 +40,7 @@ export const NON_TERMINAL_APPLICATION_STATUSES: ApplicationStatus[] = [
 @Index('ix_applications_email', ['email'])
 @Index('ix_applications_phone_e164', ['phoneE164'])
 @Index('ix_applications_email_status', ['email', 'status'])
+@Index('ix_applications_created', ['createdAt'])
 export class Application {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: string;
@@ -88,7 +90,8 @@ export class Application {
   @Column({ type: 'char', length: 2, nullable: true })
   nationality: string | null;
 
-  @Column({ name: 'id_number', type: 'varchar', length: 40, nullable: true })
+  /** C28: stored encrypted (id_number_encrypted); read and written as plain text through the transformer. */
+  @Column({ name: 'id_number_encrypted', type: 'varbinary', length: 255, nullable: true, transformer: encryptedString })
   idNumber: string | null;
 
   @Column({ type: 'varchar', length: 191, nullable: true })
@@ -117,11 +120,26 @@ export class Application {
   @Column({ name: 'consent_at', type: 'datetime', precision: 3, nullable: true })
   consentAt: Date | null;
 
+  /**
+   * C22: the daily (UTC) count of wrong OTP codes, written only by
+   * PortalOtpService with atomic UPDATEs. `select: false` — internal
+   * bookkeeping, never part of any response.
+   */
+  @Column({ name: 'otp_fail_date', type: 'date', nullable: true, select: false })
+  otpFailDate?: string | null;
+
+  @Column({ name: 'otp_fail_count', type: 'smallint', unsigned: true, default: 0, select: false })
+  otpFailCount?: number;
+
   @Column({ name: 'submitted_at', type: 'datetime', precision: 3, nullable: true })
   submittedAt: Date | null;
 
   @Column({ name: 'decided_at', type: 'datetime', precision: 3, nullable: true })
   decidedAt: Date | null;
+
+  /** C27: set when an admin anonymised the application (personal data cleared, files deleted). */
+  @Column({ name: 'anonymized_at', type: 'datetime', precision: 3, nullable: true })
+  anonymizedAt: Date | null;
 
   @Column({ name: 'assigned_reviewer_id', type: 'bigint', unsigned: true, nullable: true })
   assignedReviewerId: string | null;

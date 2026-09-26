@@ -8,6 +8,7 @@ export type MailLogStatus = 'queued' | 'sent' | 'failed' | 'skipped';
 @Index('ix_mail_retry', ['status', 'nextRetryAt'])
 @Index('ix_mail_entity', ['entityType', 'entityId'])
 @Index('ix_mail_template', ['templateKey', 'createdAt'])
+@Index('ix_mail_log_created', ['createdAt'])
 export class MailLog {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: string;

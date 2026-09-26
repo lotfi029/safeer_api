@@ -3,7 +3,7 @@ import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MailLog } from '../database/entities/mail-log.entity.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import { readPageLimit, readString } from '../common/query/list-params.js';
 import type { RequestContext } from '../common/request-context.js';
 import { MailService } from './mail.service.js';
@@ -13,7 +13,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 @Controller('admin/mail/log')
-@Roles('admin')
+@Area('settings')
 @ApiCookieAuth()
 export class MailLogController {
   constructor(

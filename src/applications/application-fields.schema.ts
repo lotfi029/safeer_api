@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { normalizePhone } from '../common/phone.js';
+import { personName } from '../common/validation/person-name.js';
 
 /**
  * The three form steps the prototype's apply flow collects, as raw zod
@@ -11,9 +12,10 @@ import { normalizePhone } from '../common/phone.js';
  */
 
 export const step1Shape = {
-  firstName: z.string().min(1).max(120),
-  middleName: z.string().min(1).max(120).nullable().optional(),
-  lastName: z.string().min(1).max(120),
+  // C16: letters (Arabic/Latin), spaces, ' and - only.
+  firstName: personName(120),
+  middleName: personName(120).nullable().optional(),
+  lastName: personName(120),
   /** YYYY-MM-DD — matches `applications.birth_date`'s DATE column. */
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'birthDate must be YYYY-MM-DD'),
   /** Normalised to E.164 on save (B2) — see `Application.syncPhoneE164`/`normalizePhone`. `+966` is the default country code for a local `05…` number. */
@@ -66,6 +68,30 @@ export const partialApplicationSchema = z
   })
   .partial()
   .strict();
+
+/**
+ * C15: `PATCH portal/application/corrections` — while `docs_missing`, the
+ * applicant may correct only these fields (identity details and study
+ * details a reviewer might query). Contact details (email, phone) are not
+ * correctable here: they are where every later notification and OTP goes.
+ */
+export const CORRECTABLE_FIELDS = ['firstName', 'middleName', 'lastName', 'birthDate', 'nationality', 'idNumber', 'university', 'major', 'degreeLevel'] as const;
+
+export const correctionsSchema = z
+  .object({
+    firstName: step1Shape.firstName,
+    middleName: step1Shape.middleName,
+    lastName: step1Shape.lastName,
+    birthDate: step1Shape.birthDate,
+    nationality: step1Shape.nationality,
+    idNumber: step1Shape.idNumber,
+    university: step2Shape.university,
+    major: step2Shape.major,
+    degreeLevel: step2Shape.degreeLevel,
+  })
+  .partial()
+  .strict()
+  .refine((v) => Object.values(v).some((x) => x !== undefined), 'At least one field to correct is required');
 
 /**
  * Which of the 3 form steps a PATCH payload touches, used to compute how

@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import type { RequestContext } from '../common/request-context.js';
 import type { ContactMessage } from '../database/entities/contact-message.entity.js';
 import type { Testimonial } from '../database/entities/testimonial.entity.js';
@@ -18,7 +18,7 @@ import type { PagedResult } from '../common/crud/crud.factory.js';
  * `deleteRoles`).
  */
 @Controller('admin/messages')
-@Roles('admin', 'support')
+@Area('inbox')
 @ApiCookieAuth()
 export class AdminMessagesController {
   constructor(private readonly messages: MessagesService) {}
@@ -91,7 +91,7 @@ export class AdminMessagesController {
    * reason: `audit_log` is append-only with no DELETE grant, so anything
    * recorded here outlives the deletion it's evidence of.
    */
-  @Roles('admin')
+  @Area('inbox.delete')
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: RequestContext): Promise<{ deleted: true }> {
     const message = await this.messages.remove(id);

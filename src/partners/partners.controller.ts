@@ -8,7 +8,9 @@ import { CacheInterceptor } from '../cache/cache.interceptor.js';
 import { CacheTags } from '../cache/cache-tags.decorator.js';
 import { CacheKeyParams } from '../cache/cache-key-params.decorator.js';
 import { readString } from '../common/query/list-params.js';
-import { Partner } from '../database/entities/partner.entity.js';
+import { PARTNER_CATEGORIES, Partner } from '../database/entities/partner.entity.js';
+import { ProblemException } from '../common/problem-details/problem.exception.js';
+import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { toPublicPartner, type PublicPartner } from './public-partner.js';
 
 @Controller('partners')
@@ -16,7 +18,7 @@ import { toPublicPartner, type PublicPartner } from './public-partner.js';
 export class PartnersController {
   constructor(@InjectRepository(Partner) private readonly repo: Repository<Partner>) {}
 
-  @ApiQuery({ name: 'category', required: false, type: String, enum: ['government', 'university', 'association', 'supporter'] })
+  @ApiQuery({ name: 'category', required: false, type: String, enum: PARTNER_CATEGORIES })
   @Public()
   @Get()
   @UseInterceptors(CacheInterceptor)
@@ -24,6 +26,10 @@ export class PartnersController {
   @CacheKeyParams('category')
   async list(@Query() query: Record<string, unknown>): Promise<PublicPartner[]> {
     const category = readString(query, 'category');
+    // C42: an unknown value is a 400, never a cached empty list.
+    if (category !== undefined && !PARTNER_CATEGORIES.includes(category as Partner['category'])) {
+      throw new ProblemException(400, ErrorCode.VALIDATION_FAILED, `Unknown partner category: ${category}`);
+    }
     const partners = await this.repo.find({
       where: { isPublished: true, ...(category ? { category: category as Partner['category'] } : {}) },
       order: { sortOrder: 'ASC' },

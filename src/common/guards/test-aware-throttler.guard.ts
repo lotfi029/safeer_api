@@ -27,6 +27,9 @@ import type { Env } from '../../config/env.js';
  * activate outside a test run. Every other environment gets the exact same
  * throttling behaviour as before.
  */
+/** NODE_ENV=test only: a request carrying this header is throttled normally (see canActivate). */
+export const ENFORCE_THROTTLE_HEADER = 'x-test-enforce-throttle';
+
 @Injectable()
 export class TestAwareThrottlerGuard implements CanActivate {
   constructor(
@@ -36,6 +39,12 @@ export class TestAwareThrottlerGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): Promise<boolean> | boolean {
     if (this.env.NODE_ENV === 'test') {
+      // A spec that asserts a route's own @Throttle opts back in per
+      // request; only those requests are counted against the bucket.
+      const req = context.switchToHttp().getRequest<{ headers: Record<string, unknown> }>();
+      if (req.headers?.[ENFORCE_THROTTLE_HEADER] === '1') {
+        return this.throttlerGuard.canActivate(context);
+      }
       return true;
     }
     return this.throttlerGuard.canActivate(context);

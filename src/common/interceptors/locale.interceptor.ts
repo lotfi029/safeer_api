@@ -63,7 +63,8 @@ function collapseBilingual(value: unknown, locale: Locale): unknown {
         if (mergeBases.has(base)) {
           const enValue = obj[`${base}En`];
           const arValue = obj[key];
-          const useEn = locale === 'en' && enValue !== null && enValue !== undefined && enValue !== '';
+          // C39: a whitespace-only English value is blank too — it falls back to Arabic.
+          const useEn = locale === 'en' && enValue !== null && enValue !== undefined && !(typeof enValue === 'string' && enValue.trim() === '');
           result[base] = useEn ? enValue : arValue;
           continue;
         }

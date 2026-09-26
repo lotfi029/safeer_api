@@ -9,11 +9,20 @@ export interface CsvColumn<T> {
   value: (row: T) => string | number | boolean | null | undefined;
 }
 
-function escapeCsvField(raw: string): string {
-  if (/[",\r\n]/.test(raw)) {
-    return `"${raw.replace(/"/g, '""')}"`;
+/**
+ * C5: a cell starting with `=`, `+`, `-`, `@`, tab or CR is a formula to
+ * Excel/LibreOffice (`=HYPERLINK(...)`, DDE). Applicant-typed text (names,
+ * universities) lands in these exports, so such a value is prefixed with
+ * `'` — shown literally, never evaluated — and then quoted.
+ */
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
+export function escapeCsvField(raw: string): string {
+  const value = FORMULA_TRIGGER.test(raw) ? `'${raw}` : raw;
+  if (value !== raw || /[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
   }
-  return raw;
+  return value;
 }
 
 function cellToString(value: string | number | boolean | null | undefined): string {

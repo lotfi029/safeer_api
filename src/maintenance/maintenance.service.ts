@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { DataSource, LessThan, Repository } from 'typeorm';
+import { PrivateFileStore } from '../storage/private-file-store.service.js';
 import { Session } from '../database/entities/session.entity.js';
 import { AuthToken } from '../database/entities/auth-token.entity.js';
 import { MailLog } from '../database/entities/mail-log.entity.js';
@@ -9,6 +10,11 @@ import { ApplicantSession } from '../database/entities/applicant-session.entity.
 import { ApplicantOtp } from '../database/entities/applicant-otp.entity.js';
 
 const MAIL_LOG_RETENTION_DAYS = 90;
+/** C27 retention policy (docs/backend/DEPLOYMENT-HOSTINGER.md, "Retention"). */
+const SMS_LOG_RETENTION_DAYS = 90;
+const CONTACT_MESSAGE_RETENTION_DAYS = 730; // 24 months
+const IDLE_DRAFT_RETENTION_DAYS = 180;
+const NEWSLETTER_INACTIVE_RETENTION_DAYS = 30;
 
 function daysAgo(days: number): Date {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -19,12 +25,9 @@ function daysAgo(days: number): Date {
  * independently try/caught, so one failing step (a locked table, ...)
  * never stops the others from running the same night.
  *
- * TODO(phase 4+/6+): african_api's equivalent also purges old
- * contact_messages rows (24-month retention) and runs a nightly
- * library-link availability check via oEmbed. Add the contact_messages
- * purge back once the Contact module and its entity land; Safeer has no
- * library-style external-link content, so that check is not being ported
- * at all.
+ * C27 retention: contact messages after 24 months, sms_log after 90 days
+ * (mail_log already), drafts idle for 180 days together with their private
+ * files, and newsletter rows unsubscribed — or never confirmed — for 30 days.
  */
 @Injectable()
 export class MaintenanceService {
@@ -37,6 +40,8 @@ export class MaintenanceService {
     @InjectRepository(MailLog) private readonly mailLogRepo: Repository<MailLog>,
     @InjectRepository(ApplicantSession) private readonly applicantSessionRepo: Repository<ApplicantSession>,
     @InjectRepository(ApplicantOtp) private readonly applicantOtpRepo: Repository<ApplicantOtp>,
+    private readonly dataSource: DataSource,
+    private readonly fileStore: PrivateFileStore,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
@@ -50,7 +55,12 @@ export class MaintenanceService {
     try {
       await this.purgeExpiredSessions();
       await this.purgeSpentAuthTokens();
+      await this.keepReplyDeliveryStatus();
       await this.purgeOldMailLog();
+      await this.purgeOldSmsLog();
+      await this.purgeOldContactMessages();
+      await this.purgeIdleDrafts();
+      await this.purgeInactiveNewsletterRows();
       await this.purgeExpiredApplicantSessions();
       await this.purgeSpentApplicantOtps();
     } finally {
@@ -96,6 +106,80 @@ export class MaintenanceService {
       this.logger.log(`Purged ${result.affected ?? 0} mail_log row(s) older than ${MAIL_LOG_RETENTION_DAYS} days`);
     } catch (err) {
       this.logger.error('Failed to purge old mail_log rows', err instanceof Error ? err.stack : String(err));
+    }
+  }
+
+  /**
+   * C46: the 90-day mail_log purge nulls `message_replies.mail_log_id`
+   * (ON DELETE SET NULL), which lost a reply's delivery outcome. Copy it
+   * onto the reply first, for every row the purge is about to remove.
+   */
+  private async keepReplyDeliveryStatus(): Promise<void> {
+    await this.step('copy reply delivery status', () =>
+      this.dataSource.query(
+        `UPDATE message_replies r JOIN mail_log m ON m.id = r.mail_log_id
+            SET r.delivery_status = m.status
+          WHERE m.created_at < ?`,
+        [daysAgo(MAIL_LOG_RETENTION_DAYS)],
+      ),
+    );
+  }
+
+  private async purgeOldSmsLog(): Promise<void> {
+    await this.step(`purge sms_log older than ${SMS_LOG_RETENTION_DAYS} days`, () =>
+      this.dataSource.query('DELETE FROM sms_log WHERE created_at < ?', [daysAgo(SMS_LOG_RETENTION_DAYS)]),
+    );
+  }
+
+  /** Replies cascade with their message (fk_reply_message); a testimonial made from one keeps its text (SET NULL). */
+  private async purgeOldContactMessages(): Promise<void> {
+    await this.step('purge contact messages older than 24 months', () =>
+      this.dataSource.query('DELETE FROM contact_messages WHERE created_at < ?', [daysAgo(CONTACT_MESSAGE_RETENTION_DAYS)]),
+    );
+  }
+
+  /**
+   * A draft nobody has touched for 180 days is abandoned: its private files
+   * are deleted through the storage driver, then the row (documents,
+   * events, sessions and OTPs cascade). Submitted applications are never
+   * touched here — only an admin removes those (DELETE admin/applications/:id).
+   */
+  private async purgeIdleDrafts(): Promise<void> {
+    await this.step('purge idle drafts', async () => {
+      const drafts: Array<{ id: string }> = await this.dataSource.query(
+        "SELECT id FROM applications WHERE status = 'draft' AND updated_at < ? LIMIT 500",
+        [daysAgo(IDLE_DRAFT_RETENTION_DAYS)],
+      );
+      for (const { id } of drafts) {
+        const files: Array<{ storage_key: string }> = await this.dataSource.query(
+          'SELECT storage_key FROM application_documents WHERE application_id = ?',
+          [id],
+        );
+        for (const file of files) await this.fileStore.remove(file.storage_key);
+        await this.dataSource.query('UPDATE interview_slots SET application_id = NULL WHERE application_id = ?', [id]);
+        await this.dataSource.query("DELETE FROM applications WHERE id = ? AND status = 'draft'", [id]);
+      }
+      return { affectedRows: drafts.length };
+    });
+  }
+
+  private async purgeInactiveNewsletterRows(): Promise<void> {
+    const cutoff = daysAgo(NEWSLETTER_INACTIVE_RETENTION_DAYS);
+    await this.step('purge unsubscribed / unconfirmed newsletter rows', () =>
+      this.dataSource.query(
+        'DELETE FROM newsletter_subscribers WHERE unsubscribed_at < ? OR (confirmed_at IS NULL AND created_at < ?)',
+        [cutoff, cutoff],
+      ),
+    );
+  }
+
+  /** Runs one retention step, logging its row count; a failure is logged and never stops the other steps. */
+  private async step(name: string, run: () => Promise<{ affectedRows?: number } | unknown>): Promise<void> {
+    try {
+      const result = (await run()) as { affectedRows?: number } | undefined;
+      this.logger.log(`${name}: ${result?.affectedRows ?? 0} row(s)`);
+    } catch (err) {
+      this.logger.error(`Failed to ${name}`, err instanceof Error ? err.stack : String(err));
     }
   }
 

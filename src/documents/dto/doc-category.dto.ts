@@ -1,11 +1,12 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { slugSchema } from '../../common/validation/slug.js';
 
 export const createDocCategorySchema = z
   .object({
-    slug: z.string().min(1).max(64),
+    slug: slugSchema().max(64), // C14
     nameAr: z.string().min(1).max(191),
-    nameEn: z.string().max(191).nullable().optional(),
+    nameEn: z.string().trim().max(191).nullable().optional(),
     isPublished: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })

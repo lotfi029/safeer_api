@@ -51,20 +51,41 @@ export function toPublicPostSummary(post: Post): PublicPostSummary {
   };
 }
 
+const WORDS_PER_MINUTE = 200;
+
+export function estimateReadMinutes(text: string | null | undefined): number {
+  if (!text) return 1;
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(wordCount / WORDS_PER_MINUTE));
+}
+
 export interface PublicPostDetail extends PublicPostSummary {
   bodyAr: string | null;
   bodyEn: string | null;
-  /** Rounded estimate, computed from the raw Markdown word count at ~200 words/minute. */
-  readMinutes: number;
+  /**
+   * C39: a rounded estimate per language, from that body's own word count
+   * at ~200 words/minute; `readMinutesEn` is null without an English body.
+   * The public locale collapse turns the pair into one `readMinutes`, so it
+   * always matches the body actually shown.
+   */
+  readMinutesAr: number;
+  readMinutesEn: number | null;
   related: PublicPostSummary[];
+  /**
+   * C41: only on a preview (a verified `?preview=` token) — append it to
+   * this post's `/files/…` URLs so an unpublished cover loads for a viewer
+   * without a session.
+   */
+  previewFileQuery?: string;
 }
 
-export function toPublicPostDetail(post: Post, readMinutes: number, related: Post[]): PublicPostDetail {
+export function toPublicPostDetail(post: Post, related: Post[]): PublicPostDetail {
   return {
     ...toPublicPostSummary(post),
     bodyAr: post.bodyAr,
     bodyEn: post.bodyEn,
-    readMinutes,
+    readMinutesAr: estimateReadMinutes(post.bodyAr),
+    readMinutesEn: post.bodyEn && post.bodyEn.trim() ? estimateReadMinutes(post.bodyEn) : null,
     related: related.map(toPublicPostSummary),
   };
 }

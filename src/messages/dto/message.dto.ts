@@ -16,7 +16,7 @@ export class SetMessageStatusDto extends createZodDto(setMessageStatusSchema) {}
 export const convertToTestimonialSchema = z
   .object({
     quoteAr: z.string().min(1),
-    quoteEn: z.string().nullable().optional(),
+    quoteEn: z.string().trim().nullable().optional(),
     authorName: z.string().min(1).max(191).optional(),
     authorDesc: z.string().max(255).nullable().optional(),
   })

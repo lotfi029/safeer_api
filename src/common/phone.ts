@@ -37,8 +37,11 @@ export function normalizePhone(raw: string | null | undefined, defaultCc = '966'
     value = `+${value.slice(2)}`;
   }
 
-  if (/^0\d+$/.test(value)) {
-    // Local number with a trunk `0` (e.g. 05XXXXXXXX) — drop the `0`, prefix the default country code.
+  if (/^05\d{8}$/.test(value)) {
+    // Local Saudi mobile with its trunk `0` (05XXXXXXXX) — drop the `0`, prefix
+    // the default country code. Only this shape: any other leading-0 number is
+    // ambiguous (a landline, a foreign trunk prefix) and is rejected rather
+    // than guessed at, exactly as 004's SQL backfill does.
     value = `+${defaultCc}${value.slice(1)}`;
   } else if (/^5\d{8}$/.test(value)) {
     // Bare Saudi mobile with no leading 0 or country code.

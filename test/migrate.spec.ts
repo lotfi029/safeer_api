@@ -119,6 +119,36 @@ describe('scripts/migrate.mjs', () => {
     expect(await query("SELECT version FROM schema_migrations WHERE version = '004_broken.sql'")).toHaveLength(0);
   });
 
+  it('runs a .mjs migration (C28): up(connection, {env}) once, checksummed, rolled back on failure', async () => {
+    writeMigrations({
+      '004_data.mjs':
+        'export async function up(connection, { env, log }) {\n' +
+        '  await connection.query("INSERT INTO t1 (id) VALUES (40)");\n' +
+        '  log(`node env ${env.NODE_ENV}`);\n' +
+        '}\n',
+    });
+    const first = migrate();
+    expect(first.status).toBe(0);
+    expect(first.stdout).toContain('node env test');
+    const [row] = await query<{ checksum: string }>("SELECT checksum FROM schema_migrations WHERE version = '004_data.mjs'");
+    expect(row.checksum).toMatch(/^[0-9a-f]{64}$/);
+    expect(migrate().stdout).toContain('Nothing to migrate');
+    expect(await query('SELECT id FROM t1 WHERE id = 40')).toHaveLength(1);
+
+    writeMigrations({
+      '005_fails.mjs':
+        'export async function up(connection) {\n' +
+        '  await connection.query("INSERT INTO t1 (id) VALUES (50)");\n' +
+        '  throw new Error("boom");\n' +
+        '}\n',
+    });
+    const failed = migrate();
+    expect(failed.status).toBe(1);
+    expect(failed.output).toContain('005_fails.mjs failed');
+    expect(await query('SELECT id FROM t1 WHERE id = 50')).toHaveLength(0);
+    expect(await query("SELECT version FROM schema_migrations WHERE version = '005_fails.mjs'")).toHaveLength(0);
+  });
+
   it('runs in UTC (C9): CURRENT_TIMESTAMP defaults match UTC_TIMESTAMP()', async () => {
     expect(migrate().status).toBe(0);
     const [row] = await query<{ drift: number }>(

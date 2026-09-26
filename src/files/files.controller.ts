@@ -1,9 +1,17 @@
-import { Controller, Get, NotFoundException, Param, Req, Res } from '@nestjs/common';
+import { Controller, Get, Inject, NotFoundException, Param, Req, Res } from '@nestjs/common';
+import { ApiQuery } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
+import type { Readable } from 'node:stream';
+import { StorageObjectNotFoundError } from '../storage/storage-driver.interface.js';
 import { MediaService } from '../media/media.service.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
+import { contentDisposition } from '../common/http/filenames.js';
+import { readString } from '../common/query/list-params.js';
+import { verifyPreviewToken } from '../auth/preview-token.util.js';
+import { ENV } from '../config/env.tokens.js';
+import type { Env } from '../config/env.js';
 
 /**
  * Nothing is ever served from a public bucket URL (D-07): these two routes
@@ -29,11 +37,20 @@ import type { RequestContext } from '../common/request-context.js';
  * available here without requiring a session for the common case (a
  * published asset, fetched anonymously).
  */
+/** C25: originals and PDFs — short-lived so an unpublish takes effect within minutes. */
+const ORIGINAL_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=60';
+const VARIANT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
 @Controller('files')
 @SkipThrottle()
 export class FilesController {
-  constructor(private readonly mediaService: MediaService) {}
+  constructor(
+    private readonly mediaService: MediaService,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
+  @ApiQuery({ name: 'preview', required: false, type: String, description: 'C41: a post preview token (with `post`), for an asset that post shows.' })
+  @ApiQuery({ name: 'post', required: false, type: String })
   @Public()
   @Get(':publicId')
   async streamOriginal(@Param('publicId') publicId: string, @Req() req: RequestContext, @Res() res: Response): Promise<void> {
@@ -52,9 +69,18 @@ export class FilesController {
       void this.mediaService.incrementDownloadCount(publicId);
     }
 
-    await this.sendFile(res, asset.storageKey, asset.mimeType, asset.kind === 'pdf', isPrivate === 'allow-private');
+    await this.sendFile(
+      res,
+      asset.storageKey,
+      asset.mimeType,
+      asset.kind === 'pdf' ? asset.originalName : null,
+      isPrivate === 'allow-private',
+      ORIGINAL_CACHE_CONTROL,
+    );
   }
 
+  @ApiQuery({ name: 'preview', required: false, type: String, description: 'C41: a post preview token (with `post`), for an asset that post shows.' })
+  @ApiQuery({ name: 'post', required: false, type: String })
   @Public()
   @Get(':publicId/:variant')
   async streamVariant(
@@ -72,7 +98,7 @@ export class FilesController {
     const found = await this.mediaService.findVariant(asset.id, variant);
     if (!found) throw new NotFoundException();
 
-    await this.sendFile(res, found.storageKey, 'image/webp', false, isPrivate === 'allow-private');
+    await this.sendFile(res, found.storageKey, 'image/webp', null, isPrivate === 'allow-private', VARIANT_CACHE_CONTROL);
   }
 
   /**
@@ -82,10 +108,28 @@ export class FilesController {
    * `no-store` (an editor previewing an unpublished attachment, or an
    * admin who has the link from the dashboard). `'deny'` — not publicly
    * readable and no session: 404, indistinguishable from a missing asset.
+   *
+   * C41: a shared preview link (`GET news/:slug?preview=…`) is opened by
+   * someone without a session, so its unpublished cover would 404. The
+   * news detail hands back `previewFileQuery` (`preview=<token>&post=<id>`)
+   * for such a response; with it, an asset *that post shows* is served
+   * privately, and only while the token is valid.
    */
   private async gatePublication(assetId: string, req: RequestContext): Promise<'allow-public' | 'allow-private' | 'deny'> {
     if (await this.mediaService.isPubliclyReadable(assetId)) return 'allow-public';
     if (req.user) return 'allow-private';
+    const query = (req.query ?? {}) as Record<string, unknown>;
+    const token = readString(query, 'preview');
+    const postId = readString(query, 'post');
+    if (
+      token &&
+      postId &&
+      /^\d+$/.test(postId) &&
+      verifyPreviewToken(this.env.APP_ENCRYPTION_KEY, 'posts', postId, token) &&
+      (await this.mediaService.isUsedByPost(assetId, postId))
+    ) {
+      return 'allow-private';
+    }
     return 'deny';
   }
 
@@ -95,14 +139,33 @@ export class FilesController {
    * caching, content-type or the download-count side effect above depends
    * on where the bytes actually live.
    */
-  private async sendFile(res: Response, storageKey: string, mimeType: string, asAttachment: boolean, isPrivate: boolean): Promise<void> {
+  private async sendFile(
+    res: Response,
+    storageKey: string,
+    mimeType: string,
+    attachmentName: string | null,
+    isPrivate: boolean,
+    cacheControl: string,
+  ): Promise<void> {
     res.setHeader('Content-Type', mimeType);
-    res.setHeader('Cache-Control', isPrivate ? 'private, no-store' : 'public, max-age=31536000, immutable');
+    // C25: an original or a PDF can be unpublished (or replaced) at any time,
+    // so browsers and CDNs may keep it only briefly; the WebP variants' URLs
+    // are only ever handed out alongside a published row and change with the
+    // asset, so they stay long-lived.
+    res.setHeader('Cache-Control', isPrivate ? 'private, no-store' : cacheControl);
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    if (asAttachment) {
-      res.setHeader('Content-Disposition', 'attachment');
+    if (attachmentName !== null) {
+      // C19: RFC 5987 filename (Arabic document titles) with an ASCII fallback.
+      res.setHeader('Content-Disposition', contentDisposition('attachment', attachmentName));
     }
-    const stream = await this.mediaService.getStream(storageKey);
+    let stream: Readable;
+    try {
+      stream = await this.mediaService.getStream(storageKey);
+    } catch (err) {
+      // The row exists but its file doesn't — the same 404 as a missing asset.
+      if (err instanceof StorageObjectNotFoundError) throw new NotFoundException();
+      throw err;
+    }
     stream.on('error', () => {
       if (!res.headersSent) res.status(404);
       res.end();

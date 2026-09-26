@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { personName } from '../../common/validation/person-name.js';
 
 // `website` is a honeypot: a real visitor never sees or fills this field
 // (hidden by CSS on the form); a bot that fills every input trips it.
@@ -8,7 +9,7 @@ import { z } from 'zod';
 // check. Neither is persisted.
 export const contactSchema = z
   .object({
-    name: z.string().min(1).max(191),
+    name: personName(191), // C16
     email: z.string().email().max(191),
     phone: z.string().max(40).nullable().optional(),
     subject: z.enum(['scholarship', 'partnership', 'feedback', 'other']),
@@ -29,3 +30,13 @@ export const newsletterSchema = z
   .strict();
 
 export class NewsletterDto extends createZodDto(newsletterSchema) {}
+
+/** C27: `POST newsletter/confirm` and `POST newsletter/unsubscribe` — the email and signed token from the link. */
+export const newsletterTokenSchema = z
+  .object({
+    email: z.string().email().max(191),
+    token: z.string().min(10).max(200),
+  })
+  .strict();
+
+export class NewsletterTokenDto extends createZodDto(newsletterTokenSchema) {}

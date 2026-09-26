@@ -2,18 +2,18 @@ import { Body, Controller, Delete, Get, Param, Patch, Req } from '@nestjs/common
 import { ApiCookieAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Area } from '../auth/role-matrix.js';
 import type { RequestContext } from '../common/request-context.js';
 import { toPublicUser } from './public-user.js';
 
 /**
  * No POST here — account creation is exclusively through /auth/invite
  * (FR-A-09: admins never type another user's password). RolesGuard is
- * registered globally (AppModule); `@Roles('admin')` here just supplies the
+ * registered globally (AppModule); `@Area('users')` here just supplies the
  * metadata it reads.
  */
 @Controller('admin/users')
-@Roles('admin')
+@Area('users')
 @ApiCookieAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}

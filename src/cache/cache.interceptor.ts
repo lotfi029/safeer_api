@@ -6,6 +6,7 @@ import { tap } from 'rxjs/operators';
 import type { RequestContext } from '../common/request-context.js';
 import { CACHE_TAGS_KEY } from './cache-tags.decorator.js';
 import { CACHE_KEY_PARAMS_KEY } from './cache-key-params.decorator.js';
+import { PREVIEW_AWARE_KEY } from './preview-aware.decorator.js';
 import { CacheService } from './cache.service.js';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
@@ -68,23 +69,17 @@ export class CacheInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    // 7.8/FR-G-05: `?preview=` is deliberately absent from
-    // CACHEABLE_QUERY_KEYS, which means without this check it would change
-    // nothing about the cache key at all — a preview request for an
-    // unpublished row would either read back a stale *published* response
-    // that happens to already be cached, or (worse) get its own
-    // unpublished payload stored under the exact key an anonymous visitor's
-    // next request reads from. Bypass the cache entirely instead: no read,
-    // no write, and the response is marked private so nothing upstream
-    // (a CDN, a shared browser cache) stores it either. This is also why
-    // there is no `?includeUnpublished=true` trusting a session cookie —
-    // the cache key has no session dimension, so that flag would have the
-    // exact same collision the moment it hit a cached route.
-    if (req.query?.preview !== undefined) {
-      const res = context.switchToHttp().getResponse<Response>();
-      res.setHeader('Cache-Control', 'private, no-store');
-      return next.handle();
-    }
+    // C24 (was 7.8/FR-G-05's blanket bypass): `?preview=` is never part of
+    // the cache key. On a route that doesn't support previews it is simply
+    // ignored — `GET /home?preview=x` is served from the cache like any
+    // other request, so the parameter is no longer a free way to push every
+    // request through to the database. On a @PreviewAware() route the
+    // cached copy is skipped (a cached *published* body must not stand in
+    // for a preview), and after the handler runs: if it verified the token
+    // (`req.previewVerified`), the response is private and never stored; if
+    // not, it's the ordinary public response and is cached as usual.
+    const previewAware = this.reflector.get<boolean>(PREVIEW_AWARE_KEY, context.getHandler()) === true;
+    const previewRequested = previewAware && req.query?.preview !== undefined;
 
     // 26-backend-code-review.md Task 2 / 28-caching-review.md §3: these
     // headers used to be set here unconditionally, before it was known
@@ -107,15 +102,21 @@ export class CacheInterceptor implements NestInterceptor {
 
     const keyParams = cacheKeyParams(this.reflector, context);
     const key = this.buildCacheKey(req, keyParams);
-    const cached = this.cache.get(key);
+    const cached = previewRequested ? undefined : this.cache.get(key);
     if (cached !== undefined) {
       setCacheHeaders();
       return of(cached);
     }
 
     const tags = this.reflector.get<string[]>(CACHE_TAGS_KEY, context.getHandler()) ?? [];
+    // C31: taken before the handler reads anything — see CacheService.versionOf().
+    const version = this.cache.versionOf(tags);
     return next.handle().pipe(
       tap((data) => {
+        if (req.previewVerified) {
+          res.setHeader('Cache-Control', 'private, no-store');
+          return;
+        }
         setCacheHeaders();
         // 30-backend-finishing-prompt.md §2.3: a handler sets this when the
         // *particular* response isn't worth caching even though the route
@@ -127,7 +128,7 @@ export class CacheInterceptor implements NestInterceptor {
         // *read* can never serve one searcher's results back to another —
         // this only stops the *write*.
         if (req.skipCacheWrite) return;
-        this.cache.set(key, data, tags);
+        this.cache.set(key, data, tags, version);
       }),
     );
   }
