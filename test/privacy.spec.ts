@@ -218,6 +218,40 @@ describe('C27: retention', () => {
       await deleteApplication(kept.id);
     }
   });
+
+  // A10 (safeer-delivery-review.md): the purge deleted a draft's files before
+  // its conditional row delete, so a draft submitted while the purge ran kept
+  // its row and lost its files. Here the "submit" holds the row lock (as the
+  // real submit does, B14) while the nightly job runs, and commits after.
+  it('A10: a draft submitted while the purge runs keeps its files', async () => {
+    const draft = await createApplication();
+    const tag = `a10-${Date.now()}`;
+    expect((await uploadApplicationDocument(draft, 'id_copy', tag)).status).toBe(201);
+    const [key] = await storageKeys(draft.id);
+    await withDb((conn) => conn.execute('UPDATE applications SET updated_at = UTC_TIMESTAMP(3) - INTERVAL 200 DAY WHERE id = ?', [draft.id]));
+    try {
+      await withDb(async (conn) => {
+        await conn.beginTransaction();
+        await conn.execute('SELECT id FROM applications WHERE id = ? FOR UPDATE', [draft.id]);
+        await conn.execute("UPDATE applications SET status = 'new', submitted_at = UTC_TIMESTAMP(3) WHERE id = ?", [draft.id]);
+        const run = api('POST', '/__dev/maintenance/run');
+        // Commit only once the purge has reached this draft and is waiting on its lock.
+        const deadline = Date.now() + 15_000;
+        for (;;) {
+          const waiting = await scalar("SELECT COUNT(*) FROM information_schema.INNODB_TRX WHERE trx_state = 'LOCK WAIT'");
+          if (Number(waiting) > 0) break;
+          if (Date.now() > deadline) throw new Error('the purge never waited on the draft row');
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        await conn.commit();
+        expect((await run).status).toBe(200);
+      });
+      expect(await scalar('SELECT status FROM applications WHERE id = ?', [draft.id])).toBe('new');
+      expect(existsSync(path.join(STORAGE_ROOT, key))).toBe(true);
+    } finally {
+      await deleteApplication(draft.id);
+    }
+  });
 });
 
 describe('C27: DELETE admin/applications/:id anonymises', () => {
