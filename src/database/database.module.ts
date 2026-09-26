@@ -1,9 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, type OnApplicationBootstrap } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { ENV } from '../config/env.tokens.js';
 import { ConfigModule } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { entities } from './entities/index.js';
+import { assertUtcSession, utcConnectionOptions } from './utc.js';
 
 /**
  * `synchronize` is off in every environment (D-02, hard rule) — the schema
@@ -28,6 +30,8 @@ import { entities } from './entities/index.js';
  * THIS STRING AND THE `COLLATE=` ON EVERY TABLE IN 001_schema.sql MUST
  * MATCH. Change one, change the other — the failure mode of getting it
  * wrong is that asset deletion breaks and nothing else does.
+ *
+ * Every connection is UTC (C9) — see utc.ts. Boot fails if it isn't.
  */
 @Module({
   imports: [
@@ -43,6 +47,7 @@ import { entities } from './entities/index.js';
         password: env.DB_PASSWORD,
         database: env.DB_NAME,
         charset: 'utf8mb4_unicode_ci',
+        ...utcConnectionOptions,
         synchronize: false,
         entities,
         autoLoadEntities: true,
@@ -53,4 +58,10 @@ import { entities } from './entities/index.js';
   ],
   exports: [TypeOrmModule],
 })
-export class DatabaseModule {}
+export class DatabaseModule implements OnApplicationBootstrap {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async onApplicationBootstrap(): Promise<void> {
+    await assertUtcSession((sql) => this.dataSource.query(sql));
+  }
+}

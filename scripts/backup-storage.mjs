@@ -10,13 +10,13 @@
 //
 // Local mode: writes <outDir>/safeer-storage-<UTC timestamp>.tar.gz of the
 // whole STORAGE_ROOT tree. outDir defaults to ./var/backups, created if
-// missing. Cron line for the out-of-repo deployment notes:
+// missing. Cron line (docs/backend/DEPLOYMENT-HOSTINGER.md, "Backups"):
 //   0 3 * * * cd /path/to/safeer_api && NODE_ENV=production node scripts/backup-storage.mjs /path/to/backups >> /var/log/safeer-storage-backup.log 2>&1
 //
 // S3 mode: prints a message and exits 0 — nothing to do here. Back up the
 // S3_BUCKET_PRIVATE/S3_BUCKET_PUBLIC buckets with the provider's own
 // mechanism (versioning, cross-region replication, a scheduled export),
-// documented in the out-of-repo deployment notes.
+// documented in docs/backend/DEPLOYMENT-HOSTINGER.md.
 
 import 'dotenv/config';
 import { spawn } from 'node:child_process';

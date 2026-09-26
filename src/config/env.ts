@@ -27,6 +27,13 @@ const envSchema = z.object({
   DB_USER: z.string().min(1),
   DB_PASSWORD: z.string(),
   DB_NAME: z.string().min(1),
+  // C29: the DDL-capable account scripts/migrate.mjs and db-reset.mjs use
+  // (scripts/lib/db-connection.mjs). The app never connects with it — it's
+  // declared here so the running process's env is validated as one set.
+  // Required by the scripts in staging/production; in development/test they
+  // fall back to DB_USER/DB_PASSWORD.
+  MIGRATION_DB_USER: z.string().min(1).optional(),
+  MIGRATION_DB_PASSWORD: z.string().optional(),
 
   SESSION_COOKIE_NAME: z.string().min(1).default('sf_sid'),
   SESSION_IDLE_HOURS: z.coerce.number().positive().default(8),

@@ -76,7 +76,9 @@ export async function withDb<T>(fn: (conn: Connection) => Promise<T>): Promise<T
     password: process.env.TEST_DB_PASSWORD,
     database: process.env.TEST_DB_NAME,
     charset: 'utf8mb4_unicode_ci',
+    timezone: 'Z', // C9: same clock as the app (src/database/utc.ts)
   });
+  await conn.query("SET time_zone = '+00:00'");
   try {
     return await fn(conn);
   } finally {
@@ -210,4 +212,18 @@ export async function uploadApplicationDocument(session: Session, docType: strin
   });
   const json = await res.json().catch(() => undefined);
   return { status: res.status, body: json };
+}
+
+/** `POST portal/auth/verify-otp`, returning the applicant session it mints (cookie + csrfToken). */
+export async function verifyOtpSession(identifier: string, code: string): Promise<Session> {
+  const res = await fetch(`${BASE}/portal/auth/verify-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier, code }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`verify-otp failed: ${res.status} ${text}`);
+  const setCookie = res.headers.get('set-cookie');
+  if (!setCookie) throw new Error('verify-otp did not set a session cookie');
+  return { cookie: setCookie.split(';')[0], csrfToken: JSON.parse(text).csrfToken };
 }

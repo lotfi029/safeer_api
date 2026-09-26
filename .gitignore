@@ -9,5 +9,4 @@ var/
 Thumbs.db
 *.tsbuildinfo
 .claude/
-docs/
 test/.server.pid

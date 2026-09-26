@@ -5,6 +5,7 @@ import 'dotenv/config';
 import { DataSource } from 'typeorm';
 import { loadEnv } from '../config/env.js';
 import { entities } from './entities/index.js';
+import { utcConnectionOptions } from './utc.js';
 
 /**
  * Plain TypeORM DataSource for the CLI only — `schema:check` (P4) is the one
@@ -23,6 +24,8 @@ export const AppDataSource = new DataSource({
   database: env.DB_NAME,
   // Full collation, not just the charset name — see database.module.ts.
   charset: 'utf8mb4_unicode_ci',
+  // UTC on every connection (C9) — see utc.ts.
+  ...utcConnectionOptions,
   synchronize: false,
   entities,
 });
