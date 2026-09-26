@@ -242,3 +242,14 @@ export async function waitForAuthToken(userId: string, purpose = 'reset', timeou
 }
 
 export const settleForgot = () => new Promise((r) => setTimeout(r, 500));
+
+/**
+ * A4: `POST portal/auth/request-otp` answers before it looks the identifier
+ * up; the lookup, the `applicant_otps` row and the send run afterwards
+ * (BackgroundWork). This waits until that work is done — for specs that
+ * check rows or logs straight after a request. `readOtp()` waits on its own.
+ */
+export async function settleBackground(): Promise<void> {
+  const res = await fetch(`${BASE}/__dev/settle`, { method: 'POST' });
+  if (!res.ok) throw new Error(`__dev/settle answered ${res.status}`);
+}

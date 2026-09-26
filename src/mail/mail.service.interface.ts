@@ -16,6 +16,13 @@ export interface SendMailParams {
    * mail can't be retried after a restart (an OTP has expired by then anyway).
    */
   sensitiveVars?: readonly string[];
+  /**
+   * A4: resolve only after the first delivery attempt (success or a
+   * recorded failure), not as soon as the row is queued. For callers that
+   * already run in the background and need the send itself ordered and
+   * covered by the shutdown drain — the request-otp code. Never throws.
+   */
+  awaitDelivery?: boolean;
 }
 
 /**

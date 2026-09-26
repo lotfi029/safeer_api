@@ -17,6 +17,12 @@ module.exports = {
       script: 'dist/main.js',
       instances: 1,
       exec_mode: 'fork',
+      // A4: on a restart PM2 sends SIGINT, then SIGKILL after kill_timeout.
+      // The app waits up to 10 s for background sends still running
+      // (request-otp answers before its SMS/email goes out — see
+      // src/common/background/background-work.service.ts); 12 s lets that
+      // drain finish instead of cutting it at PM2's default 1.6 s.
+      kill_timeout: 12000,
       env: {
         NODE_ENV: 'production',
       },

@@ -16,12 +16,16 @@ import { normalizePhone } from '../common/phone.js';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
 import { OtpPeekService } from '../dev/otp-peek.service.js';
+import { BackgroundWork } from '../common/background/background-work.service.js';
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
-/** C22: wrong codes per application per UTC day before OTP sign-in locks until the next day. */
-const OTP_DAILY_FAILURE_LIMIT = 10;
+/** A1: wrong codes inside a rolling hour before OTP sign-in locks for OTP_LOCK_MINUTES. */
+const OTP_HOURLY_FAILURE_LIMIT = 10;
+const OTP_LOCK_MINUTES = 60;
+/** A1: wrong codes per application per UTC day before OTP sign-in locks until the next day. */
+const OTP_DAILY_FAILURE_LIMIT = 30;
 
 /** `applications.reference` shape, e.g. `SA-2026-00185` (ApplicationsService.create). */
 const REFERENCE_RE = /^[A-Z]{1,10}-\d{4}-\d{5}$/i;
@@ -37,6 +41,9 @@ const REFERENCE_RE = /^[A-Z]{1,10}-\d{4}-\d{5}$/i;
 const OTP_REQUEST_LIMIT = 5;
 const OTP_REQUEST_WINDOW_MS = 15 * 60 * 1000;
 const OTP_REQUEST_MAX_TRACKED = 10_000;
+
+/** A4: the BackgroundWork queue every request-otp lookup runs on, in arrival order. */
+const OTP_LOOKUP_QUEUE = 'otp:lookup';
 
 export type VerifyOtpResult = MintedApplicantSession;
 export type RequestedOtpChannel = 'sms' | 'email' | undefined;
@@ -63,6 +70,7 @@ export class PortalOtpService {
     private readonly applicantSessions: ApplicantSessionService,
     @Inject(ENV) private readonly env: Env,
     private readonly otpPeek: OtpPeekService,
+    private readonly background: BackgroundWork,
   ) {}
 
   /**
@@ -80,29 +88,53 @@ export class PortalOtpService {
    * whether or not `identifier` matches an application, so it never
    * enumerates. It is not a guarantee: SMS silently falls back to email
    * per-application when the phone is missing or the send fails (see
-   * `resolveChannel`/`deliver` below).
+   * `smsRecipient`/`deliver` below).
+   *
+   * A4 (safeer-delivery-review.md): the response goes out before the
+   * identifier is even looked up. Only the per-identifier limiter (the same
+   * for a hit and a miss) and the settings-only `channelHint` run first;
+   * the lookup, the `applicant_otps` row and the send (up to 5 s for an SMS,
+   * then the email fallback) run afterwards on BackgroundWork. Awaiting them
+   * made a matching identifier measurably slower to answer than a miss.
+   *
+   * Ordering: every lookup runs on one queue (`otp:lookup`, a few ms each),
+   * and each application's codes are then issued on their own queue
+   * (`otp:<applicationId>`) — insert, send, record — one after another.
+   * Two quick requests for one application are issued in the order they
+   * arrived, and the last code delivered is always the live one.
    */
   async requestOtp(identifier: string, channel?: RequestedOtpChannel): Promise<{ ok: true; channelHint: 'sms' | 'email' }> {
     this.checkRequestRateLimit(identifier);
 
     const channelHint = channel ?? (await this.defaultChannelHint());
 
-    const application = await this.findApplication(identifier);
-    // C22: every silent stop below returns exactly what a miss returns, so
-    // none of them enumerates: no application, the per-application request
-    // budget spent (whichever identifier named it), or OTP sign-in locked
-    // for today after too many wrong codes.
-    if (!application || !this.takeApplicationRequestSlot(application.id) || (await this.isLockedToday(application.id))) {
-      return { ok: true, channelHint };
-    }
+    this.background.run('otp lookup', () => this.queueIssue(identifier, channel), OTP_LOOKUP_QUEUE);
+    return { ok: true, channelHint };
+  }
 
+  /** A4: resolves the identifier and, if a code should go out, queues it on the application's own queue. */
+  private async queueIssue(identifier: string, channel: RequestedOtpChannel): Promise<void> {
+    const application = await this.findApplication(identifier);
+    // C22: every silent stop below is invisible to the caller (who already
+    // has the same `{ ok: true }` a miss gets): no application, the
+    // per-application request budget spent (whichever identifier named it),
+    // or OTP sign-in locked after too many wrong codes (A1).
+    if (!application || !this.takeApplicationRequestSlot(application.id) || (await this.isLocked(application.id))) {
+      return;
+    }
+    this.background.run('otp send', () => this.issue(application, channel), `otp:${application.id}`);
+  }
+
+  /**
+   * One code for one application. The row is written (and every older live
+   * code invalidated — C22) and committed before anything is sent (B1), so
+   * a code the applicant receives always exists to be verified.
+   */
+  private async issue(application: Application, channel: RequestedOtpChannel): Promise<void> {
     const code = String(randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, '0');
     const smsTo = await this.smsRecipient(application, channel);
     const plannedChannel: ApplicantOtpChannel = smsTo ? 'sms' : 'email';
 
-    // The row is written (and every older live code invalidated — C22)
-    // before anything is sent, so a code the applicant receives always
-    // exists to be verified.
     const otp = await this.otpRepo.manager.transaction(async (manager) => {
       await manager
         .createQueryBuilder()
@@ -127,8 +159,6 @@ export class PortalOtpService {
       await this.otpRepo.update(otp.id, { channel: usedChannel });
     }
     this.otpPeek.record(application.id, code, usedChannel);
-
-    return { ok: true, channelHint };
   }
 
   /**
@@ -170,6 +200,8 @@ export class PortalOtpService {
       }
     }
 
+    // A4: wait for the SMTP attempt itself, so this application's queue
+    // (BackgroundWork) orders real deliveries and a shutdown drains them.
     await this.mailService.send({
       key: 'otp_code',
       to: application.email ?? '',
@@ -177,6 +209,7 @@ export class PortalOtpService {
       locale: application.locale,
       entity,
       sensitiveVars,
+      awaitDelivery: true,
     });
     return 'email';
   }
@@ -206,7 +239,7 @@ export class PortalOtpService {
    */
   async verifyOtp(identifier: string, code: string, req: RequestContext): Promise<VerifyOtpResult> {
     const application = await this.findApplication(identifier);
-    if (!application || (await this.isLockedToday(application.id))) {
+    if (!application || (await this.isLocked(application.id))) {
       throw genericOtpError();
     }
 
@@ -229,17 +262,25 @@ export class PortalOtpService {
 
       if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS || hashToken(code) !== otp.codeHash) {
         if (otp) {
+          // A1: only a guess actually checked against a live code counts
+          // toward the lock. No code issued, or one whose 5 attempts are
+          // spent, is not a guess — counting those let anyone who knew a
+          // reference lock that applicant out without ever seeing a code.
+          const guessed = otp.attempts < OTP_MAX_ATTEMPTS;
           otp.attempts += 1;
           await manager.save(otp);
+          if (guessed) await this.recordFailure(manager, application.id);
         }
-        await this.recordDailyFailure(manager, application.id);
         return { ok: false as const };
       }
 
       otp.attempts += 1;
       otp.consumedAt = new Date();
       await manager.save(otp);
-      await manager.query('UPDATE applications SET otp_fail_count = 0 WHERE id = ?', [application.id]);
+      await manager.query(
+        'UPDATE applications SET otp_fail_count = 0, otp_hour_count = 0, otp_hour_start = NULL, otp_locked_until = NULL WHERE id = ?',
+        [application.id],
+      );
 
       const minted = await this.applicantSessions.mint(manager, application.id, req);
       return { ok: true as const, minted };
@@ -252,24 +293,41 @@ export class PortalOtpService {
   }
 
   /**
-   * C22: one more wrong code today (UTC). Atomic, and assignment order
-   * matters: MySQL evaluates SET left to right, so the count is computed
-   * against the *old* date before the date is moved to today.
+   * C22 + A1: one more wrong code. One atomic UPDATE; assignment order
+   * matters — SET runs left to right, each assignment seeing the previous
+   * ones (utc.ts keeps MariaDB's SIMULTANEOUS_ASSIGNMENT off):
+   *
+   * 1. The UTC-day count, computed against the *old* date before the date
+   *    moves to today.
+   * 2. The rolling-hour window: a new window (count 1, starting now) when
+   *    there is none or it is over an hour old, otherwise one more.
+   * 3. At OTP_HOURLY_FAILURE_LIMIT, lock for OTP_LOCK_MINUTES and close the
+   *    window.
    */
-  private async recordDailyFailure(manager: EntityManager, applicationId: string): Promise<void> {
+  private async recordFailure(manager: EntityManager, applicationId: string): Promise<void> {
     await manager.query(
       `UPDATE applications
           SET otp_fail_count = IF(otp_fail_date = UTC_DATE(), otp_fail_count + 1, 1),
-              otp_fail_date = UTC_DATE()
+              otp_fail_date = UTC_DATE(),
+              otp_hour_count = IF(otp_hour_start > UTC_TIMESTAMP(3) - INTERVAL 1 HOUR, otp_hour_count + 1, 1),
+              otp_hour_start = IF(otp_hour_count = 1, UTC_TIMESTAMP(3), otp_hour_start),
+              otp_locked_until = IF(otp_hour_count >= ?, UTC_TIMESTAMP(3) + INTERVAL ? MINUTE, otp_locked_until),
+              otp_hour_start = IF(otp_hour_count >= ?, NULL, otp_hour_start),
+              otp_hour_count = IF(otp_hour_count >= ?, 0, otp_hour_count)
         WHERE id = ?`,
-      [applicationId],
+      [OTP_HOURLY_FAILURE_LIMIT, OTP_LOCK_MINUTES, OTP_HOURLY_FAILURE_LIMIT, OTP_HOURLY_FAILURE_LIMIT, applicationId],
     );
   }
 
-  /** C22: OTP sign-in is locked for the rest of the UTC day after OTP_DAILY_FAILURE_LIMIT wrong codes. */
-  private async isLockedToday(applicationId: string): Promise<boolean> {
-    const rows: Array<{ locked: number | string }> = await this.applicationRepo.query(
-      'SELECT (otp_fail_date = UTC_DATE() AND otp_fail_count >= ?) AS locked FROM applications WHERE id = ?',
+  /**
+   * A1: OTP sign-in is locked for OTP_LOCK_MINUTES after
+   * OTP_HOURLY_FAILURE_LIMIT wrong codes inside an hour, and for the rest of
+   * the UTC day after OTP_DAILY_FAILURE_LIMIT.
+   */
+  private async isLocked(applicationId: string): Promise<boolean> {
+    const rows: Array<{ locked: number | string | null }> = await this.applicationRepo.query(
+      `SELECT (otp_locked_until > UTC_TIMESTAMP(3) OR (otp_fail_date = UTC_DATE() AND otp_fail_count >= ?)) AS locked
+         FROM applications WHERE id = ?`,
       [OTP_DAILY_FAILURE_LIMIT, applicationId],
     );
     return Number(rows[0]?.locked) === 1;

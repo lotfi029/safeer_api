@@ -8,7 +8,7 @@
 //   accepted, and rows a minute past must be refused.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { api, createApplication, createTempUser, deleteApplication, deleteTempUser, loginAs, readMailOtpCode, waitForAuthToken, withDb } from './helpers';
+import { api, createApplication, createTempUser, deleteApplication, deleteTempUser, loginAs, readMailOtpCode, settleBackground, waitForAuthToken, withDb } from './helpers';
 
 const IDLE_HOURS = Number(process.env.SESSION_IDLE_HOURS ?? 8);
 const ABSOLUTE_DAYS = Number(process.env.SESSION_ABSOLUTE_DAYS ?? 30);
@@ -35,6 +35,7 @@ describe('UTC everywhere (C9)', () => {
     const applicant = await createApplication();
     try {
       await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
+      await settleBackground(); // A4: the row is written after the response
       const left = await secondsUntil('applicant_otps', 'expires_at', 'application_id = ?', [applicant.id]);
       expect(Math.abs(left - 600)).toBeLessThanOrEqual(15);
 
@@ -46,6 +47,7 @@ describe('UTC everywhere (C9)', () => {
 
       // A fresh code, expired a minute ago on the UTC clock: refused.
       await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
+      await settleBackground();
       await exec(
         'UPDATE applicant_otps SET expires_at = UTC_TIMESTAMP(3) - INTERVAL 1 MINUTE WHERE application_id = ? AND consumed_at IS NULL',
         [applicant.id],

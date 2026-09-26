@@ -102,6 +102,12 @@ async function bootstrap() {
     Logger.log('Swagger UI disabled (NODE_ENV=production)', 'Bootstrap');
   }
 
+  // A4: on SIGTERM/SIGINT (a PM2 restart, a redeploy) Nest runs its
+  // shutdown hooks before exiting, so BackgroundWork can finish sends that
+  // public routes answered before (request-otp). ecosystem.config.cjs gives
+  // it kill_timeout: 12000 to do so.
+  app.enableShutdownHooks();
+
   await app.listen(env.PORT);
 }
 
