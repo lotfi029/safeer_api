@@ -70,6 +70,9 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `npm run openapi` | Boots the app (without listening) and writes the live Swagger document to the committed `openapi.json`. Run this after any route/DTO change. |
 | `npm run openapi:check` | Regenerates the document in memory and diffs it against the committed `openapi.json` — the CI gate that catches a stale contract. |
 | `npm run smoke` | Runs `scripts/smoke.mjs` against a running instance (build it, migrate/seed the database, start it, then run this in a second terminal). |
+| `npm test` | Jest + supertest-style HTTP tests (`test/*.spec.ts`) against a dedicated, real MySQL database and a real running instance of the app — both created and torn down automatically (`test/global-setup.ts`/`global-teardown.ts`). Just `npm run build` first. |
+| `npm run check:admin-roles` | Fails if any `admin/*` route has no `@Roles()` and isn't explicitly allow-listed (`scripts/lib/check-admin-roles.mjs`). Needs a migrated database, like `openapi:check`. |
+| `npm run backup:storage` | `STORAGE_DRIVER=local`: tars `STORAGE_ROOT`. `STORAGE_DRIVER=s3`: no-op (the provider's own job). |
 | `npm run schema:check` | `typeorm schema:log` against the compiled data source — a read-only diff between the entities and the live schema. |
 
 ## Deployment

@@ -28,7 +28,8 @@
     "openapi:check": "node scripts/check-openapi.mjs",
     "check:admin-roles": "node scripts/check-admin-roles.mjs",
     "backup:storage": "node scripts/backup-storage.mjs",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "test": "jest --config jest.config.cjs --runInBand"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",
@@ -66,16 +67,21 @@
     "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
     "@types/jsdom": "^30.0.0",
     "@types/multer": "^2.2.0",
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^8.0.1",
+    "@types/supertest": "^7.2.1",
     "concurrently": "^10.0.5",
     "dotenv": "^17.4.2",
+    "jest": "^30.5.2",
     "nodemon": "^3.1.14",
     "oxlint": "^1.58.0",
     "prettier": "^3.4.2",
     "source-map-support": "^0.5.21",
+    "supertest": "^7.3.0",
+    "ts-jest": "^29.4.14",
     "typescript": "^6.0.2"
   },
   "overrides": {
