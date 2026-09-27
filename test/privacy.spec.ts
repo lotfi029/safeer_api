@@ -235,10 +235,23 @@ describe('C27: retention', () => {
         await conn.execute('SELECT id FROM applications WHERE id = ? FOR UPDATE', [draft.id]);
         await conn.execute("UPDATE applications SET status = 'new', submitted_at = UTC_TIMESTAMP(3) WHERE id = ?", [draft.id]);
         const run = api('POST', '/__dev/maintenance/run');
-        // Commit only once the purge has reached this draft and is waiting on its lock.
+        // Commit only once the purge has reached this draft and is blocked on
+        // its lock: its locking statement for this row (the fix's SELECT … FOR
+        // UPDATE, or the unfixed code's DELETE) is running on another
+        // connection while this one holds the lock, so it can only be waiting.
+        // PROCESSLIST, not INNODB_TRX: InnoDB serves INNODB_TRX from a cache
+        // it refreshes only when it hasn't been read for 0.1 s, so a fast poll
+        // kept seeing the snapshot from before the wait began (flaky on CI).
         const deadline = Date.now() + 15_000;
         for (;;) {
-          const waiting = await scalar("SELECT COUNT(*) FROM information_schema.INNODB_TRX WHERE trx_state = 'LOCK WAIT'");
+          const waiting = await scalar(
+            `SELECT COUNT(*) FROM information_schema.PROCESSLIST
+              WHERE ID <> CONNECTION_ID() AND COMMAND = 'Query'
+                AND INFO LIKE '%applications%'
+                AND (INFO LIKE '%FOR UPDATE%' OR INFO LIKE 'DELETE%')
+                AND (INFO LIKE ? OR INFO LIKE ?)`,
+            [`%id = '${draft.id}'%`, `%id = ${draft.id} %`],
+          );
           if (Number(waiting) > 0) break;
           if (Date.now() > deadline) throw new Error('the purge never waited on the draft row');
           await new Promise((r) => setTimeout(r, 50));
