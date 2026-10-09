@@ -1,4 +1,4 @@
-import { Module, type OnApplicationBootstrap } from '@nestjs/common';
+import { Inject, Module, type OnApplicationBootstrap } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ENV } from '../config/env.tokens.js';
@@ -6,6 +6,7 @@ import { ConfigModule } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 import { entities } from './entities/index.js';
 import { assertUtcSession, utcConnectionOptions } from './utc.js';
+import { assertAndRecordEncryptionKey } from './encryption-key-check.js';
 
 /**
  * `synchronize` is off in every environment (D-02, hard rule) — the schema
@@ -31,7 +32,9 @@ import { assertUtcSession, utcConnectionOptions } from './utc.js';
  * MATCH. Change one, change the other — the failure mode of getting it
  * wrong is that asset deletion breaks and nothing else does.
  *
- * Every connection is UTC (C9) — see utc.ts. Boot fails if it isn't.
+ * Every connection is UTC (C9) — see utc.ts. Boot fails if it isn't, and
+ * (A7) if APP_ENCRYPTION_KEY isn't the key this database's data was
+ * encrypted with — see encryption-key-check.ts.
  */
 @Module({
   imports: [
@@ -59,9 +62,14 @@ import { assertUtcSession, utcConnectionOptions } from './utc.js';
   exports: [TypeOrmModule],
 })
 export class DatabaseModule implements OnApplicationBootstrap {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     await assertUtcSession((sql) => this.dataSource.query(sql));
+    // A7: refuse to start with an APP_ENCRYPTION_KEY that isn't this database's.
+    await assertAndRecordEncryptionKey((sql, params) => this.dataSource.query(sql, params), this.env.APP_ENCRYPTION_KEY);
   }
 }

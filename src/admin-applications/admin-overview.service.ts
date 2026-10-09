@@ -9,6 +9,9 @@ import { Page } from '../database/entities/page.entity.js';
 import { MessagesService } from '../messages/messages.service.js';
 import type { UserRole } from '../database/entities/user.entity.js';
 import { User } from '../database/entities/user.entity.js';
+import { AREA_ROLES, type Area } from '../auth/role-matrix.js';
+
+const hasArea = (area: Area, role: UserRole): boolean => (AREA_ROLES[area] as readonly UserRole[]).includes(role);
 
 const RECENT_AUDIT_LIMIT = 20;
 const SERIES_MONTHS = 6;
@@ -40,7 +43,7 @@ function lastNMonths(n: number): MonthBucket[] {
  *   series, the latest-applications list, the applications sidebar badge)
  *   are omitted for `editor`.
  * - messages-related blocks (the unread-messages stat card and sidebar
- *   badge) are omitted for `reviewer`.
+ *   badge) only for the inbox area's roles (admin, support — A5).
  * - B6/C20: `recentAuditLog` is admin-only, and never carries `diff` or IP hashes —
  *   every other role gets an empty array. The feed includes application
  *   references, status changes, and reviewer/user actions across every
@@ -61,10 +64,11 @@ export class AdminOverviewService {
   ) {}
 
   async get(role: UserRole) {
-    // C20: application figures and applicant names only for the roles that
-    // own the applications area (the same matrix @Roles applies to it).
-    const includeApplications = role === 'admin' || role === 'reviewer';
-    const includeMessages = role !== 'reviewer';
+    // C20 + A5: each block only for the roles that own its area — the same
+    // matrix @Area() applies to the routes behind it. Message figures are
+    // the inbox area's (admin, support): editors don't see the inbox.
+    const includeApplications = hasArea('applications', role);
+    const includeMessages = hasArea('inbox', role);
 
     const [applicationsBlock, messagesBlock, contentAlerts, recentAuditLog] = await Promise.all([
       includeApplications ? this.applicationsBlock() : null,

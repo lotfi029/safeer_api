@@ -29,6 +29,10 @@
 //
 // C9: the connection is UTC (timezone 'Z' + SET time_zone), like the app.
 //
+// A7: with APP_ENCRYPTION_KEY set, the run refuses to start when the key
+// isn't the one this database's encrypted data belongs to, and records the
+// key's check value in site_settings on first use.
+//
 // Usage:
 //   node scripts/migrate.mjs            apply every pending migration
 //   node scripts/migrate.mjs --status   list applied / pending / changed, write nothing
@@ -45,6 +49,7 @@ import 'dotenv/config';
 import { DEV_ENVS, requireNodeEnv } from './lib/node-env.mjs';
 import { openMigrationConnection } from './lib/db-connection.mjs';
 import { ensureDevAssetFiles } from './lib/dev-assets.mjs';
+import { assertEncryptionKey, recordEncryptionKey } from './lib/encryption-key-check.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = process.env.MIGRATIONS_DIR
@@ -272,7 +277,18 @@ async function main() {
       await ensureTrackingTables(connection);
       const applied = await readApplied(connection);
       await verifyChecksums(connection, files, applied);
+      // A7: before anything runs, make sure APP_ENCRYPTION_KEY is the key
+      // this database's encrypted data belongs to (scripts/lib/encryption-key-check.mjs).
+      const encryptionKey = process.env.APP_ENCRYPTION_KEY;
+      if (encryptionKey) {
+        try {
+          await assertEncryptionKey(connection, encryptionKey);
+        } catch (err) {
+          throw new MigrateError(err.message);
+        }
+      }
       const count = await applyPending(connection, files, applied);
+      if (encryptionKey) await recordEncryptionKey(connection, encryptionKey);
       console.log(count ? `All migrations applied (${count} new).` : 'Nothing to migrate — already up to date.');
       // C45: development/test only, and only for files on local disk.
       if (DEV_ENVS.includes(nodeEnv) && (process.env.STORAGE_DRIVER ?? 'local') === 'local') {

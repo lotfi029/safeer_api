@@ -699,7 +699,14 @@ export class AdminApplicationsService {
   }
 
   async getDocumentForStream(applicationId: string, docId: string): Promise<ApplicationDocument> {
-    return this.findDocumentOrNotFound(applicationId, docId);
+    const doc = await this.findDocumentOrNotFound(applicationId, docId);
+    // A11: a replaced document's file was deleted with the replacement (C18) —
+    // say so, rather than letting storage answer a bare 404 (or, on S3, a
+    // signed URL to nothing).
+    if (doc.supersededAt) {
+      throw new ProblemException(410, ErrorCode.DOCUMENT_SUPERSEDED, 'This document was replaced; its file no longer exists');
+    }
+    return doc;
   }
 
   // -------------------------------------------------------------------

@@ -58,6 +58,24 @@ describe('C20: dashboard overview', () => {
     }
   });
 
+  // A5 (safeer-delivery-review.md): editors don't own the inbox, so they
+  // must not see its unread count either — only admin and support do.
+  it.each([
+    ['editor', false],
+    ['reviewer', false],
+    ['support', true],
+  ] as const)('%s sees the unread-messages figures: %s', async (role, visible) => {
+    const user = await createTempUser(role);
+    try {
+      const res = await api('GET', '/admin/overview', { session: user });
+      expect(res.status).toBe(200);
+      expect('unreadMessages' in res.body.statCards).toBe(visible);
+      expect('unreadMessages' in res.body.badges).toBe(visible);
+    } finally {
+      await deleteTempUser(user.id);
+    }
+  });
+
   it('reviewer gets application figures but no audit feed', async () => {
     const user = await createTempUser('reviewer');
     try {
@@ -198,6 +216,53 @@ describe('C27: retention', () => {
       });
       await deleteApplication(draft.id);
       await deleteApplication(kept.id);
+    }
+  });
+
+  // A10 (safeer-delivery-review.md): the purge deleted a draft's files before
+  // its conditional row delete, so a draft submitted while the purge ran kept
+  // its row and lost its files. Here the "submit" holds the row lock (as the
+  // real submit does, B14) while the nightly job runs, and commits after.
+  it('A10: a draft submitted while the purge runs keeps its files', async () => {
+    const draft = await createApplication();
+    const tag = `a10-${Date.now()}`;
+    expect((await uploadApplicationDocument(draft, 'id_copy', tag)).status).toBe(201);
+    const [key] = await storageKeys(draft.id);
+    await withDb((conn) => conn.execute('UPDATE applications SET updated_at = UTC_TIMESTAMP(3) - INTERVAL 200 DAY WHERE id = ?', [draft.id]));
+    try {
+      await withDb(async (conn) => {
+        await conn.beginTransaction();
+        await conn.execute('SELECT id FROM applications WHERE id = ? FOR UPDATE', [draft.id]);
+        await conn.execute("UPDATE applications SET status = 'new', submitted_at = UTC_TIMESTAMP(3) WHERE id = ?", [draft.id]);
+        const run = api('POST', '/__dev/maintenance/run');
+        // Commit only once the purge has reached this draft and is blocked on
+        // its lock: its locking statement for this row (the fix's SELECT … FOR
+        // UPDATE, or the unfixed code's DELETE) is running on another
+        // connection while this one holds the lock, so it can only be waiting.
+        // PROCESSLIST, not INNODB_TRX: InnoDB serves INNODB_TRX from a cache
+        // it refreshes only when it hasn't been read for 0.1 s, so a fast poll
+        // kept seeing the snapshot from before the wait began (flaky on CI).
+        const deadline = Date.now() + 15_000;
+        for (;;) {
+          const waiting = await scalar(
+            `SELECT COUNT(*) FROM information_schema.PROCESSLIST
+              WHERE ID <> CONNECTION_ID() AND COMMAND = 'Query'
+                AND INFO LIKE '%applications%'
+                AND (INFO LIKE '%FOR UPDATE%' OR INFO LIKE 'DELETE%')
+                AND (INFO LIKE ? OR INFO LIKE ?)`,
+            [`%id = '${draft.id}'%`, `%id = ${draft.id} %`],
+          );
+          if (Number(waiting) > 0) break;
+          if (Date.now() > deadline) throw new Error('the purge never waited on the draft row');
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        await conn.commit();
+        expect((await run).status).toBe(200);
+      });
+      expect(await scalar('SELECT status FROM applications WHERE id = ?', [draft.id])).toBe('new');
+      expect(existsSync(path.join(STORAGE_ROOT, key))).toBe(true);
+    } finally {
+      await deleteApplication(draft.id);
     }
   });
 });

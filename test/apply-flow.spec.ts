@@ -112,6 +112,63 @@ describe('apply flow', () => {
       await deleteApplication(applicant.id);
     }
   });
+
+  // A6 (safeer-delivery-review.md): the duplicate check is a locking read.
+  // With LOWER(a.email) no index applied, so it scanned and locked every open
+  // application. The test captures the exact statement the app ran (general
+  // log) and EXPLAINs it. On MariaDB 10.11 (dev fixtures), the same query:
+  //
+  //   plain =    type index_merge, key ix_applications_email,ix_applications_phone_e164,
+  //              Extra "Using union(ix_applications_email,ix_applications_phone_e164)", rows 2
+  //   LOWER()    type ALL, key NULL, possible_keys without ix_applications_email, rows 6 (every row)
+  //
+  // Which plan the optimizer picks on a tiny test table can vary, so the
+  // assertion is on possible_keys: with LOWER() the email index isn't a
+  // candidate at all.
+  it('A6: the duplicate check matches case-insensitively and can use the email index', async () => {
+    const applicant = await createApplication();
+    const [[{ wasOn }]]: any = await withDb((conn) => conn.query("SELECT @@GLOBAL.general_log AS wasOn"));
+    try {
+      await withDb(async (conn) => {
+        await conn.query("SET GLOBAL log_output = 'TABLE'");
+        await conn.query('TRUNCATE mysql.general_log');
+        await conn.query('SET GLOBAL general_log = 1');
+      });
+      const res = await fetch(`${process.env.TEST_BASE_URL}/applications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: 'Someone',
+          lastName: 'Else',
+          birthDate: '2000-01-01',
+          phone: `+9665${String(Date.now()).slice(-8)}`,
+          nationality: 'SA',
+          email: applicant.email.toUpperCase(),
+          gender: 'male',
+        }),
+      });
+      // The collation is case-insensitive: an upper-cased email is still the same applicant.
+      expect(res.status).toBe(409);
+
+      const plan: any[] = await withDb(async (conn) => {
+        await conn.query('SET GLOBAL general_log = 0');
+        const [rows]: any = await conn.query(
+          "SELECT CONVERT(argument USING utf8mb4) AS sql_text FROM mysql.general_log WHERE CONVERT(argument USING utf8mb4) LIKE '%FOR UPDATE%' AND CONVERT(argument USING utf8mb4) LIKE ?",
+          [`%${applicant.email.toUpperCase()}%`],
+        );
+        expect(rows.length).toBeGreaterThan(0);
+        const statement = String(rows[0].sql_text).replace(/\s+FOR UPDATE\s*$/i, '');
+        expect(statement).not.toMatch(/LOWER\(/i);
+        const [explain]: any = await conn.query(`EXPLAIN ${statement}`);
+        return explain;
+      });
+      const applications = plan.find((row) => row.table === 'a');
+      expect(String(applications.possible_keys)).toMatch(/ix_applications_email/);
+    } finally {
+      await withDb((conn) => conn.query(`SET GLOBAL general_log = ${Number(wasOn) ? 1 : 0}`));
+      await deleteApplication(applicant.id);
+    }
+  });
 });
 
 function fullSubmitBody(applicant: TestApplicant) {

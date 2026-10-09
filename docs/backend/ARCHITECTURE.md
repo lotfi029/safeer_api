@@ -55,8 +55,10 @@ area, or whose roles differ from its area's.
 Open to any signed-in staff member, with no area: `admin/me`,
 `admin/auth/*` (own sessions, own password), `admin/overview`,
 `admin/preview-token`, `admin/roles`. `GET admin/overview` adapts to the
-caller's role: application figures only for admin and reviewer, message
-figures for everyone but reviewers, the audit feed for admins only (C20).
+caller's role, using the same role matrix as the routes behind each block:
+application figures for the `applications` area (admin, reviewer), message
+figures for the `inbox` area (admin, support — A5), the audit feed for
+admins only (C20).
 
 ### Staff accounts: status and lockout
 

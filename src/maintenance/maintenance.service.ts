@@ -139,27 +139,46 @@ export class MaintenanceService {
   }
 
   /**
-   * A draft nobody has touched for 180 days is abandoned: its private files
-   * are deleted through the storage driver, then the row (documents,
-   * events, sessions and OTPs cascade). Submitted applications are never
-   * touched here — only an admin removes those (DELETE admin/applications/:id).
+   * A draft nobody has touched for 180 days is abandoned: the row goes
+   * (documents, events, sessions and OTPs cascade), then its private files
+   * through the storage driver. Submitted applications are never touched
+   * here — only an admin removes those (DELETE admin/applications/:id).
+   *
+   * A10 (safeer-delivery-review.md): files used to go first, then a
+   * conditional row delete — a draft submitted mid-purge kept its row and
+   * lost its files. Now each draft is re-checked under a row lock (the same
+   * lock submit and autosave take, B14), deleted in that transaction, and
+   * only after the commit are its files removed. A draft that was submitted
+   * or edited in the meantime is skipped, files and all.
    */
   private async purgeIdleDrafts(): Promise<void> {
     await this.step('purge idle drafts', async () => {
+      const cutoff = daysAgo(IDLE_DRAFT_RETENTION_DAYS);
       const drafts: Array<{ id: string }> = await this.dataSource.query(
         "SELECT id FROM applications WHERE status = 'draft' AND updated_at < ? LIMIT 500",
-        [daysAgo(IDLE_DRAFT_RETENTION_DAYS)],
+        [cutoff],
       );
+      let purged = 0;
       for (const { id } of drafts) {
-        const files: Array<{ storage_key: string }> = await this.dataSource.query(
-          'SELECT storage_key FROM application_documents WHERE application_id = ?',
-          [id],
-        );
-        for (const file of files) await this.fileStore.remove(file.storage_key);
-        await this.dataSource.query('UPDATE interview_slots SET application_id = NULL WHERE application_id = ?', [id]);
-        await this.dataSource.query("DELETE FROM applications WHERE id = ? AND status = 'draft'", [id]);
+        const storageKeys = await this.dataSource.transaction(async (manager) => {
+          const [locked]: Array<{ id: string }> = await manager.query(
+            "SELECT id FROM applications WHERE id = ? AND status = 'draft' AND updated_at < ? FOR UPDATE",
+            [id, cutoff],
+          );
+          if (!locked) return null;
+          const files: Array<{ storage_key: string }> = await manager.query(
+            'SELECT storage_key FROM application_documents WHERE application_id = ?',
+            [id],
+          );
+          await manager.query('UPDATE interview_slots SET application_id = NULL WHERE application_id = ?', [id]);
+          await manager.query('DELETE FROM applications WHERE id = ?', [id]);
+          return files.map((f) => f.storage_key);
+        });
+        if (storageKeys === null) continue;
+        purged++;
+        for (const key of storageKeys) await this.fileStore.remove(key);
       }
-      return { affectedRows: drafts.length };
+      return { affectedRows: purged };
     });
   }
 

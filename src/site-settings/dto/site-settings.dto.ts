@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { safeUrl } from '../../common/validation/safe-url.js';
+import { mapEmbedUrl, safeUrl } from '../../common/validation/safe-url.js';
 
 export const updateSiteSettingsSchema = z
   .object({
@@ -23,6 +23,9 @@ export const updateSiteSettingsSchema = z
     linkedinUrl: safeUrl().nullable().optional(), // C10
     whatsappUrl: safeUrl().nullable().optional(), // C10
     tiktokUrl: safeUrl().nullable().optional(), // C10
+    mapEmbedUrl: mapEmbedUrl().nullable().optional(), // A12
+    mapLat: z.number().min(-90).max(90).nullable().optional(), // A12
+    mapLng: z.number().min(-180).max(180).nullable().optional(), // A12
     enEnabled: z.boolean().optional(),
     seoTitleAr: z.string().max(191).nullable().optional(),
     seoTitleEn: z.string().trim().max(191).nullable().optional(),

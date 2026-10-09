@@ -7041,6 +7041,23 @@
             "maxLength": 255,
             "nullable": true
           },
+          "mapEmbedUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true
+          },
+          "mapLat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "nullable": true
+          },
+          "mapLng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "nullable": true
+          },
           "enEnabled": {
             "type": "boolean"
           },

@@ -40,7 +40,7 @@ import { PortalModule } from './portal/portal.module.js';
 import { AdminApplicationsModule } from './admin-applications/admin-applications.module.js';
 import { SitemapModule } from './sitemap/sitemap.module.js';
 import { TestAwareThrottlerGuard } from './common/guards/test-aware-throttler.guard.js';
-import { DevModule } from './dev/dev.module.js';
+import { devModuleFor } from './dev/dev.module.js';
 import { BackgroundWorkModule } from './common/background/background-work.module.js';
 
 // Phase 2 (done): the full schema (001_schema.sql) and entities for every
@@ -110,7 +110,8 @@ import { BackgroundWorkModule } from './common/background/background-work.module
     ApplicationsModule,
     PortalModule,
     AdminApplicationsModule,
-    DevModule,
+    // A8: the __dev routes exist only in development/test.
+    devModuleFor(process.env.NODE_ENV),
     SitemapModule,
   ],
   providers: [

@@ -59,12 +59,16 @@ export class ApplicationsService {
       // deterministically pick between. `pessimistic_write` on the matching
       // row(s) makes two concurrent `POST applications` for the same
       // contact details serialise instead of both slipping through.
+      // A6: plain `=` on email — the column's utf8mb4_unicode_ci collation
+      // already compares case-insensitively, and LOWER() hid it from
+      // ix_applications_email, so the locking read scanned (and locked)
+      // every open application instead of the matching ones.
       const phoneE164 = normalizePhone(dto.phone);
       const duplicateQb = manager
         .createQueryBuilder(Application, 'a')
         .setLock('pessimistic_write')
         .where('a.status IN (:...nonTerminal)', { nonTerminal: NON_TERMINAL_APPLICATION_STATUSES })
-        .andWhere('(LOWER(a.email) = LOWER(:email)' + (phoneE164 ? ' OR a.phone_e164 = :phoneE164)' : ')'), {
+        .andWhere('(a.email = :email' + (phoneE164 ? ' OR a.phone_e164 = :phoneE164)' : ')'), {
           email: dto.email,
           ...(phoneE164 ? { phoneE164 } : {}),
         })
