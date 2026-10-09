@@ -190,3 +190,23 @@ application's locale.
   password is limited to 5 attempts per 15 minutes.
 - **English text (C39).** Admin DTOs trim every `*En` field.
 
+## VPS deploy (S1–S4, BF-2, BF-4, D1)
+
+**The HTTP contract is unchanged.** No route, DTO or response shape moved;
+`openapi.json` is identical. What changed for whoever runs the API:
+
+- **`POST applications` under load (S1/BF-2).** Concurrent creates by
+  different applicants no longer deadlock into a `500`. The answers are
+  unchanged: `201` with a reference, or `409 APPLICATION_EXISTS`.
+- **New env vars (D1, BF-4):**
+  - `TRUST_PROXY`: Express trust-proxy hop count, `0`–`10`, default `1`.
+    It was hardcoded to `1`.
+  - `HOST`: the bind address. **Default `127.0.0.1`**, where the API used to
+    bind every interface. A bare-host deploy with its proxy on another
+    machine must now set `HOST` explicitly. The Docker image sets `0.0.0.0`.
+  - An empty value (`KEY=`) means the default, so `TRUST_PROXY=` is `1`,
+    not `0`.
+- **Production database: MySQL 8.4** (S4), in a container on the VPS.
+  `safeer-web`'s `API_INTERNAL_URL` is `http://api:3900` on the private
+  Compose network (`deploy/docker-compose.yml`).
+

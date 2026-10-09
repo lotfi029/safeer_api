@@ -80,6 +80,20 @@
   for a different, real reason — the legacy-news bulk-delete smoke case
   needs `dev/003_dev_sample.sql`'s 3 "legacy template" posts to have
   anything to act on.
+- **Other locking transactions could deadlock the way `POST applications`
+  did (S1 follow-up).** These are not covered by the S1 fix:
+  - interview booking (`portal-interview.service.ts`)
+  - OTP issue and verify (`portal-otp.service.ts`)
+  - document upload and replace (`portal-documents.service.ts`)
+  - the portal application save (`portal-application.service.ts`)
+  - staff login and users (`auth.service.ts`, `users.service.ts`)
+  - the maintenance purge
+
+  They all take `FOR UPDATE` locks, and none is wrapped in
+  `withTransactionRetry` (`src/database/transaction-retry.ts`). None has
+  been seen deadlocking. Next step: a concurrent same-slot booking test.
+  If it deadlocks, fix the lock order first, as S1 did, and wrap the
+  transaction (never anything after its commit) in `withTransactionRetry`.
 - **`npm audit` leftovers after S3** (`npm audit fix`, no `--force`, 2026-10-09).
   sharp is at 0.35.5 (the librsvg CVE). What remains, and why it stays:
   - *Runtime (what the Docker image installs):* `js-yaml` 5.0–5.4 via
