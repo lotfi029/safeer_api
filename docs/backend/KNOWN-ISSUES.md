@@ -80,6 +80,22 @@
   for a different, real reason — the legacy-news bulk-delete smoke case
   needs `dev/003_dev_sample.sql`'s 3 "legacy template" posts to have
   anything to act on.
+- **`npm audit` leftovers after S3** (`npm audit fix`, no `--force`, 2026-10-09).
+  sharp is at 0.35.5 (the librsvg CVE). What remains, and why it stays:
+  - *Runtime (what the Docker image installs):* `js-yaml` 5.0–5.4 via
+    `@nestjs/swagger` (moderate, merge-key CPU use). The fix is a major
+    swagger bump (12.x). Swagger only *dumps* YAML, never parses input, and
+    is not mounted when `NODE_ENV=production`, so it isn't reachable. Revisit
+    with the swagger 12 upgrade.
+  - *Dev tooling only:* `braces` via `nodemon` → `chokidar` (high; the fix is
+    a nodemon downgrade to 1.x), `js-yaml`/`sprintf-js`/`argparse` via Jest's
+    istanbul chain (moderate). None of it is in the image's runtime stage
+    (the Dockerfile installs with `--omit=dev` and without this repo's
+    `.npmrc`). `concurrently` → `shell-quote` and `ts-jest` → `handlebars`
+    were fixed by `npm audit fix`.
+  - To audit what production installs, override the `.npmrc`:
+    `npm_config_include=prod npm audit --omit=dev`. `include=dev` wins over
+    `--omit=dev` otherwise.
 
 ## Resolved during this pass (noted for context)
 
