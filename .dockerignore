@@ -1,0 +1,20 @@
+# Only package*.json, the build configs, src/, migrations/ and scripts/ are
+# copied into the image (Dockerfile); keep everything else out of the build
+# context, secrets above all.
+node_modules
+dist
+var
+.env
+.env.*
+!.env.example
+docs
+test
+tools
+deploy
+coverage
+.git
+.github
+.claude
+*.log
+Dockerfile
+.dockerignore
