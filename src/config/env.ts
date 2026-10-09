@@ -13,6 +13,16 @@ function boolFromString(defaultValue: 'true' | 'false') {
     .transform((v) => v === 'true');
 }
 
+/**
+ * C4 (VPS deploy plan): `KEY=` in an env file arrives as ''. z.coerce.number()
+ * would turn that into 0 — for TRUST_PROXY a silent "trust nobody", every
+ * visitor sharing the proxy's IP and its rate limits — so an empty value
+ * falls back to the default instead.
+ */
+function emptyAsUnset<T extends z.ZodType>(schema: T) {
+  return z.preprocess((v) => (v === '' ? undefined : v), schema);
+}
+
 /** The local Next.js dev server — FRONTEND_BASE_URL's default outside staging/production. */
 const DEV_FRONTEND_BASE_URL = 'http://localhost:4200';
 
@@ -24,6 +34,18 @@ const envSchema = z.object({
   // startup error instead.
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']),
   PORT: z.coerce.number().int().positive().default(3000),
+  // BF-4/S2: the address app.listen() binds. Loopback by default, so a
+  // bare-host deploy is only reachable through its reverse proxy; the Docker
+  // image sets 0.0.0.0 (the container's own network is the boundary there).
+  HOST: emptyAsUnset(z.string().min(1).default('127.0.0.1')),
+  // D1/S2: Express's `trust proxy` hop count — how many proxies in front of
+  // this process may set X-Forwarded-For. 1 for both topologies: Nginx →
+  // API on a bare host, and Caddy → safeer-web → API on the VPS (the SSR
+  // server overwrites XFF with the client address Caddy gave it, so the API
+  // only ever trusts its direct peer). Too high lets a client spoof its IP,
+  // and with it the ip_hash and every per-IP rate limit; 0 makes every
+  // visitor the proxy.
+  TRUST_PROXY: emptyAsUnset(z.coerce.number().int().min(0).max(10).default(1)),
 
   DB_HOST: z.string().min(1),
   DB_PORT: z.coerce.number().int().positive().default(3306),

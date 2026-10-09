@@ -68,6 +68,9 @@ jobs:
       # to have anything to act on.
       NODE_ENV: development
       PORT: 3900
+      # BF-4: the API binds HOST; the boot and smoke steps reach it on loopback.
+      HOST: 127.0.0.1
+      TRUST_PROXY: '1'
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_USER: root
@@ -195,7 +198,7 @@ jobs:
           node --enable-source-maps dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           for i in $(seq 1 30); do
-            curl -sf http://localhost:3900/health > /dev/null && exit 0
+            curl -sf http://127.0.0.1:3900/health > /dev/null && exit 0
             sleep 1
           done
           echo "API did not become healthy in time"

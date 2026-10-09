@@ -85,6 +85,9 @@ module.exports = async function globalSetup() {
     ...migrateEnv,
     TZ: process.env.TEST_APP_TZ ?? 'Asia/Riyadh',
     PORT: TEST_PORT,
+    // BF-4: the app binds HOST (default 127.0.0.1); pinned so a HOST in the
+    // developer's own .env can't move the test server off loopback.
+    HOST: '127.0.0.1',
     STORAGE_ROOT: storageRoot,
     BOOTSTRAP_ADMIN_EMAIL: process.env.BOOTSTRAP_ADMIN_EMAIL ?? 'admin@safeer-sa.org',
     BOOTSTRAP_ADMIN_PASSWORD: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? 'test-only-password',

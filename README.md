@@ -42,6 +42,8 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 |---|---|
 | `NODE_ENV` | `development` \| `test` \| `staging` \| `production`. No default — deliberately: it gates both the session cookies' `Secure` flag (set in staging and production, C32) and whether `ALLOW_DEV_PASSWORD_FIXUP` is even permitted. |
 | `PORT` | HTTP port the API listens on. |
+| `HOST` | Address the API binds. Default `127.0.0.1`, so on a bare host it's reachable only through its reverse proxy. The Docker image sets `0.0.0.0`. |
+| `TRUST_PROXY` | Express `trust proxy` hop count, `0`–`10`, default `1`. One proxy sits directly in front of the API in both supported setups (Nginx on a bare host; Caddy → `safeer-web` → API on the VPS). Raising it lets clients spoof `X-Forwarded-For`, and with it `ip_hash` and the per-IP rate limits; an empty value means the default, not `0`. |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL/MariaDB connection used by the app. In production, a least-privilege account (`scripts/create-app-db-user.sql`). |
 | `MIGRATION_DB_USER`, `MIGRATION_DB_PASSWORD` | DDL-capable account for `npm run migrate` / `db:reset`. Required when `NODE_ENV` is `staging`/`production`; in `development`/`test` they fall back to `DB_USER`/`DB_PASSWORD`. |
 | `SESSION_COOKIE_NAME` | Staff session cookie name (default `sf_sid`). |
