@@ -87,7 +87,9 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 Project documentation lives in [`docs/`](docs/):
 
 - [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md) — roles and the permission matrix, the two cookie-session systems, UTC.
-- [`docs/backend/DEPLOYMENT-HOSTINGER.md`](docs/backend/DEPLOYMENT-HOSTINGER.md) — production deployment, env checklist, SMS/S3 setup, migrations, backups.
+- [`docs/backend/DEPLOYMENT-VPS.md`](docs/backend/DEPLOYMENT-VPS.md) — **production**: the Docker stack on the VPS behind the edge Caddy (first deploy, staging, cutover, updates, rollback, verification, backups). The bundle is [`deploy/`](deploy/README.md); the image is built from the `Dockerfile` and published by `.github/workflows/image.yml` on a `v*` tag.
+- [`docs/backend/DEPLOYMENT-HOSTINGER.md`](docs/backend/DEPLOYMENT-HOSTINGER.md) — superseded for production, kept for reference: Node.js hosting + MariaDB. Its APP_ENCRYPTION_KEY, migrations, SMS/S3 and data-retention sections still apply.
+- [`docs/safeer-vps-deploy-review.md`](docs/safeer-vps-deploy-review.md) — the VPS deploy review this setup comes from (redacted).
 - [`docs/backend/KNOWN-ISSUES.md`](docs/backend/KNOWN-ISSUES.md) — out-of-scope items and gotchas.
 - [`docs/backend/API-CHANGES.md`](docs/backend/API-CHANGES.md) — contract changes the frontend has to follow (fix plan).
 - [`docs/backend/FIX-PLAN-STATUS.md`](docs/backend/FIX-PLAN-STATUS.md) — every B/C item: fix, commit, test.
