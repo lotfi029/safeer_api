@@ -9,6 +9,8 @@ Backend for جمعية سفير الدعوية: NestJS 11 + TypeORM + MySQL/Mari
 - `docs/safeer-backend-fix-prompt.md` — **the current task list** (phases 0–7, items B1–B19 and C1–C47)
 - `docs/backend/` — `ARCHITECTURE.md` (role matrix, sessions, UTC), `DEPLOYMENT-HOSTINGER.md`, `KNOWN-ISSUES.md`, `API-CHANGES.md` (contract changes for the frontend), `FIX-PLAN-STATUS.md` (item → fix → commit → test)
 - `docs/safeer-backend-code-review.md` — the deep code review (C1–C47) the fix prompt refers to
+- `docs/safeer-vps-deploy-review.md` — the VPS deploy review (Docker behind the edge Caddy, MySQL 8.4): blockers B1–B4, items S1–S8 (redacted copy)
+- `docs/safeer-vps-deploy-prompt.md` — the prompts that review produced (redacted copy)
 - `README.md` — setup, env vars, scripts
 
 ## Rules
