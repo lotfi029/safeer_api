@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Application, NON_TERMINAL_APPLICATION_STATUSES } from '../database/entities/application.entity.js';
 import { ApplicationEvent } from '../database/entities/application-event.entity.js';
-import { Counter } from '../database/entities/counter.entity.js';
 import { SiteSettings } from '../database/entities/site-settings.entity.js';
 import { MAIL_SERVICE, type MailServiceInterface } from '../mail/mail.service.interface.js';
 import { SMS_SERVICE, type SmsServiceInterface } from '../sms/sms.service.interface.js';
@@ -16,6 +15,8 @@ import type { RequestContext } from '../common/request-context.js';
 import type { CreateApplicationDto } from './dto/create-application.dto.js';
 import { normalizePhone } from '../common/phone.js';
 import { portalLoginUrl } from '../common/links/frontend-url.js';
+import { withTransactionRetry } from '../database/transaction-retry.js';
+import { lockCounter } from './reference-counter.js';
 
 export interface StartApplicationResult {
   reference: string;
@@ -53,7 +54,21 @@ export class ApplicationsService {
    * already sent a mail for a row that doesn't exist.
    */
   async create(dto: CreateApplicationDto, req: RequestContext): Promise<StartApplicationResult> {
-    const outcome = await this.applicationRepo.manager.transaction<CreateOutcome>(async (manager) => {
+    // S1/BF-2: a deadlock victim is retried from the start, as a new
+    // transaction (withTransactionRetry). Only the transaction: the mail
+    // below goes out once, after the commit.
+    const outcome = await withTransactionRetry(() => this.applicationRepo.manager.transaction<CreateOutcome>(async (manager) => {
+      // S1: the yearly counter row is locked FIRST, before the duplicate
+      // check below takes its gap locks on ix_applications_email and
+      // ix_applications_phone_e164. The other way round, two concurrent
+      // creates each held a gap lock the other's INSERT needed while one
+      // waited on the counter — a deadlock on nearly every concurrent pair
+      // (37 of 40 creates answered 500 in apply-flow.spec's S1 test). Now
+      // every create queues on the counter row before touching the index,
+      // so creates can't deadlock each other.
+      const year = new Date().getUTCFullYear(); // C9: the reference year is the UTC year
+      const counter = await lockCounter(manager, `application:${year}`);
+
       // B2: block a second active application for the same email or phone
       // rather than silently creating one findApplication() could never
       // deterministically pick between. `pessimistic_write` on the matching
@@ -80,36 +95,6 @@ export class ApplicationsService {
 
       const settings = await manager.findOne(SiteSettings, { where: { id: '1' } });
       const prefix = settings?.applicationRefPrefix ?? DEFAULT_REF_PREFIX;
-
-      const year = new Date().getUTCFullYear(); // C9: the reference year is the UTC year
-      const counterKey = `application:${year}`;
-
-      let counter = await manager
-        .createQueryBuilder(Counter, 'c')
-        .setLock('pessimistic_write')
-        .where('c.key = :key', { key: counterKey })
-        .getOne();
-
-      if (!counter) {
-        // First application of the year on this database. Insert-then-lock
-        // rather than lock-then-insert: a plain INSERT takes its own
-        // exclusive lock on the new row, so a concurrent request racing to
-        // create the same yearly counter fails on the unique primary key
-        // instead of both proceeding from value 0. That race loser simply
-        // re-reads (now locked, now present) rather than erroring out.
-        try {
-          counter = await manager.save(manager.create(Counter, { key: counterKey, value: 0 }));
-        } catch {
-          counter = await manager
-            .createQueryBuilder(Counter, 'c')
-            .setLock('pessimistic_write')
-            .where('c.key = :key', { key: counterKey })
-            .getOne();
-        }
-      }
-      if (!counter) {
-        throw new Error(`Failed to mint or read the ${counterKey} counter`);
-      }
 
       counter.value += 1;
       await manager.save(counter);
@@ -148,7 +133,7 @@ export class ApplicationsService {
       );
 
       return { kind: 'created', application, token, csrfToken };
-    });
+    }), { label: 'POST applications' });
 
     if (outcome.kind === 'duplicate') {
       // B2: notify the *existing* application's own stored contact

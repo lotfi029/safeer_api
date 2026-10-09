@@ -169,6 +169,55 @@ describe('apply flow', () => {
       await deleteApplication(applicant.id);
     }
   });
+
+  // S1/BF-2: concurrent creates take gap locks on the email and phone
+  // indexes and the yearly counter row, so InnoDB can pick one of them as a
+  // deadlock victim (errno 1213). Without the retry that applicant got a 500.
+  // Five rounds of eight, so a lucky schedule can't make it pass by chance.
+  it('concurrent creates by distinct applicants all succeed with distinct references (S1)', async () => {
+    const ROUNDS = 5;
+    const PER_ROUND = 8;
+    const statuses: number[] = [];
+    const references: string[] = [];
+    try {
+      for (let round = 0; round < ROUNDS; round++) {
+        const results = await Promise.all(
+          Array.from({ length: PER_ROUND }, async (_, i) => {
+            const tag = `${Date.now()}-${round}-${i}-${Math.random().toString(36).slice(2, 8)}`;
+            const res = await fetch(`${process.env.TEST_BASE_URL}/applications`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                firstName: 'Concurrent',
+                lastName: 'Applicant',
+                birthDate: '2000-01-01',
+                phone: `+9665${String(round)}${String(i)}${String(Date.now()).slice(-6)}`,
+                nationality: 'SA',
+                email: `jest-concurrent-${tag}@example.com`,
+                gender: 'male',
+              }),
+            });
+            const body = await res.json().catch(() => ({}));
+            return { status: res.status, reference: body.reference as string | undefined };
+          }),
+        );
+        for (const r of results) {
+          statuses.push(r.status);
+          if (r.reference) references.push(r.reference);
+        }
+      }
+      expect(statuses.filter((s) => s !== 201)).toEqual([]);
+      expect(references).toHaveLength(ROUNDS * PER_ROUND);
+      expect(new Set(references).size).toBe(ROUNDS * PER_ROUND);
+      for (const ref of references) expect(ref).toMatch(REFERENCE_RE);
+    } finally {
+      await withDb(async (conn) => {
+        if (references.length) {
+          await conn.query('DELETE FROM applications WHERE reference IN (?)', [references]);
+        }
+      });
+    }
+  });
 });
 
 function fullSubmitBody(applicant: TestApplicant) {
