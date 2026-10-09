@@ -1,0 +1,28 @@
+# deploy/Caddyfile.safeer.prod — Safeer's site blocks for the edge Caddy,
+# PRODUCTION. Replaces Caddyfile.safeer.staging at cutover, once the apex
+# and www DNS records point at the VPS (docs/backend/DEPLOYMENT-VPS.md);
+# never install both.
+#
+# Matches SITE_URL=https://safeer-sa.org in /srv/safeer/.env.
+#
+# - safeer-web is the web container's alias on the edge network
+#   (deploy/docker-compose.yml); Caddy must be attached to that network.
+# - No trusted_proxies: Caddy then treats every client as untrusted and
+#   REPLACES any X-Forwarded-For it sends with the real client address. The
+#   web server trusts exactly one hop (TRUST_PROXY=1), and so does the API
+#   behind it, so ip_hash and every per-IP rate limit see the real visitor.
+#   Adding trusted_proxies here would let a client choose its own IP.
+# - No caching: every HTML response carries its own CSP nonce and
+#   per-visitor state; caching is left to the app's own Cache-Control.
+# - No encode: the web server already compresses its responses.
+# - No request_body limit: Caddy has none by default, which covers the API's
+#   10 MB document uploads.
+
+safeer-sa.org {
+	reverse_proxy safeer-web:4000
+}
+
+# One canonical host: www redirects to the apex, path and query kept.
+www.safeer-sa.org {
+	redir https://safeer-sa.org{uri} permanent
+}
