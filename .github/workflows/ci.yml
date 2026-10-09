@@ -21,25 +21,22 @@ jobs:
     name: build-and-test (${{ matrix.db.name }})
     runs-on: ubuntu-latest
 
-    # A3: production runs on Hostinger's MariaDB, development on MySQL 8 —
-    # the whole pipeline runs on both. The MariaDB leg also switches on
-    # SIMULTANEOUS_ASSIGNMENT globally (see the step below), so the
-    # per-connection reset in src/database/utc.ts is actually exercised.
+    # S4: production runs on MySQL 8.4 (the VPS, docs/backend/DEPLOYMENT-VPS.md),
+    # and so does this pipeline. The MariaDB 10.11 leg was dropped with the
+    # move off Hostinger's Node.js hosting; the code stays engine-neutral
+    # (utf8mb4_unicode_ci, A3's per-connection sql_mode reset). A matrix of
+    # one, so another engine is a single entry away.
     strategy:
       fail-fast: false
       matrix:
         db:
-          - name: mysql-8.0
-            image: mysql:8.0
+          - name: mysql-8.4
+            image: mysql:8.4
             health: mysqladmin ping --silent
-          - name: mariadb-10.11
-            image: mariadb:10.11
-            health: healthcheck.sh --connect --innodb_initialized
 
     services:
-      # MySQL 8.0 — the database.module.ts charset comment explains why the
-      # exact collation (utf8mb4_unicode_ci, used everywhere in this repo
-      # so it also works unchanged on Hostinger's MariaDB) matters: a
+      # The database.module.ts charset comment explains why the exact
+      # collation (utf8mb4_unicode_ci, used everywhere in this repo) matters: a
       # mismatch breaks any query mixing a string literal with a table
       # column with "Illegal mix of collations" and silently drops Arabic
       # accent-insensitivity.
@@ -49,7 +46,7 @@ jobs:
           MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
           MYSQL_DATABASE: safeer
           # C9: the server's own clock runs off-UTC (UTC+3, POSIX form so it
-          # needs no zoneinfo files), like a MariaDB set to the association's
+          # needs no zoneinfo files), like a server set to the association's
           # local time would. The app, migrate.mjs and the tests must pin
           # every connection to UTC regardless; test/utc.spec.ts fails if not.
           TZ: '<+03>-3'
@@ -132,20 +129,12 @@ jobs:
             sleep 1
           done
 
-      # The service creates `safeer` with the server's default charset —
-      # latin1 on MariaDB 10.11. Every table sets utf8mb4_unicode_ci itself,
-      # but the database default should match too (as db-reset.mjs creates it).
+      # The service creates `safeer` with the server's default collation
+      # (utf8mb4_0900_ai_ci on MySQL 8.4). Every table sets utf8mb4_unicode_ci
+      # itself, but the database default should match too (as db-reset.mjs
+      # creates it).
       - name: Database collation
         run: mysql -h 127.0.0.1 -P 3306 -u root -e 'ALTER DATABASE safeer CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-
-      # A3: the lockout counters rely on SET running left to right; this mode
-      # (MariaDB only) would evaluate every right-hand side against the old
-      # row. Every connection the app and scripts open must turn it off.
-      - name: Switch on SIMULTANEOUS_ASSIGNMENT (MariaDB)
-        if: matrix.db.name == 'mariadb-10.11'
-        run: |
-          mysql -h 127.0.0.1 -P 3306 -u root -e "SET GLOBAL sql_mode = CONCAT(@@GLOBAL.sql_mode, ',SIMULTANEOUS_ASSIGNMENT')"
-          mysql -h 127.0.0.1 -P 3306 -u root -N -e 'SELECT @@GLOBAL.sql_mode'
 
       - run: npm run migrate
 

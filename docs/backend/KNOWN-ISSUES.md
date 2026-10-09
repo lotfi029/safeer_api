@@ -52,16 +52,17 @@
   `Date`-in-JSON-Schema problem at all. A full sweep of `src/` for both
   patterns (phase 8 of the project plan) found no other instance — this file
   is where the next one should be checked against before it reaches CI.
-- **`docker-compose.yml`'s MySQL 8 image (bound to `127.0.0.1:3308`) is a
-  development convenience, not what production runs on.** `DEPLOYMENT-HOSTINGER.md` targets MariaDB
-  (Hostinger's Node.js hosting plans provision MariaDB, not MySQL). Both
-  speak the same wire protocol and both are configured with
-  `utf8mb4_unicode_ci` throughout this codebase specifically so the schema
-  and every query work unchanged on either. One SQL mode is known to
-  matter: MariaDB's `SIMULTANEOUS_ASSIGNMENT` would break the lockout
-  counters, so every connection turns it off and boot fails if it can't (A3).
-  CI runs the whole suite on MySQL 8.0 and on MariaDB 10.11 with that mode
-  switched on globally.
+- **Production runs on MySQL 8.4** (S4: the VPS deploy, `DEPLOYMENT-VPS.md`),
+  and so do `docker-compose.yml` (bound to `127.0.0.1:3308`) and CI. The
+  earlier target, Hostinger's Node.js hosting, provisioned MariaDB, which is
+  why the code is still engine-neutral: `utf8mb4_unicode_ci` throughout, and
+  every connection turns MariaDB's `SIMULTANEOUS_ASSIGNMENT` off (A3; a no-op
+  on MySQL). The MariaDB CI leg was dropped with the move, so MariaDB is no
+  longer tested.
+- **Dev database 8.0 → 8.4 is a one-way upgrade.** An existing `dbdata`
+  volume created by the old `mysql:8.0` image is upgraded in place on the
+  first 8.4 start and can't go back. Dump it first if you need it, or start
+  clean with `docker compose down -v`.
 - **The CI workflow's dev-fixture comments predate Safeer's actual seed
   shape.** `.github/workflows/ci.yml` was ported from `african_api`
   (whose dev sample seeds a couple of editor accounts) in phase 1 and, until

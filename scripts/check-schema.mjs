@@ -5,7 +5,7 @@
 // an entity change and its migration in step.
 //
 // Why not `typeorm schema:log` (still available as `npm run schema:log`)?
-// On MariaDB, the production engine, it reports ~280 lines on a database
+// On MariaDB (production's engine until the S4 move to MySQL 8.4) it reports ~280 lines on a database
 // that matches exactly: every foreign key dropped and re-added, JSON
 // columns (stored by MariaDB as LONGTEXT) dropped and re-added, identical
 // indexes dropped and re-created. Nothing in that output can gate CI. This

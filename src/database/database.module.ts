@@ -26,7 +26,10 @@ import { assertAndRecordEncryptionKey } from './encryption-key-check.js';
  * of 20 September 2026: the deployment target is Hostinger shared hosting,
  * which runs MariaDB, where `0900_ai_ci` does not exist at all. See
  * 38-hostinger-shared-deployment-review.md §1 and the header of
- * migrations/001_schema.sql for the full reasoning.
+ * migrations/001_schema.sql for the full reasoning. Production has since
+ * moved to MySQL 8.4 on the VPS (S4, docs/backend/DEPLOYMENT-VPS.md); the
+ * collation stays, since it works on both engines and changing it would
+ * mean rewriting every table.
  *
  * THIS STRING AND THE `COLLATE=` ON EVERY TABLE IN 001_schema.sql MUST
  * MATCH. Change one, change the other — the failure mode of getting it

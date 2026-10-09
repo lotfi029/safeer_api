@@ -1,6 +1,10 @@
 services:
   db:
-    image: mysql:8.0
+    # S4: the same major as production (deploy/docker-compose.yml) and CI.
+    # Moving an existing dbdata volume from the old mysql:8.0 image to 8.4 is
+    # a one-way, in-place upgrade on first start: dump it first if you need
+    # to go back, or start clean with `docker compose down -v`.
+    image: mysql:8.4
     container_name: safeer-db
     environment:
       MYSQL_ROOT_PASSWORD: root

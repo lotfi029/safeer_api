@@ -1,6 +1,6 @@
 # CLAUDE.md — safeer_api
 
-Backend for جمعية سفير الدعوية: NestJS 11 + TypeORM + MySQL/MariaDB. Cookie sessions + CSRF, RFC 7807 errors, numbered SQL migrations.
+Backend for جمعية سفير الدعوية: NestJS 11 + TypeORM + MySQL 8.4. Cookie sessions + CSRF, RFC 7807 errors, numbered SQL migrations.
 
 ## Read first
 - `docs/safeer-design-spec.md` — product and design spec (the source of truth for features)
