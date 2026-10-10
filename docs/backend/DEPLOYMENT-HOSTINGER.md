@@ -1,5 +1,13 @@
 # Deploying to Hostinger (Node.js hosting)
 
+> **Superseded for production — kept for reference.** Production runs on the
+> VPS as a Docker stack behind the edge Caddy, on MySQL 8.4:
+> [`DEPLOYMENT-VPS.md`](DEPLOYMENT-VPS.md). What this page says about
+> Node.js hosting, LiteSpeed, PM2 and MariaDB no longer applies there. These
+> sections still apply as written and are linked from the VPS runbook:
+> *APP_ENCRYPTION_KEY*, *Migrations*, *SMS provider*, *S3 storage mode* and
+> *Data retention*.
+
 This describes deploying `safeer_api` to a Hostinger Node.js hosting plan —
 LiteSpeed running the app under PM2/`lsnode.js`, a MariaDB database on the
 same account, and a `.env` set from the hosting panel's environment-variable

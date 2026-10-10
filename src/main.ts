@@ -25,10 +25,12 @@ async function bootstrap() {
     logger: env.NODE_ENV === 'production' ? new RedactingJsonLogger() : undefined,
   });
 
-  // Deployed behind Nginx (11-architecture.md §7); without this, req.ip is
-  // the proxy's address and every ip_hash column records the same value for
-  // every visitor.
-  app.set('trust proxy', 1);
+  // D1/S2: always behind a reverse proxy — Caddy → safeer-web (SSR) → API
+  // on the VPS (docs/backend/DEPLOYMENT-VPS.md), Nginx → API on a bare host.
+  // Without it, req.ip is the proxy's address and every ip_hash column and
+  // per-IP rate limit sees one visitor. TRUST_PROXY (default 1) is the hop
+  // count; see env.ts for why it must not be raised casually.
+  app.set('trust proxy', env.TRUST_PROXY);
 
   app.use(requestIdMiddleware);
   app.use(ipHashMiddleware(env.IP_HASH_SALT));
@@ -108,7 +110,9 @@ async function bootstrap() {
   // it kill_timeout: 12000 to do so.
   app.enableShutdownHooks();
 
-  await app.listen(env.PORT);
+  // BF-4/S2: HOST defaults to 127.0.0.1, so on a bare host the API is
+  // reachable only through its proxy; the Docker image sets 0.0.0.0.
+  await app.listen(env.PORT, env.HOST);
 }
 
 // Not a top-level `await bootstrap()`: Hostinger's Node.js hosting runs the

@@ -1,6 +1,6 @@
 # Safeer API
 
-NestJS 11 + TypeORM + MySQL/MariaDB REST API for the Safeer Association: the
+NestJS 11 + TypeORM + MySQL REST API for the Safeer Association: the
 public site, the passwordless student portal (scholarship applications) and
 the staff admin dashboard. Every route lives under `/api/v1` except `/health`
 and `/files/:publicId[/:variant]`. Swagger UI is served at `/api/docs` outside
@@ -9,7 +9,7 @@ production; the same contract is committed as `openapi.json`.
 ## Prerequisites
 
 - Node.js `^22.22.2` or `>=24.15.0`.
-- MySQL 8 or MariaDB with `utf8mb4_unicode_ci` as the database collation.
+- MySQL 8.4 (production, CI and `docker-compose.yml`) with `utf8mb4_unicode_ci` as the database collation. The code stays MariaDB-compatible, but MariaDB is no longer tested.
 - Docker (optional).
 
 ## Setup
@@ -42,7 +42,9 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 |---|---|
 | `NODE_ENV` | `development` \| `test` \| `staging` \| `production`. No default — deliberately: it gates both the session cookies' `Secure` flag (set in staging and production, C32) and whether `ALLOW_DEV_PASSWORD_FIXUP` is even permitted. |
 | `PORT` | HTTP port the API listens on. |
-| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL/MariaDB connection used by the app. In production, a least-privilege account (`scripts/create-app-db-user.sql`). |
+| `HOST` | Address the API binds. Default `127.0.0.1`, so on a bare host it's reachable only through its reverse proxy. The Docker image sets `0.0.0.0`. |
+| `TRUST_PROXY` | Express `trust proxy` hop count, `0`–`10`, default `1`. One proxy sits directly in front of the API in both supported setups (Nginx on a bare host; Caddy → `safeer-web` → API on the VPS). Raising it lets clients spoof `X-Forwarded-For`, and with it `ip_hash` and the per-IP rate limits; an empty value means the default, not `0`. |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL connection used by the app. In production, a least-privilege account (`scripts/create-app-db-user.sql`). |
 | `MIGRATION_DB_USER`, `MIGRATION_DB_PASSWORD` | DDL-capable account for `npm run migrate` / `db:reset`. Required when `NODE_ENV` is `staging`/`production`; in `development`/`test` they fall back to `DB_USER`/`DB_PASSWORD`. |
 | `SESSION_COOKIE_NAME` | Staff session cookie name (default `sf_sid`). |
 | `SESSION_IDLE_HOURS`, `SESSION_ABSOLUTE_DAYS` | Staff session lifetime (default 8h idle / 30d absolute). |
@@ -78,14 +80,16 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `npm run check:admin-roles` | Fails if any `admin/*` route has no `@Roles()` and isn't explicitly allow-listed (`scripts/lib/check-admin-roles.mjs`). Needs a migrated database, like `openapi:check`. |
 | `npm run backup:storage` | `STORAGE_DRIVER=local`: tars `STORAGE_ROOT`. `STORAGE_DRIVER=s3`: no-op (the provider's own job). |
 | `npm run schema:check` | Fails if the entities and the migrated database disagree (tables, columns, nullability, type, length, enum values, declared indexes, unmapped required columns) — `scripts/check-schema.mjs`, run in CI (C44). Needs `npm run build`. |
-| `npm run schema:log` | TypeORM's own `schema:log` diff. Informational only: on MariaDB it lists many no-op changes (FKs, JSON columns, indexes). |
+| `npm run schema:log` | TypeORM's own `schema:log` diff. Informational only: it lists no-op changes (FKs, JSON columns, indexes), especially on MariaDB; `schema:check` is the gate. |
 
 ## Docs
 
 Project documentation lives in [`docs/`](docs/):
 
 - [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md) — roles and the permission matrix, the two cookie-session systems, UTC.
-- [`docs/backend/DEPLOYMENT-HOSTINGER.md`](docs/backend/DEPLOYMENT-HOSTINGER.md) — production deployment, env checklist, SMS/S3 setup, migrations, backups.
+- [`docs/backend/DEPLOYMENT-VPS.md`](docs/backend/DEPLOYMENT-VPS.md) — **production**: the Docker stack on the VPS behind the edge Caddy (first deploy, staging, cutover, updates, rollback, verification, backups). The bundle is [`deploy/`](deploy/README.md); the image is built from the `Dockerfile` and published by `.github/workflows/image.yml` on a `v*` tag.
+- [`docs/backend/DEPLOYMENT-HOSTINGER.md`](docs/backend/DEPLOYMENT-HOSTINGER.md) — superseded for production, kept for reference: Node.js hosting + MariaDB. Its APP_ENCRYPTION_KEY, migrations, SMS/S3 and data-retention sections still apply.
+- [`docs/safeer-vps-deploy-review.md`](docs/safeer-vps-deploy-review.md) — the VPS deploy review this setup comes from (redacted).
 - [`docs/backend/KNOWN-ISSUES.md`](docs/backend/KNOWN-ISSUES.md) — out-of-scope items and gotchas.
 - [`docs/backend/API-CHANGES.md`](docs/backend/API-CHANGES.md) — contract changes the frontend has to follow (fix plan).
 - [`docs/backend/FIX-PLAN-STATUS.md`](docs/backend/FIX-PLAN-STATUS.md) — every B/C item: fix, commit, test.

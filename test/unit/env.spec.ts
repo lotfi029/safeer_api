@@ -57,4 +57,35 @@ describe('env validation', () => {
       'ALLOW_DEV_PASSWORD_FIXUP',
     );
   });
+
+  describe('TRUST_PROXY and HOST (D1, BF-4)', () => {
+    it('default to 1 hop and loopback', () => {
+      const result = validateEnv(base);
+      expect(result.data!.TRUST_PROXY).toBe(1);
+      expect(result.data!.HOST).toBe('127.0.0.1');
+    });
+
+    it('an empty value (KEY= in an env file) falls back to the default, not 0', () => {
+      const result = validateEnv({ ...base, TRUST_PROXY: '', HOST: '' });
+      expect(result.success).toBe(true);
+      expect(result.data!.TRUST_PROXY).toBe(1);
+      expect(result.data!.HOST).toBe('127.0.0.1');
+    });
+
+    it.each(['0', '1', '2', '10'])('accepts TRUST_PROXY=%s', (value) => {
+      const result = validateEnv({ ...base, TRUST_PROXY: value });
+      expect(result.success).toBe(true);
+      expect(result.data!.TRUST_PROXY).toBe(Number(value));
+    });
+
+    it.each(['-1', '11', '1.5', 'abc', 'true'])('refuses TRUST_PROXY=%s', (value) => {
+      expect(issues({ ...base, TRUST_PROXY: value })).toContain('TRUST_PROXY');
+    });
+
+    it.each(['0.0.0.0', '::', '127.0.0.1', 'localhost'])('accepts HOST=%s', (value) => {
+      const result = validateEnv({ ...base, HOST: value });
+      expect(result.success).toBe(true);
+      expect(result.data!.HOST).toBe(value);
+    });
+  });
 });

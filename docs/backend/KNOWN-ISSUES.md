@@ -52,16 +52,17 @@
   `Date`-in-JSON-Schema problem at all. A full sweep of `src/` for both
   patterns (phase 8 of the project plan) found no other instance — this file
   is where the next one should be checked against before it reaches CI.
-- **`docker-compose.yml`'s MySQL 8 image (bound to `127.0.0.1:3308`) is a
-  development convenience, not what production runs on.** `DEPLOYMENT-HOSTINGER.md` targets MariaDB
-  (Hostinger's Node.js hosting plans provision MariaDB, not MySQL). Both
-  speak the same wire protocol and both are configured with
-  `utf8mb4_unicode_ci` throughout this codebase specifically so the schema
-  and every query work unchanged on either. One SQL mode is known to
-  matter: MariaDB's `SIMULTANEOUS_ASSIGNMENT` would break the lockout
-  counters, so every connection turns it off and boot fails if it can't (A3).
-  CI runs the whole suite on MySQL 8.0 and on MariaDB 10.11 with that mode
-  switched on globally.
+- **Production runs on MySQL 8.4** (S4: the VPS deploy, `DEPLOYMENT-VPS.md`),
+  and so do `docker-compose.yml` (bound to `127.0.0.1:3308`) and CI. The
+  earlier target, Hostinger's Node.js hosting, provisioned MariaDB, which is
+  why the code is still engine-neutral: `utf8mb4_unicode_ci` throughout, and
+  every connection turns MariaDB's `SIMULTANEOUS_ASSIGNMENT` off (A3; a no-op
+  on MySQL). The MariaDB CI leg was dropped with the move, so MariaDB is no
+  longer tested.
+- **Dev database 8.0 → 8.4 is a one-way upgrade.** An existing `dbdata`
+  volume created by the old `mysql:8.0` image is upgraded in place on the
+  first 8.4 start and can't go back. Dump it first if you need it, or start
+  clean with `docker compose down -v`.
 - **The CI workflow's dev-fixture comments predate Safeer's actual seed
   shape.** `.github/workflows/ci.yml` was ported from `african_api`
   (whose dev sample seeds a couple of editor accounts) in phase 1 and, until
@@ -79,6 +80,36 @@
   for a different, real reason — the legacy-news bulk-delete smoke case
   needs `dev/003_dev_sample.sql`'s 3 "legacy template" posts to have
   anything to act on.
+- **Other locking transactions could deadlock the way `POST applications`
+  did (S1 follow-up).** These are not covered by the S1 fix:
+  - interview booking (`portal-interview.service.ts`)
+  - OTP issue and verify (`portal-otp.service.ts`)
+  - document upload and replace (`portal-documents.service.ts`)
+  - the portal application save (`portal-application.service.ts`)
+  - staff login and users (`auth.service.ts`, `users.service.ts`)
+  - the maintenance purge
+
+  They all take `FOR UPDATE` locks, and none is wrapped in
+  `withTransactionRetry` (`src/database/transaction-retry.ts`). None has
+  been seen deadlocking. Next step: a concurrent same-slot booking test.
+  If it deadlocks, fix the lock order first, as S1 did, and wrap the
+  transaction (never anything after its commit) in `withTransactionRetry`.
+- **`npm audit` leftovers after S3** (`npm audit fix`, no `--force`, 2026-10-09).
+  sharp is at 0.35.5 (the librsvg CVE). What remains, and why it stays:
+  - *Runtime (what the Docker image installs):* `js-yaml` 5.0–5.4 via
+    `@nestjs/swagger` (moderate, merge-key CPU use). The fix is a major
+    swagger bump (12.x). Swagger only *dumps* YAML, never parses input, and
+    is not mounted when `NODE_ENV=production`, so it isn't reachable. Revisit
+    with the swagger 12 upgrade.
+  - *Dev tooling only:* `braces` via `nodemon` → `chokidar` (high; the fix is
+    a nodemon downgrade to 1.x), `js-yaml`/`sprintf-js`/`argparse` via Jest's
+    istanbul chain (moderate). None of it is in the image's runtime stage
+    (the Dockerfile installs with `--omit=dev` and without this repo's
+    `.npmrc`). `concurrently` → `shell-quote` and `ts-jest` → `handlebars`
+    were fixed by `npm audit fix`.
+  - To audit what production installs, override the `.npmrc`:
+    `npm_config_include=prod npm audit --omit=dev`. `include=dev` wins over
+    `--omit=dev` otherwise.
 
 ## Resolved during this pass (noted for context)
 

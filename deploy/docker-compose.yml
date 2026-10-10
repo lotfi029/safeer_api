@@ -1,0 +1,144 @@
+# deploy/docker-compose.yml — the Safeer stack on the VPS, behind the edge
+# Caddy that already owns 80/443 (docs/backend/DEPLOYMENT-VPS.md).
+#
+#   visitor ─HTTPS─▶ Caddy (edge) ─▶ web:4000 ─▶ api:3900 ─▶ db:3306
+#                    [edge network]  [edge + safeer] [safeer]  [safeer]
+#
+# Lives in /srv/safeer next to three env files (all chmod 600, never
+# committed). Each one is filled from its *.example in this directory:
+#   .env      compose interpolation: image tags, EDGE_NETWORK, SITE_URL, and
+#             the migration account (it feeds both db and migrate below)
+#   db.env    MySQL root password; only the db container sees it
+#   app.env   the API's own settings and secrets
+#
+# Nothing here publishes a port: the API and the database are reachable only
+# on the private `safeer` network, and the web server only through Caddy.
+
+name: safeer
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
+# What the API process and its one-off tasks (migrate, schema:check) share.
+# FRONTEND_BASE_URL and CORS_ORIGINS come from SITE_URL, the same value the
+# web server gets as PUBLIC_SITE_URL, so the three can't drift (the web
+# server only answers SITE_URL's host and www).
+x-api-environment: &api-environment
+  DB_HOST: db
+  DB_PORT: "3306"
+  FRONTEND_BASE_URL: ${SITE_URL:?set SITE_URL in .env}
+  CORS_ORIGINS: ${SITE_URL:?set SITE_URL in .env}
+
+services:
+  db:
+    image: mysql:8.4.11
+    env_file: db.env
+    environment:
+      MYSQL_DATABASE: safeer
+      # The image creates this account on first start, with ALL on `safeer`.
+      # It is the migration account: only the migrate service uses it.
+      MYSQL_USER: ${MIGRATION_DB_USER:?set MIGRATION_DB_USER in .env}
+      MYSQL_PASSWORD: ${MIGRATION_DB_PASSWORD:?set MIGRATION_DB_PASSWORD in .env}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # The VPS (8 GB) is shared with another stack; Safeer's working set is
+      # small. Raise it if `SHOW ENGINE INNODB STATUS` shows many reads.
+      - --innodb-buffer-pool-size=256M
+      - --skip-name-resolve
+    volumes:
+      - dbdata:/var/lib/mysql
+    networks: [safeer]
+    # Exits 0 once the server answers, even when it refuses the login, so
+    # no password is needed here.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped
+    logging: *logging
+
+  # One-off: `docker compose run --rm migrate`. The only service that gets
+  # the migration account (DDL rights); the running API never sees it.
+  migrate:
+    image: ghcr.io/lotfi029/safeer-api:${SAFEER_API_TAG:?set SAFEER_API_TAG in .env}
+    profiles: [ops]
+    command: ["npm", "run", "migrate"]
+    env_file: app.env
+    environment:
+      <<: *api-environment
+      MIGRATION_DB_USER: ${MIGRATION_DB_USER}
+      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [safeer]
+    restart: "no"
+    logging: *logging
+
+  api:
+    image: ghcr.io/lotfi029/safeer-api:${SAFEER_API_TAG:?set SAFEER_API_TAG in .env}
+    env_file: app.env
+    environment:
+      <<: *api-environment
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [safeer]
+    # On SIGTERM the API waits up to 10 s for OTP sends it already answered
+    # for (A4); Docker's default 10 s would SIGKILL it mid-drain.
+    stop_grace_period: 15s
+    restart: unless-stopped
+    logging: *logging
+
+  web:
+    image: ghcr.io/lotfi029/safeer-web:${SAFEER_WEB_TAG:?set SAFEER_WEB_TAG in .env}
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "4000"
+      # Caddy is the one proxy in front of it; it overwrites the client's
+      # X-Forwarded-For, and this server overwrites it again for the API.
+      TRUST_PROXY: "1"
+      PUBLIC_SITE_URL: ${SITE_URL:?set SITE_URL in .env}
+      # SSR calls the API directly on the private network, never through
+      # the public domain.
+      API_INTERNAL_URL: http://api:3900
+    # Anything else safeer_web's own docs ask for goes in web.env (optional).
+    env_file:
+      - path: web.env
+        required: false
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      safeer: {}
+      edge:
+        # What Caddyfile.safeer.* proxies to. Unique on the shared edge
+        # network, unlike the plain service name `web`.
+        aliases: [safeer-web]
+    # safeer_web's server force-exits 8 s after SIGTERM.
+    stop_grace_period: 12s
+    restart: unless-stopped
+    logging: *logging
+
+networks:
+  safeer:
+    name: safeer
+  # The edge Caddy's network, created by the edge project. Find its name with
+  # `docker network ls`, or under `networks:` in /srv/edge/docker-compose.yml
+  # (a network `foo` there is usually `edge_foo` here).
+  edge:
+    external: true
+    name: ${EDGE_NETWORK:?set EDGE_NETWORK in .env}
+
+volumes:
+  dbdata:
+  storage:

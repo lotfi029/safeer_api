@@ -147,3 +147,24 @@ build (`a8a8454`) first and failed for the reason the review gives.
 | A10 | Idle-draft purge re-checks and deletes the row under a lock, then removes files | `84d697d` | `privacy.spec` (A10: a submit holding the lock mid-purge) |
 | A11 | 019 masks OTP codes in old `sms_log`/`mail_log` rows and re-enables one admin if none is active; `downloadPath` null and 410 `DOCUMENT_SUPERSEDED` for superseded documents | `7027646` | `delivery-followups.spec` (A11 ×2) |
 | A12 | `map_embed_url` (https Google Maps embed / OpenStreetMap only), `map_lat`, `map_lng` (020) in admin settings and `GET /site` | `7027646` | `delivery-followups.spec` (A12), unit `safe-url.spec` (mapEmbedUrl) |
+
+### VPS deploy (S1–S4, BF-2, BF-4, D1, C1)
+
+On branch `chore/vps-deploy`, stacked on `fix/delivery-followups-2` (PR #6).
+Source: `docs/safeer-vps-deploy-review.md` §4 and the revised plan's
+corrections C1–C11. The plan's C1–C11 are not the code review's C1–C47.
+Production target: the VPS, Docker behind the edge Caddy, MySQL 8.4
+(`DEPLOYMENT-VPS.md`).
+
+| Item | Fix | Commit | Test |
+|---|---|---|---|
+| S1 / BF-2 | The yearly counter row is locked before the duplicate check's gap locks (lock order), and `withTransactionRetry` re-runs a deadlock victim's transaction: 1213 only, 5 attempts, full-jitter backoff 25–400 ms. Mail stays after the commit. | `87736df` | `apply-flow.spec` (S1: 5 × 8 concurrent creates, all 201, 40 distinct references; **37/40 were 500 before**), unit `transaction-retry.spec` |
+| C1 (plan) | The first-use counter insert rethrows everything but a duplicate key (`lockCounter`); it used to carry on outside a rolled-back transaction | `87736df` | unit `transaction-retry.spec` (lockCounter ×2) |
+| D1 / BF-4 / S2 | `TRUST_PROXY` (0–10, default 1) and `HOST` (default 127.0.0.1) in `env.ts`, `main.ts`, `.env.example`, README; `''` means the default (plan C4) | `d9ccbec` | unit `env.spec` (TRUST_PROXY and HOST, 15 cases), `bind-host.spec` (refuses the machine's own address; fails on the old `listen(PORT)`) |
+| S4 | `mysql:8.4` in dev compose and CI; MariaDB leg dropped; production-is-MariaDB text fixed | `670aaf0` | CI on mysql:8.4; locally on 8.4.11 (UTC+3 server clock): migrate ×2, `schema:check`, production migrate, `npm test`, smoke 14/14 |
+| S3 | `npm audit fix`; sharp 0.35.5; leftovers recorded in KNOWN-ISSUES | `d92e5c1` | `npm test`; `npm_config_include=prod npm audit --omit=dev` leaves only js-yaml via @nestjs/swagger (moderate, unreachable) |
+| Image | `Dockerfile` (node 24.21 slim, prod deps without `.npmrc`, `USER node`, healthcheck), `.dockerignore`, `dotenv` → dependencies, `deploy/create-app-db-user.sql` (`'%'`), CI `image` job | `f0b84d0` | `.github/scripts/check-image.sh` against mysql:8.4: migrate → app user → `schema:check` → `/health/ready` ok → `backup:storage` → no dev tooling, non-root |
+| GHCR | `image.yml`: `v*` tags and manual runs push `:<tag>` and `:sha-<short>`; actions pinned to SHAs | `e8d6526` | runs on the owner's `v1.0.0` tag |
+| B3 | `deploy/`: compose (`db`, `migrate` profile, `api`, `web`), env templates split per C7, Caddy staging/prod blocks (C8), `backup.sh` | `896d72f` | Local compose run: first-deploy order, `backup.sh`, restore into a scratch schema (41/41 `CHECKSUM TABLE` equal), retention; `caddy validate`, shellcheck |
+| §5 | `DEPLOYMENT-VPS.md`; Hostinger runbook marked superseded | `10036e8` | — |
+

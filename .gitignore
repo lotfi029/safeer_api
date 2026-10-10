@@ -3,6 +3,8 @@ dist/
 .env
 .env.*
 !.env.example
+# deploy/ env files once filled in (db.env, app.env, web.env): secrets.
+*.env
 var/
 *.log
 .DS_Store
