@@ -11,8 +11,9 @@ staging, cutover, updates, rollback, verification, backups — is
 | `.env.example` | `/srv/safeer/.env` | Compose variables: image tags, `EDGE_NETWORK`, `SITE_URL`, the migration account. |
 | `db.env.example` | `/srv/safeer/db.env` | MySQL root password (db container only). |
 | `app.env.example` | `/srv/safeer/app.env` | The API's settings and secrets, with how to generate each. |
-| `create-app-db-user.sql` | run once | The least-privilege runtime account, `'safeer_app'@'%'`, after the first migrate. |
+| `create-app-db-user.sql` | in the API image | The least-privilege runtime account, `'safeer_app'@'%'`. `deploy.sh` applies it from the image after every migrate. |
 | `Caddyfile.safeer.staging` / `.prod` | the edge Caddy | One of the two, never both. |
+| `deploy.sh` | `/srv/safeer/` | `init`, `api <tag>` / `web <tag>` (release with rollback), `migrate <tag>`, `backup`, `status`. GitHub Actions calls it over SSH (§8). |
 | `backup.sh` | `/srv/safeer/` | Nightly DB dump and storage tarball, 14-day retention; restore steps in its header. |
 
 The env files hold secrets: `chmod 600`, never commit the filled-in copies.
