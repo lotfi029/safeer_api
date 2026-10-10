@@ -1,7 +1,7 @@
 # deploy/docker-compose.yml — the Safeer stack on the VPS, behind the edge
 # Caddy that already owns 80/443 (docs/backend/DEPLOYMENT-VPS.md).
 #
-#   visitor ─HTTPS─▶ Caddy (edge) ─▶ web:4000 ─▶ api:3900 ─▶ db:3306
+#   visitor ─HTTPS─▶ Caddy (edge) ─▶ web:4000 ─▶ safeer-api:3900 ─▶ db:3306
 #                    [edge network]  [edge + safeer] [safeer]  [safeer]
 #
 # Lives in /srv/safeer next to three env files (all chmod 600, never
@@ -91,7 +91,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks: [safeer]
+    networks:
+      safeer:
+        # The name the web server calls it by. Not the plain service name
+        # `api`: the web container is also on the shared edge network, where
+        # another project's `api` answers to that name too.
+        aliases: [safeer-api]
     # On SIGTERM the API waits up to 10 s for OTP sends it already answered
     # for (A4); Docker's default 10 s would SIGKILL it mid-drain.
     stop_grace_period: 15s
@@ -109,8 +114,8 @@ services:
       TRUST_PROXY: "1"
       PUBLIC_SITE_URL: ${SITE_URL:?set SITE_URL in .env}
       # SSR calls the API directly on the private network, never through
-      # the public domain.
-      API_INTERNAL_URL: http://api:3900
+      # the public domain. safeer-api, not api: see the api service's alias.
+      API_INTERNAL_URL: http://safeer-api:3900
     # Anything else safeer_web's own docs ask for goes in web.env (optional).
     env_file:
       - path: web.env

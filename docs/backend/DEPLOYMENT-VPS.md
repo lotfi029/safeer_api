@@ -7,7 +7,7 @@ runs on ports 80/443. Another project already runs behind the same Caddy;
 nothing here touches it.
 
 ```
-visitor ─HTTPS─▶ Caddy (edge) ─▶ safeer-web:4000 ─▶ api:3900 ─▶ db:3306
+visitor ─HTTPS─▶ Caddy (edge) ─▶ safeer-web:4000 ─▶ safeer-api:3900 ─▶ db:3306
                  TLS, sets XFF    TRUST_PROXY=1      TRUST_PROXY=1  mysql:8.4
                  [edge network]   [edge + safeer]    [safeer]       [safeer]
 ```
