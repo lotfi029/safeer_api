@@ -207,6 +207,6 @@ application's locale.
   - An empty value (`KEY=`) means the default, so `TRUST_PROXY=` is `1`,
     not `0`.
 - **Production database: MySQL 8.4** (S4), in a container on the VPS.
-  `safeer-web`'s `API_INTERNAL_URL` is `http://api:3900` on the private
+  `safeer-web`'s `API_INTERNAL_URL` is `http://safeer-api:3900` (the api service's alias; the plain name `api` collides with other projects on the shared edge network) on the private
   Compose network (`deploy/docker-compose.yml`).
 
