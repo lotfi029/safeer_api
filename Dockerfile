@@ -42,6 +42,9 @@ RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY migrations ./migrations
 COPY scripts ./scripts
+# deploy/deploy.sh re-applies the app user's grants from the image itself, so
+# they always match this image's migrations.
+COPY deploy/create-app-db-user.sql ./deploy/create-app-db-user.sql
 
 # Uploaded files. Compose mounts the named `storage` volume here. No VOLUME
 # instruction: it would add an anonymous volume to every one-off

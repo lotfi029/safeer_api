@@ -14,13 +14,16 @@ visitor ─HTTPS─▶ Caddy (edge) ─▶ safeer-web:4000 ─▶ api:3900 ─�
 
 - **Images** come from GHCR: `ghcr.io/lotfi029/safeer-api` (this repo's
   `.github/workflows/image.yml`) and `ghcr.io/lotfi029/safeer-web` (safeer_web's).
-  Each repo pushes `:<tag>` on a `v*` tag, and `:sha-<short>` on every publish.
+  Each repo pushes `:<tag>` on a `v*` tag, and `:sha-<short>` on every publish
+  (`image.yml`); `vps-deploy.yml` pushes `:<12-hex commit>` on every push to
+  `main` and releases it (§8).
 - **Files:** the stack is [`deploy/`](../../deploy/README.md):
   - `docker-compose.yml`
   - three env templates
   - `create-app-db-user.sql`
   - two Caddy blocks
   - `backup.sh`
+  - `deploy.sh`, the one entry point for install, releases, migrations and status
 - **Network:** nothing publishes a port. The API and MySQL are reachable only
   on the private `safeer` network; the web server only through Caddy.
 - **Client IPs:** Caddy keeps no `trusted_proxies`, so it replaces any
@@ -87,17 +90,18 @@ deliberately not written in this public repo.
 ```bash
 sudo mkdir -p /srv/safeer && cd /srv/safeer
 # from a checkout of this repo at the release tag:
-cp deploy/docker-compose.yml deploy/backup.sh deploy/create-app-db-user.sql /srv/safeer/
+cp deploy/docker-compose.yml deploy/backup.sh deploy/deploy.sh /srv/safeer/
 cp deploy/.env.example .env
 cp deploy/db.env.example db.env
 cp deploy/app.env.example app.env
-chmod 600 .env db.env app.env && chmod 700 backup.sh
+chmod 600 .env db.env app.env && chmod 700 backup.sh deploy.sh
 ```
 
 Fill in the three files. Each variable's comment says how to generate it.
 
 - `.env`:
-  - `SAFEER_API_TAG` / `SAFEER_WEB_TAG` (e.g. `v1.0.0`)
+  - `SAFEER_API_TAG` / `SAFEER_WEB_TAG`: a published tag, e.g. `v1.0.0`, or
+    the 12-hex commit tag a manual run of `vps-deploy.yml` printed
   - `EDGE_NETWORK`
   - `SITE_URL=https://new.safeer-sa.org` (staging first)
   - `MIGRATION_DB_PASSWORD`
@@ -114,25 +118,24 @@ Fill in the three files. Each variable's comment says how to generate it.
 > every backup. Never reuse the value in `.github/workflows/ci.yml`; it is
 > public. See [APP_ENCRYPTION_KEY](DEPLOYMENT-HOSTINGER.md#app_encryption_key).
 
-Then, in this order. The app user's table grants need the tables, so it is
-created after the first migrate, and `schema:check` runs as that user:
+Then run `./deploy.sh init`. It refuses if the `safeer_dbdata` volume already
+exists, and does, in this order (the app user's table grants need the tables,
+so it is created after the first migrate, and `schema:check` runs as that
+user):
+
+1. `docker compose pull`, then starts `db` and waits for healthy;
+2. `docker compose run --rm migrate`, as the migration account (DDL);
+3. creates the least-privilege runtime account `'safeer_app'@'%'` from the
+   API image's own `deploy/create-app-db-user.sql`, with `DB_PASSWORD` from
+   `app.env` (it must be hex: `openssl rand -hex 24`). Neither password
+   appears on a command line;
+4. `npm run schema:check` as `safeer_app`;
+5. starts `api` and waits for `/health/ready`, then starts `web`.
 
 ```bash
 cd /srv/safeer
-docker compose pull
-docker compose up -d db                     # wait for "healthy": docker compose ps
-docker compose run --rm migrate             # as the migration account (DDL)
-
-# The least-privilege runtime account, 'safeer_app'@'%'. The root password is
-# read inside the container, so it never appears on the host's command line.
-APP_DB_PASSWORD=$(grep '^DB_PASSWORD=' app.env | cut -d= -f2-)
-sed "s/CHANGE_ME_BEFORE_USE/$APP_DB_PASSWORD/" create-app-db-user.sql \
-  | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD"'
-unset APP_DB_PASSWORD
-
-docker compose run --rm --no-deps api npm run schema:check   # as safeer_app
-docker compose up -d api web
-docker compose ps                           # db, api, web: "healthy"; no ports listed
+./deploy.sh init
+./deploy.sh status          # db, api, web: "healthy"; no ports listed; ready: 200
 ```
 
 `npm run migrate` refuses to run with a different `APP_ENCRYPTION_KEY` than
@@ -316,25 +319,51 @@ Its header holds the full restore procedure.
 
 ## 8. Updates
 
+**Auto-deploy.** Each repo's `.github/workflows/vps-deploy.yml` builds the
+image on a push to `main`, pushes `:<12-hex commit>`, and runs
+`deploy.sh api|web <tag>` over SSH. `deploy.sh` pulls, swaps that one
+container, waits for it to be healthy (the API also for `/health/ready`), and
+otherwise puts the previous tag back. A failed release leaves the previous
+version serving and the workflow run red.
+
+- It only runs once the repository variable `VPS_ENABLED` is `true`, with
+  four **repository** secrets: `VPS_HOST`, `VPS_USER` (`deploy`),
+  `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS` (`ssh-keyscan <VPS_IP>`).
+- The key is a dedicated one, restricted on the VPS to `deploy.sh`; it can
+  request only `api <tag>` or `web <tag>`. Its `authorized_keys` line, for the
+  `deploy` user:
+
+  ```
+  command="/srv/safeer/deploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA… safeer-deploy
+  ```
+
+  Test it: `ssh -i <key> deploy@<VPS_IP> status` prints `refused: …`.
+
+**A release with a migration.** `deploy.sh api <tag>` refuses while that
+image has pending migrations (the run goes red, the old API keeps serving).
+On the VPS:
+
 ```bash
 cd /srv/safeer
-./backup.sh                                   # always: this is the rollback point
-sed -i 's/^SAFEER_API_TAG=.*/SAFEER_API_TAG=v1.1.0/' .env   # and/or SAFEER_WEB_TAG
-docker compose pull
-docker compose run --rm migrate               # no-op when there's nothing new
-docker compose up -d                          # recreates only what changed
-docker compose ps && docker image prune -f
+./deploy.sh migrate <tag>     # backup.sh first, then migrate, then the app user's grants + schema:check
+./deploy.sh api <tag>
 ```
 
-Then the short form of §4: `/healthz`, `/api/v1/site`, and the admin
-sign-in. On SIGTERM the API waits up to 10 s for in-flight OTP sends;
-compose allows it 15 s.
+`migrate` re-applies the grants from that image's
+`deploy/create-app-db-user.sql`, so a table a new migration creates is granted
+to `safeer_app` before the new API needs it.
+
+**By hand** (a release tag, or a rollback): `./deploy.sh api v1.1.0` /
+`./deploy.sh web v1.1.0`. Then the short form of §4: `/healthz`,
+`/api/v1/site`, and the admin sign-in. On SIGTERM the API waits up to 10 s
+for in-flight OTP sends; compose allows it 15 s.
 
 ## 9. Rollback
 
-- **Code only** (no migration ran): set the previous tags in `.env`, then
-  `docker compose up -d`. Every published version stays in GHCR, under both
-  `:<tag>` and `:sha-<short>`.
+- **Code only** (no migration ran): `./deploy.sh api <previous tag>` (or
+  `web`). The previous tag is in the last successful workflow run, or in
+  `docker image ls ghcr.io/lotfi029/safeer-*`. Every published version stays
+  in GHCR.
 - **A migration ran.** Migrations are forward-only, so the database goes
   back with the code:
   1. `docker compose stop api web`

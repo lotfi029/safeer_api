@@ -1,4 +1,5 @@
-# Only package*.json, the build configs, src/, migrations/ and scripts/ are
+# Only package*.json, the build configs, src/, migrations/, scripts/ and
+# deploy/create-app-db-user.sql are
 # copied into the image (Dockerfile); keep everything else out of the build
 # context, secrets above all.
 node_modules
@@ -11,6 +12,7 @@ docs
 test
 tools
 deploy
+!deploy/create-app-db-user.sql
 coverage
 .git
 .github
