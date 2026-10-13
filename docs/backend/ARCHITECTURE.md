@@ -117,6 +117,17 @@ past `SESSION_IDLE_HOURS` (C33).
   that locks the site_settings row. A published licence makes its file
   public on `/files`, and an asset a licence references can't be deleted.
 
+## Organisational structure (023)
+
+- `org_positions` is a tree (`parent_id` → itself, `ON DELETE RESTRICT`);
+  `board_members.org_position_id` says which position a member holds.
+  `GET org-chart` builds the published forest with each position's
+  published holders; `LocaleInterceptor` collapses names inside it.
+- Tree writes (`admin/org-positions`) lock every position row first and run
+  `org-chart/tree-guard.ts` — no self-parent, missing parent or cycle, at
+  most 5 levels counted both ways — so two concurrent moves can't form a
+  cycle. Delete returns 409 with what still references the position.
+
 ## Time zone
 
 Every database connection runs in UTC: the app (`src/database/utc.ts`), the

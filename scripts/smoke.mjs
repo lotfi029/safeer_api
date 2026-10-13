@@ -572,6 +572,34 @@ test('governance: sections with counts, a section by slug, contact subjects, lic
   assert(cleared.settings.licenceNo === null, 'deleting the primary licence should clear GET /site licenceNo');
 });
 
+test('org chart (023): a position tree with a member holder, cycles refused, delete in use refused', async () => {
+  const ids = [];
+  let memberId;
+  try {
+    const root = await api('POST', '/admin/org-positions', { body: { nameAr: 'هيكل تجريبي', nameEn: 'Smoke structure' } });
+    assert(root.status === 201, `creating a position failed: ${root.status}: ${JSON.stringify(root.body)}`);
+    ids.push(root.body.id);
+    const child = await api('POST', '/admin/org-positions', { body: { nameAr: 'منصب تابع', parentId: root.body.id } });
+    assert(child.status === 201, `creating a child position failed: ${child.status}`);
+    ids.push(child.body.id);
+    const cycle = await api('PATCH', `/admin/org-positions/${root.body.id}`, { body: { parentId: child.body.id } });
+    assert(cycle.status === 400 && cycle.body.field === 'parentId', `a cycle should be 400 on parentId, got ${cycle.status}`);
+    const member = await api('POST', '/admin/board', {
+      body: { nameAr: 'عضو تجريبي', nameEn: 'Smoke member', roleAr: 'عضو', grp: 'board', orgPositionId: child.body.id, isPublished: true },
+    });
+    assert(member.status === 201, `linking a member to a position failed: ${member.status}: ${JSON.stringify(member.body)}`);
+    memberId = member.body.id;
+    const chart = await fetch(`${BASE}/org-chart?lang=en`).then((r) => r.json());
+    const node = chart.find((n) => n.id === root.body.id);
+    assert(node?.name === 'Smoke structure' && node.children[0]?.holders[0]?.name === 'Smoke member', `GET org-chart: ${JSON.stringify(node)}`);
+    const inUse = await api('DELETE', `/admin/org-positions/${child.body.id}`);
+    assert(inUse.status === 409 && inUse.body.code === 'RESOURCE_IN_USE', `deleting a held position should be 409, got ${inUse.status}`);
+  } finally {
+    if (memberId) await api('DELETE', `/admin/board/${memberId}`);
+    for (const id of ids.reverse()) await api('DELETE', `/admin/org-positions/${id}`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 
 async function main() {

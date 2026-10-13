@@ -414,3 +414,51 @@ asset a licence uses is 409 `ASSET_IN_USE` with
 022 turned the documents filed under the old `licences` category into
 licences (title, file and visibility carried over; no number, issuer or
 primary yet).
+
+## Organisational structure (023, branch `feat/org-chart`)
+
+The association's org chart («الهيكل التنظيمي»), ported from ta3lom. A tree
+of positions; a board or executive member can hold one, and a position shows
+the names of its published holders.
+
+### Public
+
+`GET org-chart` → a forest, published positions only, siblings in
+`sortOrder`:
+
+```ts
+interface OrgNode {
+  id: string;
+  name: string;            // locale-collapsed (nameAr/nameEn)
+  tone: 'neutral' | 'sky' | 'green' | 'brand';  // `auto` already resolved by depth
+  holders: { id: string; name: string }[];       // [] unless the position shows holders
+  children: OrgNode[];
+}
+```
+
+A position under an unpublished parent is hidden with its whole branch; only
+published members appear as holders. Cached under `org_chart`, purged by
+every admin/org-positions and admin/board write.
+
+### Admin (`content` area)
+
+| Route | Body / result |
+|---|---|
+| `GET admin/org-positions` | paged `{data, total, page, limit}`; `?q=`, `?published=`, `?parentId=` |
+| `GET admin/org-positions/:id` | the raw row |
+| `POST admin/org-positions` | `nameAr` (required, ≤ 190), `nameEn`, `parentId` (or null for a top box), `tone` (`auto` default, `neutral`, `sky`, `green`, `brand`), `showHolders` (default true), `isPublished` (default true), `sortOrder` |
+| `PATCH admin/org-positions/:id` | any subset of the above |
+| `PATCH admin/org-positions/:id/publish` | `{isPublished?: boolean}` |
+| `POST admin/org-positions/reorder` | `[{id, sortOrder}]` |
+| `DELETE admin/org-positions/:id` | `{deleted: true}` |
+
+Rules: `parentId` is 400 `VALIDATION_FAILED` with `field: "parentId"` and
+`reason` one of `SELF_PARENT`, `PARENT_NOT_FOUND`, `CYCLE` (reports to one of
+its own sub-positions), `TOO_DEEP` (more than 5 levels, counted including the
+position's own sub-tree). A new position, or one moved to another parent,
+goes last among its siblings unless `sortOrder` is sent. Deleting a position
+that sub-positions or members still point at is 409 `RESOURCE_IN_USE` with
+`usages: [{entity: "org_positions" | "board_members", id, label}]`.
+
+`admin/board` rows gain `orgPositionId` (nullable); an id that doesn't exist
+is 400 `VALIDATION_FAILED` with `field: "orgPositionId"`.
