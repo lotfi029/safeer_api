@@ -105,9 +105,8 @@ async function bootstrap() {
   }
 
   // A4: on SIGTERM/SIGINT (a PM2 restart, a redeploy) Nest runs its
-  // shutdown hooks before exiting, so BackgroundWork can finish sends that
-  // public routes answered before (request-otp). ecosystem.config.cjs gives
-  // it kill_timeout: 12000 to do so.
+  // shutdown hooks before exiting, so BackgroundWork can finish work still
+  // in flight. ecosystem.config.cjs gives it kill_timeout: 12000 to do so.
   app.enableShutdownHooks();
 
   // BF-4/S2: HOST defaults to 127.0.0.1, so on a bare host the API is

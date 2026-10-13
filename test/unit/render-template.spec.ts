@@ -12,8 +12,8 @@ describe('substituteMarkdown (C16)', () => {
   });
 
   it('leaves the code-built `link` clickable', () => {
-    const out = substituteMarkdown('[{{link}}]({{link}})', { link: 'https://site.example/ar/portal/login' });
-    expect(out).toBe('[https://site.example/ar/portal/login](https://site.example/ar/portal/login)');
+    const out = substituteMarkdown('[{{link}}]({{link}})', { link: 'https://site.example/ar/admin/messages/1' });
+    expect(out).toBe('[https://site.example/ar/admin/messages/1](https://site.example/ar/admin/messages/1)');
   });
 
   it('substitutePlain does not escape (text part)', () => {

@@ -4,8 +4,6 @@
 //   B18 public GET about-items + the about/scholarships sections (014)
 //   C30 parallel readiness probes never collide
 //   C33 idle sessions aren't listed; changePassword is throttled
-//   C35 portal notifications are mapped
-//   C36 CSV export: X-Truncated + audit row
 //   C39 whitespace-only English falls back to Arabic; per-language read time
 //   C40 markdown h1 → h2, GFM tables
 //   C41 a post preview token unlocks that post's cover on /files
@@ -19,9 +17,7 @@ import {
   BASE,
   adminApi,
   api,
-  createApplication,
   createTempUser,
-  deleteApplication,
   deleteTempUser,
   loginAs,
   withDb,
@@ -54,8 +50,6 @@ describe('B17: GET admin/roles', () => {
   const expected = {
     roles: ['admin', 'reviewer', 'editor', 'support'],
     matrix: {
-      applications: ['admin', 'reviewer'],
-      'applications.delete': ['admin'],
       content: ['admin', 'editor'],
       'redirects.delete': ['admin'],
       inbox: ['admin', 'support'],
@@ -80,19 +74,21 @@ describe('B17: GET admin/roles', () => {
 
 describe('B18: about items and inner-page sections', () => {
   it('GET about-items groups published items by the requested kinds, sorted, as HTML', async () => {
-    const res = await api('GET', '/about-items?kind=vision,goal,requirement&lang=ar');
+    const res = await api('GET', '/about-items?kind=vision,goal,care_pillar&lang=ar');
     expect(res.status).toBe(200);
-    expect(Object.keys(res.body).sort()).toEqual(['goal', 'requirement', 'vision']);
+    expect(Object.keys(res.body).sort()).toEqual(['care_pillar', 'goal', 'vision']);
     expect(res.body.vision).toHaveLength(1);
     expect(res.body.goal).toHaveLength(5);
-    expect(res.body.requirement).toHaveLength(4);
+    expect(res.body.care_pillar).toHaveLength(4);
     const orders = res.body.goal.map((g: any) => g.sortOrder);
     expect(orders).toEqual([...orders].sort((a, b) => a - b));
     expect(res.body.vision[0].body).toMatch(/^<p>/);
     expect(Object.keys(res.body.vision[0]).sort()).toEqual(['body', 'icon', 'id', 'sortOrder', 'title']);
 
     const all = await api('GET', '/about-items');
-    expect(Object.keys(all.body).sort()).toEqual(['care_pillar', 'goal', 'mission', 'requirement', 'scholarship_step', 'vision']);
+    expect(Object.keys(all.body).sort()).toEqual(['care_pillar', 'goal', 'mission', 'vision']);
+    // The scholarship kinds went with the feature (021).
+    expect((await api('GET', '/about-items?kind=requirement')).status).toBe(400);
   });
 
   it('an unknown kind is a 400 (C42); an unpublished item disappears at once (cache purged)', async () => {
@@ -168,51 +164,6 @@ describe('C33: auth details', () => {
     } finally {
       await deleteTempUser(user.id);
     }
-  });
-});
-
-describe('C35: portal notifications', () => {
-  it('are mapped like recentEvents — no actorId or visibleToApplicant', async () => {
-    const applicant = await createApplication();
-    try {
-      await withDb((conn) =>
-        conn.execute("INSERT INTO application_events (application_id, type, actor_id, visible_to_applicant, data) VALUES (?, 'STATUS_CHANGED', 1, 1, ?)", [
-          applicant.id,
-          JSON.stringify({ from: 'draft', to: 'new' }),
-        ]),
-      );
-      const res = await api('GET', '/portal/notifications', { session: applicant });
-      expect(res.status).toBe(200);
-      expect(res.body.data.length).toBeGreaterThan(0);
-      for (const event of res.body.data) {
-        expect(Object.keys(event).sort()).toEqual(['createdAt', 'data', 'id', 'type']);
-      }
-    } finally {
-      await deleteApplication(applicant.id);
-    }
-  });
-});
-
-describe('C36: CSV export', () => {
-  it('says whether it was truncated and is audited with its filters and row count', async () => {
-    const admin = await loginAs(ADMIN_EMAIL, ADMIN_PASSWORD);
-    const before: number = await scalar("SELECT COALESCE(MAX(id), 0) FROM audit_log WHERE action = 'export'");
-    const res = await fetch(`${BASE}/admin/applications/export.csv?status=accepted`, { headers: { Cookie: admin.cookie } });
-    expect(res.status).toBe(200);
-    expect(res.headers.get('x-truncated')).toBe('false');
-    // The audit row is written just after the response (AuditInterceptor never delays it), so wait for it.
-    let row: any;
-    for (let i = 0; i < 50 && !row; i++) {
-      [row] = await withDb((conn) =>
-        conn.execute("SELECT entity_type, diff FROM audit_log WHERE action = 'export' AND id > ? ORDER BY id DESC LIMIT 1", [before]).then(([r]: any) => r),
-      );
-      if (!row) await new Promise((r) => setTimeout(r, 50));
-    }
-    expect(row.entity_type).toBe('applications');
-    const diff = typeof row.diff === 'string' ? JSON.parse(row.diff) : row.diff;
-    expect(diff.after.filters).toEqual({ status: 'accepted', q: null, reviewerId: null });
-    expect(typeof diff.after.rows).toBe('number');
-    expect(diff.after.truncated).toBe(false);
   });
 });
 

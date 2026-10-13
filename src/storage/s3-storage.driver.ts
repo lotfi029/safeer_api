@@ -1,24 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Readable } from 'node:stream';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
-import { StorageObjectNotFoundError, type SignedUrlOptions, type StorageDriver } from './storage-driver.interface.js';
-
-/** Which S3 bucket a given `S3StorageDriver` instance writes to — see storage.module.ts's two provider bindings. */
-export type S3Bucket = 'public' | 'private';
+import { StorageObjectNotFoundError, type StorageDriver } from './storage-driver.interface.js';
 
 /**
  * `STORAGE_DRIVER=s3` — an S3-compatible object store (any provider that
  * speaks the S3 API: AWS itself, a self-hosted MinIO, etc. — `S3_ENDPOINT`
- * points at it). One instance per bucket (`bucket` picks
- * `S3_BUCKET_PUBLIC`/`S3_BUCKET_PRIVATE` at construction) — see
- * storage.module.ts for the two DI bindings.
- *
- * The private bucket is never made public: `signedUrl()` is the only way
- * anything in it is ever reachable from outside this process, and it's
- * always short-lived (`S3_SIGNED_URL_TTL_SECONDS`, default 300s).
+ * points at it), writing to `S3_BUCKET_PUBLIC` — see storage.module.ts.
  */
 @Injectable()
 export class S3StorageDriver implements StorageDriver {
@@ -26,10 +16,7 @@ export class S3StorageDriver implements StorageDriver {
   private readonly client: S3Client;
   private readonly bucketName: string;
 
-  constructor(
-    @Inject(ENV) private readonly env: Env,
-    bucket: S3Bucket,
-  ) {
+  constructor(@Inject(ENV) env: Env) {
     this.client = new S3Client({
       endpoint: env.S3_ENDPOINT,
       region: env.S3_REGION,
@@ -39,7 +26,7 @@ export class S3StorageDriver implements StorageDriver {
       // virtual-hosted-style (`bucket.endpoint/key`) default.
       forcePathStyle: true,
     });
-    this.bucketName = bucket === 'public' ? env.S3_BUCKET_PUBLIC! : env.S3_BUCKET_PRIVATE!;
+    this.bucketName = env.S3_BUCKET_PUBLIC!;
   }
 
   async put(key: string, buffer: Buffer): Promise<void> {
@@ -76,18 +63,6 @@ export class S3StorageDriver implements StorageDriver {
     } catch {
       return false;
     }
-  }
-
-  async signedUrl(key: string, options: SignedUrlOptions = {}): Promise<string> {
-    const command = new GetObjectCommand({
-      Bucket: this.bucketName,
-      Key: key,
-      // C19: the signed download carries the same type and RFC 5987 filename
-      // a streamed one would.
-      ResponseContentType: options.contentType,
-      ResponseContentDisposition: options.contentDisposition,
-    });
-    return getSignedUrl(this.client, command, { expiresIn: options.ttlSeconds ?? this.env.S3_SIGNED_URL_TTL_SECONDS });
   }
 }
 

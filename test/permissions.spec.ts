@@ -6,12 +6,11 @@
 // 403, and a delete probe on an id that doesn't exist answers 404 (allowed,
 // nothing there) or 403 (refused before the lookup). A coverage check fails
 // if openapi.json gains an admin route group this file doesn't probe.
-// Also: the unauthenticated 401, and staff/applicant cookies never accepted
-// on each other's routes.
+// Also: the unauthenticated 401.
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { adminApi, api, createApplication, createTempUser, deleteApplication, deleteTempUser, type Session, type StaffRole } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, type Session, type StaffRole } from './helpers';
 
 const MISSING_ID = '999999999';
 
@@ -23,9 +22,6 @@ interface Probe {
 }
 
 const PROBES: Record<string, Probe> = {
-  'admin/applications': { area: 'applications', read: '/admin/applications', delete: { path: `/admin/applications/${MISSING_ID}`, area: 'applications.delete' } },
-  'admin/interview-slots': { area: 'applications', read: '/admin/interview-slots', delete: { path: `/admin/interview-slots/${MISSING_ID}`, area: 'applications' } },
-
   'admin/pages': { area: 'content', read: '/admin/pages', delete: { path: `/admin/pages/${MISSING_ID}`, area: 'content' } },
   'admin/page-sections': { area: 'content', read: '/admin/page-sections', delete: { path: `/admin/page-sections/${MISSING_ID}`, area: 'content' } },
   'admin/news': { area: 'content', read: '/admin/news', delete: { path: `/admin/news/${MISSING_ID}`, area: 'content' } },
@@ -125,19 +121,6 @@ describe('permissions matrix (generated from GET admin/roles)', () => {
       const res = await api('GET', probe.read);
       expect({ path: probe.read, status: res.status }).toEqual({ path: probe.read, status: 401 });
       expect(res.body?.code).toBe('UNAUTHENTICATED');
-    }
-  });
-
-  it('a staff cookie is refused on a portal (applicant) route, and vice versa', async () => {
-    const applicant = await createApplication();
-    try {
-      for (const role of ROLES) {
-        expect((await api('GET', '/portal/me', { session: sessions[role] })).status).toBe(401);
-      }
-      expect((await api('GET', '/admin/applications', { session: applicant })).status).toBe(401);
-      expect((await api('GET', '/admin/me', { session: applicant })).status).toBe(401);
-    } finally {
-      await deleteApplication(applicant.id);
     }
   });
 });

@@ -1,4 +1,4 @@
-// test/utc.spec.ts — C9: OTPs, reset tokens and sessions expire at the right
+// test/utc.spec.ts — C9: reset tokens and sessions expire at the right
 // moment whatever the process time zone. global-setup.ts boots the app with
 // TZ=Asia/Riyadh (UTC+3), and CI also runs MySQL itself off-UTC, so a
 // connection that isn't pinned to UTC shows up here as a 3-hour error:
@@ -8,7 +8,7 @@
 //   accepted, and rows a minute past must be refused.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { api, createApplication, createTempUser, deleteApplication, deleteTempUser, loginAs, readMailOtpCode, settleBackground, waitForAuthToken, withDb } from './helpers';
+import { api, createTempUser, deleteTempUser, loginAs, waitForAuthToken, withDb } from './helpers';
 
 const IDLE_HOURS = Number(process.env.SESSION_IDLE_HOURS ?? 8);
 const ABSOLUTE_DAYS = Number(process.env.SESSION_ABSOLUTE_DAYS ?? 30);
@@ -29,35 +29,6 @@ async function exec(sql: string, params: Array<string | number>): Promise<void> 
 describe('UTC everywhere (C9)', () => {
   it('the app process really runs off-UTC in this suite', () => {
     expect(process.env.TEST_APP_TZ).not.toMatch(/^(UTC|Etc\/UTC|Z)?$/);
-  });
-
-  it('OTP: written as UTC now + 10 min; accepted until then, refused after', async () => {
-    const applicant = await createApplication();
-    try {
-      await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
-      await settleBackground(); // A4: the row is written after the response
-      const left = await secondsUntil('applicant_otps', 'expires_at', 'application_id = ?', [applicant.id]);
-      expect(Math.abs(left - 600)).toBeLessThanOrEqual(15);
-
-      // One minute left on the UTC clock: still valid.
-      await exec('UPDATE applicant_otps SET expires_at = UTC_TIMESTAMP(3) + INTERVAL 1 MINUTE WHERE application_id = ?', [applicant.id]);
-      const code = await readMailOtpCode(applicant.id);
-      const ok = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code } });
-      expect([200, 201]).toContain(ok.status);
-
-      // A fresh code, expired a minute ago on the UTC clock: refused.
-      await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference } });
-      await settleBackground();
-      await exec(
-        'UPDATE applicant_otps SET expires_at = UTC_TIMESTAMP(3) - INTERVAL 1 MINUTE WHERE application_id = ? AND consumed_at IS NULL',
-        [applicant.id],
-      );
-      const expiredCode = await readMailOtpCode(applicant.id);
-      const refused = await api('POST', '/portal/auth/verify-otp', { body: { identifier: applicant.reference, code: expiredCode } });
-      expect(refused.status).toBe(401);
-    } finally {
-      await deleteApplication(applicant.id);
-    }
   });
 
   it('password reset token: written as UTC now + 60 min; accepted until then, refused after', async () => {
@@ -112,17 +83,6 @@ describe('UTC everywhere (C9)', () => {
       expect((await api('GET', '/admin/me', { session: second })).status).toBe(401);
     } finally {
       await deleteTempUser(user.id);
-    }
-  });
-
-  it('applicant session: absolute expiry is written on the UTC clock', async () => {
-    const applicant = await createApplication();
-    try {
-      const left = await secondsUntil('applicant_sessions', 'expires_at', 'application_id = ?', [applicant.id]);
-      const days = Number(process.env.APPLICANT_SESSION_ABSOLUTE_DAYS ?? 7);
-      expect(Math.abs(left - days * 86400)).toBeLessThanOrEqual(15);
-    } finally {
-      await deleteApplication(applicant.id);
     }
   });
 });

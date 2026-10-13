@@ -7,13 +7,11 @@ import type { Env } from '../../config/env.js';
  * Phase 6 (safeer-backend-fix-prompt.md): the Jest suite (`test/`) drives a
  * real, running instance of this app over HTTP, and several routes it
  * exercises across many spec files share one hard-coded per-route
- * `@Throttle()` bucket each (`POST applications` 5/hour/IP, `POST
- * admin/auth/login` 5/60s/IP, `POST portal/auth/request-otp` 5/hour/IP, …) —
- * budgets `scripts/smoke.mjs` already spends most of in a single run.
+ * `@Throttle()` bucket each (`POST admin/auth/login` 5/60s/IP, `POST contact`,
+ * …) — budgets `scripts/smoke.mjs` already spends most of in a single run.
  * Splitting the same coverage across `permissions.spec.ts`,
- * `apply-flow.spec.ts`, `documents.spec.ts`, `admin-review.spec.ts` and
- * `content.spec.ts` would blow every one of those buckets long before the
- * suite finishes.
+ * `content.spec.ts` and the rest would blow every one of those buckets long
+ * before the suite finishes.
  *
  * Delegates to a normally-DI-constructed `ThrottlerGuard` (registered as an
  * ordinary provider below, not `APP_GUARD` — see app.module.ts) rather than

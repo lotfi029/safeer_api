@@ -22,8 +22,8 @@ import mysql2 from 'mysql2';
  *   TypeORM formats back with *local* getters — the previous day west of UTC.
  *
  * A3: the same statement also takes MariaDB's `SIMULTANEOUS_ASSIGNMENT` out
- * of `sql_mode`. Several atomic UPDATEs (AuthService.registerFailedAttempt,
- * PortalOtpService's failure counter) rely on SET being evaluated left to
+ * of `sql_mode`. Atomic UPDATEs (AuthService.registerFailedAttempt) rely on
+ * SET being evaluated left to
  * right, each assignment seeing the previous ones — MySQL's only behaviour,
  * and MariaDB's default, but that mode makes MariaDB evaluate every
  * right-hand side against the old row, which would silently break the

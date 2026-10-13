@@ -2,7 +2,7 @@ import type { CookieOptions } from 'express';
 import { isDevEnv, type Env } from '../config/env.js';
 
 /**
- * Staff and applicant session cookies share one attribute set. C32:
+ * The staff session cookie's attribute set. C32:
  * `Secure` everywhere except development/test (was production only, so a
  * staging deployment sent session cookies over plain HTTP). Staging must
  * therefore be served over HTTPS, like production.

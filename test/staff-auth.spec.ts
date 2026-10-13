@@ -293,16 +293,4 @@ describe('staff auth', () => {
       });
     });
   });
-
-  it('B7: a disabled account is not a valid assignee', async () => {
-    const reviewer = await createTempUser('reviewer');
-    try {
-      await adminApi('PATCH', `/admin/users/${reviewer.id}`, { body: { status: 'disabled' } });
-      const assignees = await adminApi('GET', '/admin/applications/assignees');
-      expect(assignees.body.some((u: any) => u.id === reviewer.id)).toBe(false);
-    } finally {
-      await deleteTempUser(reviewer.id);
-    }
-  });
 });
-

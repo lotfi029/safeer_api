@@ -3,10 +3,8 @@ import type { SiteSettings } from '../database/entities/site-settings.entity.js'
 /**
  * The subset of `SiteSettings` safe to serve to anonymous visitors — shared
  * by `GET /home` and `GET /site` so the two aggregates never drift on what
- * "public settings" means. Drops `notifyEmailOnStatusChange`/
- * `notifySmsOnStatusChange` (internal ops toggles), `applicationRefPrefix`
- * (an internal numbering detail), and `updatedBy`/`updatedAt` (an admin
- * audit trail), none of which the public site reads or should see.
+ * "public settings" means. Drops `updatedBy`/`updatedAt` (an admin audit
+ * trail), which the public site neither reads nor should see.
  */
 export interface PublicSiteSettings {
   id: string;

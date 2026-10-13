@@ -96,15 +96,6 @@ export class SiteSettings {
   @Column({ name: 'seo_description_en', type: 'varchar', length: 500, nullable: true })
   seoDescriptionEn: string | null;
 
-  @Column({ name: 'notify_email_on_status_change', type: 'boolean', default: true })
-  notifyEmailOnStatusChange: boolean;
-
-  @Column({ name: 'notify_sms_on_status_change', type: 'boolean', default: true })
-  notifySmsOnStatusChange: boolean;
-
-  @Column({ name: 'application_ref_prefix', type: 'varchar', length: 10, default: 'SA' })
-  applicationRefPrefix: string;
-
   /**
    * A7: HMAC of a fixed label under APP_ENCRYPTION_KEY — which key this
    * database's encrypted data belongs to. Written once, on first use, by

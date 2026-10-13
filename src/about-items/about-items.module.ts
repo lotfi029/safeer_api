@@ -8,7 +8,7 @@ import { createAboutItemSchema, updateAboutItemSchema } from './dto/about-item.d
 import { AboutItemsController } from './about-items.controller.js';
 import { MarkdownModule } from '../common/markdown/markdown.module.js';
 
-/** `?kind=vision|mission|goal|care_pillar|scholarship_step|requirement` filters for free via the kernel's automatic column filter. */
+/** `?kind=vision|mission|goal|care_pillar` filters for free via the kernel's automatic column filter. */
 @Controller('admin/about-items')
 @Area('content')
 class AdminAboutItemsController extends CrudController<AboutItem>({

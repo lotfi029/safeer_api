@@ -3,13 +3,12 @@
 //   Settings/social  youtube/linkedin/whatsapp/tiktok URLs reach GET /site;
 //                    an unsafe scheme is refused (C10)
 //   B13              the news search treats % and _ literally
-//   B14              two simultaneous submits: exactly one wins
 //   C37              an alt-text edit shows at once on cached public pages
 //   C38              an undecodable image is a 422; a duplicate upload returns the existing asset
 //   C46              a reply keeps its delivery status after the mail_log purge
 
 import sharp from 'sharp';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, BASE, adminApi, api, createApplication, deleteApplication, loginAs, uploadApplicationDocument, withDb } from './helpers';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, BASE, adminApi, api, loginAs, withDb } from './helpers';
 
 async function uploadMedia(buffer: Buffer, filename: string, type: string) {
   const admin = await loginAs(ADMIN_EMAIL, ADMIN_PASSWORD);
@@ -56,48 +55,6 @@ describe('B13: news search', () => {
     } finally {
       await adminApi('DELETE', `/admin/news/${literal.body.id}`);
       await adminApi('DELETE', `/admin/news/${other.body.id}`);
-    }
-  });
-});
-
-describe('B14: submit is serialised', () => {
-  it('two simultaneous submits of a complete draft: one succeeds, the other is refused, one STATUS event', async () => {
-    const applicant = await createApplication();
-    try {
-      for (const docType of ['id_copy', 'certificate', 'admission_letter']) {
-        expect((await uploadApplicationDocument(applicant, docType, `b14-${docType}`)).status).toBe(201);
-      }
-      const body = {
-        firstName: 'Test',
-        middleName: null,
-        lastName: 'Applicant',
-        birthDate: '2000-01-01',
-        phone: applicant.phone,
-        nationality: 'SA',
-        email: applicant.email,
-        gender: 'male',
-        university: 'Test University',
-        major: 'Testing',
-        degreeLevel: 'bachelor',
-        consent: true,
-      };
-      const results = await Promise.all([
-        api('POST', '/portal/application/submit', { body, session: applicant }),
-        api('POST', '/portal/application/submit', { body, session: applicant }),
-      ]);
-      const statuses = results.map((r) => r.status).sort();
-      expect(statuses.filter((s) => s === 200 || s === 201)).toHaveLength(1);
-      expect(statuses.filter((s) => s === 409)).toHaveLength(1);
-
-      const submittedEvents: number = await withDb((conn) =>
-        conn
-          .execute("SELECT COUNT(*) AS n FROM application_events WHERE application_id = ? AND type = 'SUBMITTED'", [applicant.id])
-          .then(([r]: any) => Number(r[0].n)),
-      );
-      expect(submittedEvents).toBe(1);
-      expect(await withDb((conn) => conn.execute('SELECT status FROM applications WHERE id = ?', [applicant.id]).then(([r]: any) => r[0].status))).toBe('new');
-    } finally {
-      await deleteApplication(applicant.id);
     }
   });
 });

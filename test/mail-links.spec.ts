@@ -2,9 +2,8 @@
 // sink (test/smtp-sink.ts):
 //   C2  every link is a locale-prefixed FRONTEND_BASE_URL page
 //   C16 names are letters only; contact_ack echoes nothing; typed text never autolinks
-//   C1  the OTP mail subject carries no code
 
-import { adminApi, api, createApplication, createTempUser, deleteApplication, deleteTempUser, readMailOtpCode, withDb } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, withDb } from './helpers';
 import { withMailSink } from './smtp-sink';
 
 const FRONTEND = process.env.FRONTEND_BASE_URL ?? 'http://localhost:4200';
@@ -27,18 +26,6 @@ async function deleteContactMessagesFor(email: string) {
 }
 
 describe('mail links and content', () => {
-  it('C2: application_started links to /{locale}/portal/login on the frontend', async () => {
-    await withMailSink(async (sink) => {
-      const applicant = await createApplication();
-      try {
-        const mail = await sink.waitFor((m) => m.to.includes(applicant.email));
-        expect(mail.html + mail.text).toMatch(new RegExp(`${escapeRe(FRONTEND)}/(ar|en)/portal/login`));
-      } finally {
-        await deleteApplication(applicant.id);
-      }
-    });
-  });
-
   it('C2: invite and password-reset links point at /{locale}/admin/accept|reset/{token}', async () => {
     await withMailSink(async (sink) => {
       const email = `jest-invite-${Date.now()}@example.com`;
@@ -87,46 +74,19 @@ describe('mail links and content', () => {
     });
   });
 
-  it('C1: the OTP mail subject carries no code (the body does)', async () => {
-    await withMailSink(async (sink) => {
-      const applicant = await createApplication();
-      try {
-        await api('POST', '/portal/auth/request-otp', { body: { identifier: applicant.reference, channel: 'email' } });
-        const code = await readMailOtpCode(applicant.id);
-        const mail = await sink.waitFor((m) => m.to.includes(applicant.email) && m.text.includes(code));
-        expect(mail.subject).not.toMatch(/\d{6}/);
-      } finally {
-        await deleteApplication(applicant.id);
-      }
-    });
-  });
-
   describe('C16: names are letters, spaces, apostrophes and hyphens only', () => {
-    it.each(['http://evil.example', 'www.evil.example', 'x@evil.example', 'Agent 007'])('POST /applications rejects firstName %j', async (firstName) => {
-      const res = await fetch(`${process.env.TEST_BASE_URL}/applications`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName,
-          lastName: 'Applicant',
-          birthDate: '2000-01-01',
-          phone: `+9665${String(Date.now()).slice(-8)}`,
-          nationality: 'SA',
-          email: `jest-name-${Date.now()}@example.com`,
-          gender: 'male',
-        }),
-      });
-      expect(res.status).toBe(400);
-    });
-
-    it('POST /contact rejects a URL typed as the name', async () => {
-      const res = await api('POST', '/contact', { body: contactBody({ name: 'http://evil.example' }) });
+    it.each(['http://evil.example', 'www.evil.example', 'x@evil.example', 'Agent 007'])('POST /contact rejects the name %j', async (name) => {
+      const res = await api('POST', '/contact', { body: contactBody({ name }) });
       expect(res.status).toBe(400);
     });
 
     it('accepts Arabic and Latin names with spaces, apostrophes and hyphens', async () => {
-      const applicant = await createApplication({ firstName: 'عبد الله', lastName: "O'Brien-Smith" });
-      await deleteApplication(applicant.id);
+      const body = contactBody({ name: "عبد الله O'Brien-Smith" });
+      try {
+        expect([200, 201]).toContain((await api('POST', '/contact', { body })).status);
+      } finally {
+        await deleteContactMessagesFor(String(body.email));
+      }
     });
   });
 });

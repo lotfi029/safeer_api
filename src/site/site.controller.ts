@@ -19,7 +19,7 @@ import { toPublicSiteSettings, type PublicSiteSettings } from '../site-settings/
  * deliberately excluded — it's the news-detail template page (`/pages/article`
  * exists only for its meta title/description), never a nav destination.
  */
-const NAV_SLUGS = ['home', 'about', 'board', 'work', 'scholarships', 'news', 'testimonials', 'partners', 'documents', 'contact'] as const;
+const NAV_SLUGS = ['home', 'about', 'board', 'work', 'news', 'testimonials', 'partners', 'documents', 'contact'] as const;
 
 export interface PublicNavItem {
   slug: string;

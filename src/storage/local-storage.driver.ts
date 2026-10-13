@@ -11,10 +11,8 @@ import { StorageObjectNotFoundError, type StorageDriver } from './storage-driver
 
 /**
  * `STORAGE_DRIVER=local` (the default) — everything under `STORAGE_ROOT`,
- * exactly as `MediaService`/`PrivateFileStore` wrote it directly before
- * this abstraction existed. No `signedUrl()`: local mode always streams
- * through this API (`FilesController`, the two private-document routes),
- * never a redirect.
+ * exactly as `MediaService` wrote it directly before this abstraction
+ * existed. Local mode always streams through this API (`FilesController`).
  */
 @Injectable()
 export class LocalStorageDriver implements StorageDriver {

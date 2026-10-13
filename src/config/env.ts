@@ -64,15 +64,6 @@ const envSchema = z.object({
   SESSION_IDLE_HOURS: z.coerce.number().positive().default(8),
   SESSION_ABSOLUTE_DAYS: z.coerce.number().positive().default(30),
 
-  // Student-portal session (Safeer infra change §2) — a second, completely
-  // separate cookie/table pair from the staff session above. Longer idle
-  // timeout than staff (an applicant fills a multi-step form over lunch),
-  // shorter absolute lifetime (nothing sensitive stays reachable for 30 days
-  // after a one-time OTP sign-in).
-  APPLICANT_SESSION_COOKIE_NAME: z.string().min(1).default('sf_app_sid'),
-  APPLICANT_SESSION_IDLE_HOURS: z.coerce.number().positive().default(12),
-  APPLICANT_SESSION_ABSOLUTE_DAYS: z.coerce.number().positive().default(7),
-
   // 32 raw bytes, base64-encoded — encrypts the stored SMTP password (AES-256-GCM).
   // PERMANENT: rotating it makes the stored password unreadable (trap 10).
   APP_ENCRYPTION_KEY: z
@@ -89,18 +80,15 @@ const envSchema = z.object({
   STORAGE_ROOT: z.string().min(1).default('./var/assets'),
 
   // Storage abstraction (decision 3, safeer-backend-fix-prompt.md) —
-  // B3-4's comment above is now out of date: MediaService/PrivateFileStore
-  // go through src/storage/storage-driver.interface.ts, and this is the
+  // MediaService goes through src/storage/storage-driver.interface.ts, and this is the
   // switch. S3_* below are validated as required only when
   // STORAGE_DRIVER=s3 (the superRefine below) — 'local' needs none of them.
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   S3_ENDPOINT: z.string().url().optional(),
   S3_REGION: z.string().min(1).optional(),
   S3_BUCKET_PUBLIC: z.string().min(1).optional(),
-  S3_BUCKET_PRIVATE: z.string().min(1).optional(),
   S3_ACCESS_KEY_ID: z.string().min(1).optional(),
   S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-  S3_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(300),
 
   BOOTSTRAP_ADMIN_EMAIL: z.string().email(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().min(8),
@@ -157,7 +145,6 @@ const envSchema = z.object({
       'S3_ENDPOINT',
       'S3_REGION',
       'S3_BUCKET_PUBLIC',
-      'S3_BUCKET_PRIVATE',
       'S3_ACCESS_KEY_ID',
       'S3_SECRET_ACCESS_KEY',
     ] as const;

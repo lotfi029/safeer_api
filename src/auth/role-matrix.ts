@@ -17,10 +17,6 @@ import { Roles } from './decorators/roles.decorator.js';
 export const ROLES = ['admin', 'reviewer', 'editor', 'support'] as const satisfies readonly UserRole[];
 
 export const AREA_ROLES = {
-  /** Applications, their documents/notes, interview slots, CSV export. */
-  applications: ['admin', 'reviewer'],
-  /** DELETE admin/applications/:id (anonymise). */
-  'applications.delete': ['admin'],
   /** Pages/sections, news and categories, work areas, board, stats, about items, partners, documents, media, redirects. */
   content: ['admin', 'editor'],
   /** Deleting a redirect (it can break links already shared). */

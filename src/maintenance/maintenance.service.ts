@@ -2,18 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, LessThan, Repository } from 'typeorm';
-import { PrivateFileStore } from '../storage/private-file-store.service.js';
 import { Session } from '../database/entities/session.entity.js';
 import { AuthToken } from '../database/entities/auth-token.entity.js';
 import { MailLog } from '../database/entities/mail-log.entity.js';
-import { ApplicantSession } from '../database/entities/applicant-session.entity.js';
-import { ApplicantOtp } from '../database/entities/applicant-otp.entity.js';
 
 const MAIL_LOG_RETENTION_DAYS = 90;
 /** C27 retention policy (docs/backend/DEPLOYMENT-HOSTINGER.md, "Retention"). */
 const SMS_LOG_RETENTION_DAYS = 90;
 const CONTACT_MESSAGE_RETENTION_DAYS = 730; // 24 months
-const IDLE_DRAFT_RETENTION_DAYS = 180;
 const NEWSLETTER_INACTIVE_RETENTION_DAYS = 30;
 
 function daysAgo(days: number): Date {
@@ -26,8 +22,8 @@ function daysAgo(days: number): Date {
  * never stops the others from running the same night.
  *
  * C27 retention: contact messages after 24 months, sms_log after 90 days
- * (mail_log already), drafts idle for 180 days together with their private
- * files, and newsletter rows unsubscribed — or never confirmed — for 30 days.
+ * (mail_log already), and newsletter rows unsubscribed — or never confirmed
+ * — for 30 days.
  */
 @Injectable()
 export class MaintenanceService {
@@ -38,10 +34,7 @@ export class MaintenanceService {
     @InjectRepository(Session) private readonly sessionRepo: Repository<Session>,
     @InjectRepository(AuthToken) private readonly authTokenRepo: Repository<AuthToken>,
     @InjectRepository(MailLog) private readonly mailLogRepo: Repository<MailLog>,
-    @InjectRepository(ApplicantSession) private readonly applicantSessionRepo: Repository<ApplicantSession>,
-    @InjectRepository(ApplicantOtp) private readonly applicantOtpRepo: Repository<ApplicantOtp>,
     private readonly dataSource: DataSource,
-    private readonly fileStore: PrivateFileStore,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
@@ -59,10 +52,7 @@ export class MaintenanceService {
       await this.purgeOldMailLog();
       await this.purgeOldSmsLog();
       await this.purgeOldContactMessages();
-      await this.purgeIdleDrafts();
       await this.purgeInactiveNewsletterRows();
-      await this.purgeExpiredApplicantSessions();
-      await this.purgeSpentApplicantOtps();
     } finally {
       this.running = false;
     }
@@ -138,50 +128,6 @@ export class MaintenanceService {
     );
   }
 
-  /**
-   * A draft nobody has touched for 180 days is abandoned: the row goes
-   * (documents, events, sessions and OTPs cascade), then its private files
-   * through the storage driver. Submitted applications are never touched
-   * here — only an admin removes those (DELETE admin/applications/:id).
-   *
-   * A10 (safeer-delivery-review.md): files used to go first, then a
-   * conditional row delete — a draft submitted mid-purge kept its row and
-   * lost its files. Now each draft is re-checked under a row lock (the same
-   * lock submit and autosave take, B14), deleted in that transaction, and
-   * only after the commit are its files removed. A draft that was submitted
-   * or edited in the meantime is skipped, files and all.
-   */
-  private async purgeIdleDrafts(): Promise<void> {
-    await this.step('purge idle drafts', async () => {
-      const cutoff = daysAgo(IDLE_DRAFT_RETENTION_DAYS);
-      const drafts: Array<{ id: string }> = await this.dataSource.query(
-        "SELECT id FROM applications WHERE status = 'draft' AND updated_at < ? LIMIT 500",
-        [cutoff],
-      );
-      let purged = 0;
-      for (const { id } of drafts) {
-        const storageKeys = await this.dataSource.transaction(async (manager) => {
-          const [locked]: Array<{ id: string }> = await manager.query(
-            "SELECT id FROM applications WHERE id = ? AND status = 'draft' AND updated_at < ? FOR UPDATE",
-            [id, cutoff],
-          );
-          if (!locked) return null;
-          const files: Array<{ storage_key: string }> = await manager.query(
-            'SELECT storage_key FROM application_documents WHERE application_id = ?',
-            [id],
-          );
-          await manager.query('UPDATE interview_slots SET application_id = NULL WHERE application_id = ?', [id]);
-          await manager.query('DELETE FROM applications WHERE id = ?', [id]);
-          return files.map((f) => f.storage_key);
-        });
-        if (storageKeys === null) continue;
-        purged++;
-        for (const key of storageKeys) await this.fileStore.remove(key);
-      }
-      return { affectedRows: purged };
-    });
-  }
-
   private async purgeInactiveNewsletterRows(): Promise<void> {
     const cutoff = daysAgo(NEWSLETTER_INACTIVE_RETENTION_DAYS);
     await this.step('purge unsubscribed / unconfirmed newsletter rows', () =>
@@ -199,36 +145,6 @@ export class MaintenanceService {
       this.logger.log(`${name}: ${result?.affectedRows ?? 0} row(s)`);
     } catch (err) {
       this.logger.error(`Failed to ${name}`, err instanceof Error ? err.stack : String(err));
-    }
-  }
-
-  /** Same purgeable rule as staff sessions (Safeer infra change §2: "Maintenance purges expired rows"). */
-  private async purgeExpiredApplicantSessions(): Promise<void> {
-    try {
-      const result = await this.applicantSessionRepo
-        .createQueryBuilder()
-        .delete()
-        .where('expires_at < :now', { now: new Date() })
-        .orWhere('revoked_at IS NOT NULL')
-        .execute();
-      this.logger.log(`Purged ${result.affected ?? 0} dead applicant session(s)`);
-    } catch (err) {
-      this.logger.error('Failed to purge expired applicant sessions', err instanceof Error ? err.stack : String(err));
-    }
-  }
-
-  /** An OTP row is safely purgeable once it can never be verified again — spent (consumed) or past its 10-minute expiry. */
-  private async purgeSpentApplicantOtps(): Promise<void> {
-    try {
-      const result = await this.applicantOtpRepo
-        .createQueryBuilder()
-        .delete()
-        .where('consumed_at IS NOT NULL')
-        .orWhere('expires_at < :now', { now: new Date() })
-        .execute();
-      this.logger.log(`Purged ${result.affected ?? 0} spent/expired applicant OTP(s)`);
-    } catch (err) {
-      this.logger.error('Failed to purge spent applicant OTPs', err instanceof Error ? err.stack : String(err));
     }
   }
 }

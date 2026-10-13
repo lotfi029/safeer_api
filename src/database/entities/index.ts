@@ -29,14 +29,6 @@ import { DocCategory } from './doc-category.entity.js';
 import { SafeerDocument } from './document.entity.js';
 import { ContactMessage } from './contact-message.entity.js';
 import { MessageReply } from './message-reply.entity.js';
-import { Application } from './application.entity.js';
-import { ApplicationDocument } from './application-document.entity.js';
-import { ApplicationNote } from './application-note.entity.js';
-import { ApplicationEvent } from './application-event.entity.js';
-import { InterviewSlot } from './interview-slot.entity.js';
-import { ApplicantSession } from './applicant-session.entity.js';
-import { ApplicantOtp } from './applicant-otp.entity.js';
-import { Counter } from './counter.entity.js';
 
 export {
   User,
@@ -70,24 +62,11 @@ export {
   SafeerDocument,
   ContactMessage,
   MessageReply,
-  Application,
-  ApplicationDocument,
-  ApplicationNote,
-  ApplicationEvent,
-  InterviewSlot,
-  ApplicantSession,
-  ApplicantOtp,
-  Counter,
 };
 
 /**
- * Every entity registered with TypeORM. Phase 2 adds the full schema
- * (001_schema.sql) and every entity it maps to — accounts/files/mail
- * (phase 1) plus SMS, site, content, voices/partners, documents, inbox and
- * scholarships (phase 2, per the project plan's "Data model" section). The
- * content, messages, applications/portal and admin-applications modules
- * that read and write most of these still land in later phases — see
- * app.module.ts's TODO(phase N) comments for which.
+ * Every entity registered with TypeORM: accounts, files, mail, SMS, site,
+ * content, voices/partners, documents and the contact inbox.
  */
 export const entities = [
   User,
@@ -121,12 +100,4 @@ export const entities = [
   SafeerDocument,
   ContactMessage,
   MessageReply,
-  Application,
-  ApplicationDocument,
-  ApplicationNote,
-  ApplicationEvent,
-  InterviewSlot,
-  ApplicantSession,
-  ApplicantOtp,
-  Counter,
 ];
