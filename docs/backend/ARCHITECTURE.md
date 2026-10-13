@@ -27,7 +27,9 @@ Once running:
 
 ## Roles and the permission matrix
 
-Four staff roles (`users.role`): `admin`, `reviewer`, `editor`, `support`.
+Three staff roles (`users.role`): `admin`, `editor`, `support`. (The fourth,
+`reviewer`, went with the scholarship feature: migration 021 refuses to run
+while any account still holds it, then removes it from the column.)
 There is no self-registration — the only way to create a staff account is
 `POST admin/auth/invite` (admin-only), which emails an accept-invite link;
 the very first admin comes from `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`
@@ -40,25 +42,22 @@ same constants as `{roles, matrix}`. `npm run check:admin-roles` (CI, and
 Jest via `test/content-security.spec.ts`) fails on any admin route with no
 area, or whose roles differ from its area's.
 
-| Area | admin | reviewer | editor | support | Covers |
-|---|:---:|:---:|:---:|:---:|---|
-| `applications` | ✅ | ✅ | | | applications, their documents/notes, interview slots, CSV export |
-| `applications.delete` | ✅ | | | | `DELETE admin/applications/:id` (anonymise) |
-| `content` | ✅ | | ✅ | | pages/sections, news + categories, work areas, board, stats, about items, partners, documents + categories, media, redirects |
-| `redirects.delete` | ✅ | | | | deleting a redirect |
-| `inbox` | ✅ | | | ✅ | contact messages, testimonials + themes, newsletter subscribers |
-| `inbox.delete` | ✅ | | | | deleting a contact message |
-| `users` | ✅ | | | | staff accounts, invitations |
-| `settings` | ✅ | | | | site settings, mail and SMS settings/templates/logs, cache |
-| `audit` | ✅ | | | | the audit log |
+| Area | admin | editor | support | Covers |
+|---|:---:|:---:|:---:|---|
+| `content` | ✅ | ✅ | | pages/sections, news + categories, work areas, board, stats, about items, partners, documents + categories (the governance sections), licences, media, redirects |
+| `redirects.delete` | ✅ | | | deleting a redirect |
+| `inbox` | ✅ | | ✅ | contact messages, testimonials + themes, newsletter subscribers |
+| `inbox.delete` | ✅ | | | deleting a contact message |
+| `users` | ✅ | | | staff accounts, invitations |
+| `settings` | ✅ | | | site settings, mail settings/templates/logs, cache |
+| `audit` | ✅ | | | the audit log |
 
 Open to any signed-in staff member, with no area: `admin/me`,
 `admin/auth/*` (own sessions, own password), `admin/overview`,
 `admin/preview-token`, `admin/roles`. `GET admin/overview` adapts to the
 caller's role, using the same role matrix as the routes behind each block:
-application figures for the `applications` area (admin, reviewer), message
-figures for the `inbox` area (admin, support — A5), the audit feed for
-admins only (C20).
+message figures for the `inbox` area (admin, support — A5), the audit feed
+for admins only (C20); content alerts for everyone.
 
 ### Staff accounts: status and lockout
 
@@ -85,50 +84,38 @@ admins only (C20).
   takes MariaDB's `SIMULTANEOUS_ASSIGNMENT` out of `sql_mode`, and boot
   fails if it is still set (A3).
 
-### Applicant OTP sign-in
+## The staff cookie session
 
-- `POST portal/auth/request-otp` answers `{ok, channelHint}` at once (A4).
-  Only the per-identifier limiter (429) runs first. The lookup, the
-  `applicant_otps` row and the send run afterwards on `BackgroundWork`
-  (`src/common/background/`): lookups on one queue, then each
-  application's codes on their own queue, so codes are issued and delivered
-  in request order and the last one delivered is the live one. The row is
-  committed before the send (B1).
-- On SIGTERM/SIGINT the app waits up to 10 s for that work before exiting
-  (`app.enableShutdownHooks()`, `beforeApplicationShutdown`).
-- Only a wrong code checked against a live code counts (A1). Ten inside a
-  rolling hour lock OTP sign-in for 1 h; 30 in a UTC day lock it until the
-  next day. While locked, verify answers `OTP_INVALID` and request-otp sends
-  nothing, with the same responses as ever.
+Staff are authenticated with a server-side session: cookie `sf_sid`
+(configurable), backed by the `sessions` table, joined to `users`. Every
+`/admin/*` route and the handful of session-authenticated non-admin routes
+use it; `GET admin/me` returns the session's `csrfToken`. A random token is
+set as the cookie and only its SHA-256 is stored; the CSRF token is an HMAC
+derived from that hash. The cookie is `HttpOnly`, `SameSite=Strict` and,
+outside development/test, `Secure` (`src/auth/cookie-options.ts`, C32).
+Staging must therefore run over HTTPS, like production.
 
-## Two cookie-session systems
-
-Staff and applicants are authenticated with two entirely separate,
-non-interchangeable session systems — a staff cookie is never accepted on a
-portal route, and an applicant cookie is never accepted on a staff route
-(`SessionGuard` resolves each against its own table):
-
-- **Staff** — cookie `sf_sid` (configurable), backed by the `sessions`
-  table, joined to `users`. Every `/admin/*` route and the handful of
-  session-authenticated non-admin routes (`GET /me`, `/auth/*`) use this.
-- **Applicant** — cookie `sf_app_sid` (configurable), backed by the
-  `applicant_sessions` table, joined to `applications`. Minted by
-  `POST applications` (starting a new application) or
-  `POST portal/auth/verify-otp` (an existing applicant signing back in).
-  Every `portal/*` route carrying the `@ApplicantRoute()` decorator uses
-  this instead. `GET portal/me` returns the session's `csrfToken`, like
-  `GET admin/me` does for staff (B16).
-
-Both use the same underlying mechanics (a random token, only its SHA-256
-ever stored, an HMAC CSRF token derived from that hash) — just against
-different cookies, tables, and lifetimes. Both cookies are `HttpOnly`,
-`SameSite=Strict` and, outside development/test, `Secure`
-(`src/auth/cookie-options.ts`, C32). Staging must therefore run over HTTPS,
-like production.
+(Until migration 021 there was a second, separate session system for
+scholarship applicants — the `sf_app_sid` cookie, `applicant_sessions` and
+OTP sign-in. It was removed with the student portal.)
 
 A staff member's session list (`GET admin/auth/sessions`) shows only
 sessions that could still be used: not revoked, not expired, and not idle
 past `SESSION_IDLE_HOURS` (C33).
+
+## Governance and licences (022)
+
+- `doc_categories.section_group` (`governance` | `other`) splits the
+  documents register: `GET documents/sections` lists the published
+  `governance` categories in `sort_order` with their published-document
+  counts; `GET documents/sections/:slug` serves any published category.
+  `GET documents` still lists every published category.
+- `licences` is its own table. At most one row is primary; the primary
+  *published* licence's number and issuer are written through to
+  `site_settings.licence_no` / `licence_issuer_ar` / `licence_issuer_en`
+  (GET /site, GET /home) by every admin/licences write, inside a transaction
+  that locks the site_settings row. A published licence makes its file
+  public on `/files`, and an asset a licence references can't be deleted.
 
 ## Time zone
 

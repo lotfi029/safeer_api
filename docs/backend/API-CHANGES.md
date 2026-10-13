@@ -237,3 +237,180 @@ Removed fields: `statCards.newApplications`, `statCards.underReview`,
 6-month received/accepted chart) and `latestApplications`. The role rules
 are unchanged: `unreadMessages` only for admin and support, `recentAuditLog`
 non-empty only for admin.
+
+### Removed routes (A2, A3)
+
+All of these now answer 404 (no route). The `sf_app_sid` applicant cookie is
+never set or read again.
+
+| Removed | Was |
+|---|---|
+| `POST applications` | start a scholarship application |
+| `POST portal/auth/request-otp`, `POST portal/auth/verify-otp`, `POST portal/auth/logout` | applicant OTP sign-in |
+| `GET portal/me`, `GET portal/notifications` | applicant portal |
+| `PATCH portal/application`, `PATCH portal/application/corrections`, `POST portal/application/submit` | application form |
+| `GET/POST portal/documents`, `GET portal/documents/{id}/file`, `DELETE portal/documents/{id}` | applicant documents |
+| `GET portal/interview-slots`, `POST/DELETE portal/interview` | interview booking |
+| `GET admin/applications`, `GET admin/applications/counts`, `GET admin/applications/assignees`, `GET admin/applications/export.csv`, `POST admin/applications/bulk` | application review list |
+| `GET/PATCH/DELETE admin/applications/{id}`, `POST admin/applications/{id}/request-documents`, `PATCH admin/applications/{id}/documents/{docId}`, `GET admin/applications/{id}/documents/{docId}/file`, `POST admin/applications/{id}/notes` | one application |
+| `GET/POST admin/interview-slots`, `GET/PATCH/DELETE admin/interview-slots/{id}` | interview slots |
+| `GET/PUT admin/sms/settings`, `POST admin/sms/test`, `GET admin/sms/templates`, `GET/PUT admin/sms/templates/{key}`, `GET admin/sms/templates/{key}/variables`, `POST admin/sms/templates/{key}/preview`, `GET admin/sms/log` | SMS |
+| `GET __dev/otp/{applicationId}` (development/test only, not in openapi.json) | OTP peek |
+
+Also gone:
+
+- **Error codes:** `APPLICATION_LOCKED`, `OTP_INVALID`, `DOCUMENTS_INCOMPLETE`,
+  `SLOT_ALREADY_BOOKED`, `INTERVIEW_NOT_AVAILABLE`, `INVALID_STATUS_TRANSITION`,
+  `APPLICATION_EXISTS`, `INVALID_ASSIGNEE`, `QUOTA_EXCEEDED`,
+  `DOCUMENT_NOT_REVIEWABLE`, `DOCUMENT_SUPERSEDED`.
+- **`GET meta/enums`:** `applicationStatus`, `degreeLevel` and `gender`. It
+  now returns `{partnerCategory, contactSubject}` only.
+- **`GET about-items`:** the kinds `scholarship_step` and `requirement` (now a
+  400 like any unknown kind). `vision`, `mission`, `goal` and `care_pillar`
+  remain; `GET /home`'s `aboutItems.carePillars` is unchanged.
+- **The `scholarships` page** (`GET pages/scholarships` is 404) and its nav
+  entry. Home-page buttons that pointed at `/apply`, `/portal/…` or
+  `/scholarships` now point at `/contact` (their labels are content, edited in
+  the admin).
+- **Admin settings:** `notifyEmailOnStatusChange`, `notifySmsOnStatusChange`
+  and `applicationRefPrefix` are gone from `GET/PUT admin/settings`; sending
+  them is a 400 (the DTO is strict).
+- **The `reviewer` role** (A3): `GET admin/roles` returns
+  `roles: ["admin", "editor", "support"]` and no `applications` /
+  `applications.delete` areas. `POST admin/auth/invite` and
+  `PATCH admin/users/:id` answer 400 `VALIDATION_FAILED` for
+  `role: "reviewer"`.
+- **Mail templates:** `application_started`, `application_submitted`,
+  `application_status_changed`, `application_resume`, `document_rejected`,
+  `documents_requested`, `otp_code`, `interview_booked`,
+  `interview_cancelled`, `interview_updated` (`GET admin/mail/templates` no
+  longer lists them).
+
+### Contact subjects (A5)
+
+`POST contact`'s `subject` is one of `inquiry`, `partnership`, `support`,
+`feedback`, `other` (there is no default; it is required). `scholarship` is
+now a 400. Migration 021 turned every stored `scholarship` message into
+`inquiry`, so the admin inbox (`GET admin/messages`) only ever shows the new
+values. `GET meta/enums` → `contactSubject` (labels collapsed by locale, like
+every public response):
+
+| value | ar | en |
+|---|---|---|
+| `inquiry` | استفسار | Inquiry |
+| `partnership` | شراكة | Partnership |
+| `support` | دعم وتبرع | Support and donations |
+| `feedback` | ملاحظات | Feedback |
+| `other` | أخرى | Other |
+
+The staff notification mail (`contact_notify`) carries the Arabic label.
+
+### Governance sections (A6, migration 022)
+
+Every public response collapses `xxxAr`/`xxxEn` pairs into `xxx` for the
+request's locale (`?lang=` → `Accept-Language` → `ar`, English falling back
+to Arabic). The shapes below show the collapsed form the frontend receives.
+
+**`GET documents/sections`** — published categories in the `governance`
+group, ordered by `sortOrder` then id, each with its count of published
+documents (0 included). Cached under `documents`.
+
+```json
+[
+  { "id": "2", "slug": "bylaws-policies", "name": "اللوائح والسياسات", "sectionGroup": "governance", "count": 1 },
+  { "id": "5", "slug": "financial-reports", "name": "التقارير المالية", "sectionGroup": "governance", "count": 0 }
+]
+```
+
+The seeded order: `bylaws-policies`, `financial-reports`, `general-assembly`,
+`strategic-plan`, `operational-plan`, `annual-reports`, `project-reports`,
+`committees`, `committee-decisions`. (`policies-regulations` was renamed
+`bylaws-policies` and `meeting-minutes` `general-assembly`; their ids and
+documents are unchanged. `licences` is now unpublished and in the `other`
+group — its documents moved to the licences table.)
+
+**`GET documents/sections/:slug`** — one published category of any group,
+with its published documents (ordered by `sortOrder`, then id). An unknown or
+unpublished slug is **404** `NOT_FOUND`.
+
+```json
+{
+  "category": { "id": "5", "slug": "financial-reports", "name": "Financial reports", "sectionGroup": "governance" },
+  "documents": [
+    {
+      "id": "12",
+      "title": "Financial statements 2025",
+      "meta": "Financial year 2025",
+      "docDate": "2026-03-01",
+      "asset": { "id": "40", "publicId": "…", "kind": "pdf", "mimeType": "application/pdf", "sizeBytes": 123456, "widthPx": null, "heightPx": null, "alt": null },
+      "sortOrder": 0
+    }
+  ]
+}
+```
+
+**`GET documents`** (unchanged route) — each `category` gains
+`sectionGroup`, each document gains `meta` (from `metaAr`/`metaEn`, nullable).
+
+**Admin:** `admin/doc-categories` create/update accept `sectionGroup`
+(`"governance"` default | `"other"`); `admin/documents` create/update accept
+`metaAr`, `metaEn` (string ≤ 190, trimmed, nullable). Both come back raw in
+admin responses.
+
+**Nav:** `GET /site` lists a new `governance` page (الحوكمة / Governance) in
+the slot `documents` held: `home, about, board, work, news, testimonials,
+partners, governance, contact`. `GET pages/governance` serves it;
+`GET pages/documents` still works but is out of the nav.
+
+### Licences (A7, migration 022)
+
+**`GET licences`** — published licences, the primary first, then by
+`sortOrder`, then id. A plain array (no paging). Cached under `licences`.
+
+```json
+[
+  {
+    "id": "3",
+    "title": "ترخيص المركز الوطني لتنمية القطاع غير الربحي",
+    "number": "1234",
+    "issuer": "المركز الوطني لتنمية القطاع غير الربحي",
+    "issuedOn": "2024-01-15",
+    "expiresOn": "2027-01-14",
+    "isPrimary": true,
+    "asset": { "id": "41", "publicId": "…", "kind": "pdf", "mimeType": "application/pdf", "sizeBytes": 98765, "widthPx": null, "heightPx": null, "alt": null }
+  }
+]
+```
+
+`number`, `issuer`, `issuedOn`, `expiresOn` and `asset` may be null. The file
+is fetched like every asset, `GET /files/{publicId}` — public once the
+licence is published.
+
+**`GET /site` and `GET /home`** — `settings` gains `licenceNo` and
+`licenceIssuer` (from `licenceIssuerAr`/`licenceIssuerEn`): the primary
+**published** licence's number and issuer, or `null` when there is none. They
+are written by every licence write; `PUT admin/settings` refuses them (400).
+
+**Admin (`admin/licences`, area `content`: admin and editor):**
+
+| Route | Body / notes |
+|---|---|
+| `GET admin/licences` | paged `{data, total, page, limit}`; `?q=` searches title/number; `?published=true|false` |
+| `GET admin/licences/:id` | the raw row |
+| `POST admin/licences` | `titleAr` (required, ≤ 191), `titleEn` (≤ 191), `number` (≤ 100), `issuerAr`, `issuerEn` (≤ 190), `issuedOn`, `expiresOn` (`YYYY-MM-DD`), `assetId` (media asset id), `isPrimary`, `isPublished`, `sortOrder` — all but `titleAr` optional/nullable |
+| `PATCH admin/licences/:id` | any subset of the above |
+| `PATCH admin/licences/:id/publish` | `{isPublished?: boolean}` (default true) |
+| `PATCH admin/licences/:id/primary` | no body — makes it the one primary licence |
+| `POST admin/licences/reorder` | `[{id, sortOrder}]` |
+| `DELETE admin/licences/:id` | `{deleted: true}` |
+
+Rules: at most one licence is primary (making one primary clears the
+others); an `assetId` that doesn't exist is 400 `VALIDATION_FAILED` with
+`field: "assetId"`; an image asset needs Arabic alt text (409
+`ALT_TEXT_REQUIRED`); `expiresOn` before `issuedOn` is 400. Deleting a media
+asset a licence uses is 409 `ASSET_IN_USE` with
+`usages: [{entity: "licences", id, label}]`.
+
+022 turned the documents filed under the old `licences` category into
+licences (title, file and visibility carried over; no number, issuer or
+primary yet).

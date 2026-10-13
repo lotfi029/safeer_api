@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// HISTORICAL (feat/governance-contact): this generated migrations/002_seed.sql
+// and migrations/dev/003_dev_sample.sql, which are applied and immutable —
+// scripts/migrate.mjs refuses an applied file whose checksum changed. Do not
+// re-run it into migrations/. It still emits the scholarship, applicant
+// portal and SMS content that migration 021 removed (and none of the
+// governance categories or licences from 022); later seed changes go in new
+// numbered migrations, never through this tool.
+//
 // Generates migrations/002_seed.sql and migrations/dev/003_dev_sample.sql
 // from the prototype's own copy (docs/prototype/safeer-prototype.html, or
 // PROTOTYPE_PATH — absolute, or relative to the repo root).

@@ -1,8 +1,10 @@
 # Safeer API
 
 NestJS 11 + TypeORM + MySQL REST API for the Safeer Association: the
-public site, the passwordless student portal (scholarship applications) and
-the staff admin dashboard. Every route lives under `/api/v1` except `/health`
+public site (content, the governance register and licences, the contact
+form) and the staff admin dashboard. The scholarship feature (apply flow,
+OTP student portal, application review) and SMS were removed by migration
+021 — see `docs/backend/API-CHANGES.md`. Every route lives under `/api/v1` except `/health`
 and `/files/:publicId[/:variant]`. Swagger UI is served at `/api/docs` outside
 production; the same contract is committed as `openapi.json`.
 
@@ -48,17 +50,14 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `MIGRATION_DB_USER`, `MIGRATION_DB_PASSWORD` | DDL-capable account for `npm run migrate` / `db:reset`. Required when `NODE_ENV` is `staging`/`production`; in `development`/`test` they fall back to `DB_USER`/`DB_PASSWORD`. |
 | `SESSION_COOKIE_NAME` | Staff session cookie name (default `sf_sid`). |
 | `SESSION_IDLE_HOURS`, `SESSION_ABSOLUTE_DAYS` | Staff session lifetime (default 8h idle / 30d absolute). |
-| `APPLICANT_SESSION_COOKIE_NAME` | Student-portal session cookie name (default `sf_app_sid`) — see [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md). |
-| `APPLICANT_SESSION_IDLE_HOURS`, `APPLICANT_SESSION_ABSOLUTE_DAYS` | Applicant session lifetime (default 12h idle / 7d absolute). |
-| `APP_ENCRYPTION_KEY` | 32 random bytes, base64-encoded. Encrypts the stored SMTP password, the SMS provider token and applicants' ID numbers (AES-256-GCM); also keys the signed newsletter links. **Permanent once real settings exist** — rotating it makes the stored secrets unreadable. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
-| `STORAGE_ROOT` | Local disk path for uploaded files (both the public media pipeline and applicants' private documents). Must be an absolute path outside the deployed build directory in production. Only used when `STORAGE_DRIVER=local`. |
+| `APP_ENCRYPTION_KEY` | 32 random bytes, base64-encoded. Encrypts the stored SMTP password (AES-256-GCM); also keys the signed newsletter links. **Permanent once real settings exist** — rotating it makes the stored secrets unreadable. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
+| `STORAGE_ROOT` | Local disk path for uploaded files (the media pipeline). Must be an absolute path outside the deployed build directory in production. Only used when `STORAGE_DRIVER=local`. |
 | `STORAGE_DRIVER` | `local` (default) or `s3`. See `S3_*` below. |
-| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_PUBLIC`, `S3_BUCKET_PRIVATE`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Required only when `STORAGE_DRIVER=s3` — any S3-compatible endpoint, two buckets (public assets, private applicant documents). |
-| `S3_SIGNED_URL_TTL_SECONDS` | How long a signed GET URL for a private document stays valid in S3 mode (default 300). |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_PUBLIC`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Required only when `STORAGE_DRIVER=s3` — any S3-compatible endpoint, one bucket for the media files. (`S3_BUCKET_PRIVATE` and `S3_SIGNED_URL_TTL_SECONDS` went with the applicant documents; a leftover value is ignored.) |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | The first admin account. `002_seed.sql` deliberately seeds no users — `BootstrapService` creates this account (or, if it already exists, leaves it alone) on every boot. Password needs at least 8 characters. |
 | `IP_HASH_SALT` | Salt for hashing visitor IPs before they're stored (contact messages, newsletter signups, sessions) — never store a raw IP. |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins for the (future) frontend. |
-| `FRONTEND_BASE_URL` | The public frontend's origin. Every link sent by mail or SMS points at a locale-prefixed page there: `/{locale}/admin/accept/{token}`, `/{locale}/admin/reset/{token}`, `/{locale}/admin/messages/{id}`, `/{locale}/portal/login`. Required when `NODE_ENV` is `staging`/`production`; defaults to `http://localhost:4200` otherwise. (Replaces `PUBLIC_BASE_URL`.) |
+| `FRONTEND_BASE_URL` | The public frontend's origin. Every link sent by mail points at a locale-prefixed page there: `/{locale}/admin/accept/{token}`, `/{locale}/admin/reset/{token}`, `/{locale}/admin/messages/{id}`, and the newsletter confirm/unsubscribe pages. Required when `NODE_ENV` is `staging`/`production`; defaults to `http://localhost:4200` otherwise. (Replaces `PUBLIC_BASE_URL`.) |
 | `CACHE_TTL_SECONDS`, `CACHE_MAX_ENTRIES` | The in-process response cache's TTL and entry ceiling. |
 | `ALLOW_DEV_PASSWORD_FIXUP` | Dev/staging only — **refused at boot when `NODE_ENV=production`**. Lets a seeded user still holding the unusable placeholder password hash be given `BOOTSTRAP_ADMIN_PASSWORD` instead, so a fresh dev database doesn't need a real invite/accept round-trip just to sign in as a second account. Only emails listed in `DEV_SEEDED_USER_EMAILS` (`src/auth/bootstrap.service.ts`) qualify, never an invitee (C33); the dev fixtures currently seed none. |
 | `PROTOTYPE_PATH` | `npm run seed` only — optional override for the prototype HTML. Default `docs/prototype/safeer-prototype.html`; relative paths resolve against the repo root. |
@@ -72,7 +71,7 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 | `npm run start` / `start:dev` / `start:prod` | Run the app (see [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md)). |
 | `npm run migrate` / `migrate:status` | Apply pending migrations / list them as applied, pending or changed. Takes a `GET_LOCK`, so concurrent runs wait for each other. |
 | `npm run db:reset -- --confirm=<DB_NAME>` | Drop, recreate, and re-migrate the configured database. Local `DB_HOST`, `NODE_ENV` development/test, and the database named in `--confirm` only. |
-| `npm run seed` | Regenerate `002_seed.sql`/`dev/003_dev_sample.sql` from the prototype at `PROTOTYPE_PATH` (needs network for oEmbed). Only for changing the seed content — never part of normal setup. |
+| `npm run seed` | Historical: generated `002_seed.sql`/`dev/003_dev_sample.sql` from the prototype. Both are applied and immutable, so don't re-run it into `migrations/` — seed changes go in new numbered migrations (021/022 changed the seeded content since). |
 | `npm run openapi` | Boots the app (without listening) and writes the live Swagger document to the committed `openapi.json`. Run this after any route/DTO change. |
 | `npm run openapi:check` | Regenerates the document in memory and diffs it against the committed `openapi.json` — the CI gate that catches a stale contract. |
 | `npm run smoke -- --confirm=<DB_NAME>` | Runs `scripts/smoke.mjs` against a running instance (build it, migrate/seed the database, start it, then run this in a second terminal). It writes rows directly, so it has the same `NODE_ENV` and `--confirm` guard as `db:reset`. |
@@ -86,9 +85,9 @@ The first admin account is created on boot from `BOOTSTRAP_ADMIN_EMAIL` /
 
 Project documentation lives in [`docs/`](docs/):
 
-- [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md) — roles and the permission matrix, the two cookie-session systems, UTC.
+- [`docs/backend/ARCHITECTURE.md`](docs/backend/ARCHITECTURE.md) — roles and the permission matrix, the staff cookie session, UTC.
 - [`docs/backend/DEPLOYMENT-VPS.md`](docs/backend/DEPLOYMENT-VPS.md) — **production**: the Docker stack on the VPS behind the edge Caddy (first deploy, staging, cutover, updates, rollback, verification, backups). The bundle is [`deploy/`](deploy/README.md); the image is built from the `Dockerfile` and published by `.github/workflows/image.yml` on a `v*` tag.
-- [`docs/backend/DEPLOYMENT-HOSTINGER.md`](docs/backend/DEPLOYMENT-HOSTINGER.md) — superseded for production, kept for reference: Node.js hosting + MariaDB. Its APP_ENCRYPTION_KEY, migrations, SMS/S3 and data-retention sections still apply.
+- [`docs/backend/DEPLOYMENT-HOSTINGER.md`](docs/backend/DEPLOYMENT-HOSTINGER.md) — superseded for production, kept for reference: Node.js hosting + MariaDB. Its APP_ENCRYPTION_KEY, migrations, S3 and data-retention sections still apply (its SMS and applicant-data parts don't, since 021).
 - [`docs/safeer-vps-deploy-review.md`](docs/safeer-vps-deploy-review.md) — the VPS deploy review this setup comes from (redacted).
 - [`docs/backend/KNOWN-ISSUES.md`](docs/backend/KNOWN-ISSUES.md) — out-of-scope items and gotchas.
 - [`docs/backend/API-CHANGES.md`](docs/backend/API-CHANGES.md) — contract changes the frontend has to follow (fix plan).

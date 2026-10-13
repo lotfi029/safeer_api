@@ -6,7 +6,7 @@
 #   safeer-db-<UTC>.sql.gz         mysqldump of `safeer` (consistent snapshot)
 #   safeer-storage-<UTC>.tar.gz    the `storage` volume (uploads, documents)
 # and deletes files there older than $RETENTION_DAYS (default 14).
-# Both files hold applicant personal data: they're created 600, and any
+# Both files hold personal data (contact messages, staff accounts): they're created 600, and any
 # offsite copy must be encrypted.
 #
 # Cron (root's crontab; the host clock must be UTC — `timedatectl` — so this
