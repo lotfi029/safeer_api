@@ -35,6 +35,7 @@ const PROBES: Record<string, Probe> = {
   'admin/doc-categories': { area: 'content', read: '/admin/doc-categories', delete: { path: `/admin/doc-categories/${MISSING_ID}`, area: 'content' } },
   'admin/documents': { area: 'content', read: '/admin/documents', delete: { path: `/admin/documents/${MISSING_ID}`, area: 'content' } },
   'admin/licences': { area: 'content', read: '/admin/licences', delete: { path: `/admin/licences/${MISSING_ID}`, area: 'content' } },
+  'admin/org-positions': { area: 'content', read: '/admin/org-positions', delete: { path: `/admin/org-positions/${MISSING_ID}`, area: 'content' } },
   'admin/media': { area: 'content', read: '/admin/media', delete: { path: `/admin/media/${MISSING_ID}`, area: 'content' } },
   'admin/redirects': { area: 'content', read: '/admin/redirects', delete: { path: `/admin/redirects/${MISSING_ID}`, area: 'redirects.delete' } },
 

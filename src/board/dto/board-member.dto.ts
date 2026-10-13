@@ -9,6 +9,8 @@ export const createBoardMemberSchema = z
     roleEn: z.string().trim().max(120).nullable().optional(),
     grp: z.enum(['board', 'executive']),
     isLead: z.boolean().optional(),
+    /** 023: the org-chart position this member holds (admin/org-positions id), or null. */
+    orgPositionId: z.string().regex(/^\d+$/).nullable().optional(),
     /** B12 (safeer-backend-fr-review.md) */
     bioAr: z.string().min(1).max(5000).nullable().optional(),
     bioEn: z.string().trim().max(5000).nullable().optional(),

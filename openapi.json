@@ -2777,6 +2777,33 @@
       }
     },
     "/admin/board": {
+      "post": {
+        "operationId": "AdminBoardController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBoardMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminBoard"
+        ]
+      },
       "get": {
         "operationId": "AdminBoardController_list",
         "parameters": [
@@ -2826,62 +2853,9 @@
         "tags": [
           "AdminBoard"
         ]
-      },
-      "post": {
-        "operationId": "AdminBoardController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/admin_boardCreateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminBoard"
-        ]
       }
     },
     "/admin/board/{id}": {
-      "get": {
-        "operationId": "AdminBoardController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminBoard"
-        ]
-      },
       "patch": {
         "operationId": "AdminBoardController_update",
         "parameters": [
@@ -2899,11 +2873,37 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/admin_boardUpdateDto"
+                "$ref": "#/components/schemas/UpdateBoardMemberDto"
               }
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminBoard"
+        ]
+      },
+      "get": {
+        "operationId": "AdminBoardController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -5029,6 +5029,256 @@
         ]
       }
     },
+    "/org-chart": {
+      "get": {
+        "operationId": "OrgChartController_chart",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "OrgChart"
+        ]
+      }
+    },
+    "/admin/org-positions": {
+      "post": {
+        "operationId": "AdminOrgPositionsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrgPositionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminOrgPositions"
+        ]
+      },
+      "get": {
+        "operationId": "AdminOrgPositionsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "published",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminOrgPositions"
+        ]
+      }
+    },
+    "/admin/org-positions/{id}": {
+      "patch": {
+        "operationId": "AdminOrgPositionsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrgPositionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminOrgPositions"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminOrgPositionsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminOrgPositions"
+        ]
+      },
+      "get": {
+        "operationId": "AdminOrgPositionsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminOrgPositions"
+        ]
+      }
+    },
+    "/admin/org-positions/reorder": {
+      "post": {
+        "operationId": "AdminOrgPositionsController_reorder",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/admin_org_positionsReorderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminOrgPositions"
+        ]
+      }
+    },
+    "/admin/org-positions/{id}/publish": {
+      "patch": {
+        "operationId": "AdminOrgPositionsController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/admin_org_positionsPublishDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminOrgPositions"
+        ]
+      }
+    },
     "/home": {
       "get": {
         "operationId": "HomeController_get",
@@ -6865,7 +7115,7 @@
         },
         "additionalProperties": false
       },
-      "admin_boardCreateDto": {
+      "CreateBoardMemberDto": {
         "type": "object",
         "properties": {
           "nameAr": {
@@ -6897,6 +7147,11 @@
           },
           "isLead": {
             "type": "boolean"
+          },
+          "orgPositionId": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "nullable": true
           },
           "bioAr": {
             "type": "string",
@@ -6929,29 +7184,7 @@
         ],
         "additionalProperties": false
       },
-      "admin_boardReorderDto": {
-        "minItems": 1,
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "sortOrder": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            }
-          },
-          "required": [
-            "id",
-            "sortOrder"
-          ]
-        }
-      },
-      "admin_boardUpdateDto": {
+      "UpdateBoardMemberDto": {
         "type": "object",
         "properties": {
           "nameAr": {
@@ -6984,6 +7217,11 @@
           "isLead": {
             "type": "boolean"
           },
+          "orgPositionId": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "nullable": true
+          },
           "bioAr": {
             "type": "string",
             "minLength": 1,
@@ -7009,6 +7247,28 @@
           }
         },
         "additionalProperties": false
+      },
+      "admin_boardReorderDto": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sortOrder": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "id",
+            "sortOrder"
+          ]
+        }
       },
       "admin_boardPublishDto": {
         "type": "object",
@@ -8035,6 +8295,124 @@
             "sortOrder"
           ]
         }
+      },
+      "CreateOrgPositionDto": {
+        "type": "object",
+        "properties": {
+          "nameAr": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 190
+          },
+          "nameEn": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "parentId": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "nullable": true
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "neutral",
+              "sky",
+              "green",
+              "brand"
+            ]
+          },
+          "showHolders": {
+            "type": "boolean"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "nameAr"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateOrgPositionDto": {
+        "type": "object",
+        "properties": {
+          "nameAr": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 190
+          },
+          "nameEn": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "parentId": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "nullable": true
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "neutral",
+              "sky",
+              "green",
+              "brand"
+            ]
+          },
+          "showHolders": {
+            "type": "boolean"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false
+      },
+      "admin_org_positionsReorderDto": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sortOrder": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "id",
+            "sortOrder"
+          ]
+        }
+      },
+      "admin_org_positionsPublishDto": {
+        "type": "object",
+        "properties": {
+          "isPublished": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "ContactDto": {
         "type": "object",

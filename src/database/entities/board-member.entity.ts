@@ -1,10 +1,12 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { MediaAsset } from './media-asset.entity.js';
+import { OrgPosition } from './org-position.entity.js';
 
 export type BoardMemberGroup = 'board' | 'executive';
 
 @Entity('board_members')
 @Index('ix_board_group', ['grp', 'isPublished', 'sortOrder'])
+@Index('ix_board_org_position', ['orgPositionId'])
 export class BoardMember {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: string;
@@ -24,6 +26,14 @@ export class BoardMember {
   /** `group` is a reserved word */
   @Column({ type: 'enum', enum: ['board', 'executive'] as BoardMemberGroup[] })
   grp: BoardMemberGroup;
+
+  /** 023: the org-chart position this member holds, if any. */
+  @Column({ name: 'org_position_id', type: 'bigint', unsigned: true, nullable: true })
+  orgPositionId: string | null;
+
+  @ManyToOne(() => OrgPosition, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'org_position_id', foreignKeyConstraintName: 'fk_board_org_position' })
+  orgPosition?: OrgPosition | null;
 
   @Column({ name: 'is_lead', type: 'boolean', default: false })
   isLead: boolean;

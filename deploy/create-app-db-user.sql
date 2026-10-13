@@ -76,6 +76,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.partners            TO 'safeer_ap
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.doc_categories      TO 'safeer_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.documents           TO 'safeer_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.licences            TO 'safeer_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.org_positions       TO 'safeer_app'@'%';
 
 -- Deliberately no grant at all on schema_migrations or typeorm_metadata —
 -- the running app never touches either table; only `npm run migrate` does,
