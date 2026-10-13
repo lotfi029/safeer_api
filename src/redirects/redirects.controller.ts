@@ -17,7 +17,7 @@ import { Area } from '../auth/role-matrix.js';
  * unless the subclass adds a class-level `@Roles` of its own, the same way
  * every other content controller (admin-news.controller.ts,
  * admin-partners.controller.ts, …) already does. Redirects were the one
- * collection that never did, so a reviewer or support account could
+ * collection that never did, so a support account could
  * redirect any public path to an arbitrary URL.
  */
 const BaseRedirectsController = CrudController<Redirect>({

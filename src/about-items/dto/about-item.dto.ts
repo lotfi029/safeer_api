@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 export const createAboutItemSchema = z
   .object({
-    kind: z.enum(['vision', 'mission', 'goal', 'care_pillar', 'scholarship_step', 'requirement']),
+    kind: z.enum(['vision', 'mission', 'goal', 'care_pillar']),
     icon: z.string().max(64).nullable().optional(),
     titleAr: z.string().min(1).max(191),
     titleEn: z.string().trim().max(191).nullable().optional(),

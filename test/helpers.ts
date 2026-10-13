@@ -87,7 +87,7 @@ export async function withDb<T>(fn: (conn: Connection) => Promise<T>): Promise<T
   }
 }
 
-export type StaffRole = 'admin' | 'reviewer' | 'editor' | 'support';
+export type StaffRole = 'admin' | 'editor' | 'support';
 
 /** A throwaway staff account, created by a direct row insert (see scripts/smoke.mjs's own long comment on why: no invite/accept token round-trip needed for a script's own fixture). */
 export async function createTempUser(role: StaffRole): Promise<Session & { id: string; email: string }> {
@@ -109,121 +109,9 @@ export async function deleteTempUser(id: string): Promise<void> {
   await withDb((conn) => conn.execute('DELETE FROM users WHERE id = ?', [id]));
 }
 
-export interface TestApplicant extends Session {
-  id: string;
-  reference: string;
-  email: string;
-  phone: string;
-}
-
-/** `POST applications` — mirrors scripts/smoke.mjs's own createApplication(). */
-export async function createApplication(overrides: Record<string, unknown> = {}): Promise<TestApplicant> {
-  const email = (overrides.email as string) ?? `jest-app-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-  const body = {
-    firstName: overrides.firstName ?? 'Test',
-    middleName: overrides.middleName ?? null,
-    lastName: overrides.lastName ?? 'Applicant',
-    birthDate: overrides.birthDate ?? '2000-01-01',
-    phone: overrides.phone ?? `+9665${String(Date.now()).slice(-8)}`,
-    nationality: overrides.nationality ?? 'SA',
-    idNumber: overrides.idNumber ?? null,
-    email,
-    currentJob: overrides.currentJob ?? null,
-    gender: overrides.gender ?? 'male',
-  };
-  const res = await fetch(`${BASE}/applications`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`create application failed: ${res.status} ${text}`);
-  const json = JSON.parse(text);
-  const setCookie = res.headers.get('set-cookie');
-  if (!setCookie) throw new Error('applications did not set a session cookie');
-  const cookie = setCookie.split(';')[0];
-  const id = await withDb((conn) =>
-    conn
-      .execute('SELECT id FROM applications WHERE reference = ?', [json.reference])
-      .then(([rows]: any) => rows[0]?.id && String(rows[0].id)),
-  );
-  if (!id) throw new Error(`could not resolve the numeric id for reference ${json.reference}`);
-  return { id, reference: json.reference, cookie, csrfToken: json.csrfToken, email, phone: String(body.phone) };
-}
-
-export async function deleteApplication(applicationId: string): Promise<void> {
-  await withDb(async (conn) => {
-    await conn.execute('UPDATE interview_slots SET application_id = NULL WHERE application_id = ?', [applicationId]);
-    await conn.execute('DELETE FROM applications WHERE id = ?', [applicationId]);
-  });
-}
-
-/**
- * C1: OTP codes are no longer readable from sms_log / mail_log (masked), so
- * specs read the last code issued for an application from the dev/test-only
- * hook (src/dev/dev-otp.controller.ts), along with the channel it went out on.
- */
-export async function readOtp(applicationId: string): Promise<{ code: string; channel: 'sms' | 'email' }> {
-  const res = await fetch(`${BASE}/__dev/otp/${applicationId}`);
-  if (!res.ok) throw new Error(`no OTP issued for application ${applicationId} (dev hook answered ${res.status})`);
-  return res.json();
-}
-
-/** The last code for `applicationId`, which must have gone out by SMS. */
-export async function readSmsOtpCode(applicationId: string): Promise<string> {
-  const otp = await readOtp(applicationId);
-  if (otp.channel !== 'sms') throw new Error(`expected the OTP to go out by sms, it went by ${otp.channel}`);
-  return otp.code;
-}
-
-/** The last code for `applicationId`, which must have gone out by email. */
-export async function readMailOtpCode(applicationId: string): Promise<string> {
-  const otp = await readOtp(applicationId);
-  if (otp.channel !== 'email') throw new Error(`expected the OTP to go out by email, it went by ${otp.channel}`);
-  return otp.code;
-}
-
-export async function withSmsEnabled<T>(fn: () => Promise<T>): Promise<T> {
-  const before = await adminApi('GET', '/admin/sms/settings');
-  const enabled = await adminApi('PUT', '/admin/sms/settings', { body: { isEnabled: true, driver: 'log' } });
-  if (enabled.status !== 200) throw new Error(`enabling SMS (log driver) failed: ${enabled.status}`);
-  try {
-    return await fn();
-  } finally {
-    await adminApi('PUT', '/admin/sms/settings', { body: { isEnabled: before.body.isEnabled, driver: before.body.driver } });
-  }
-}
-
 /** A minimal but genuinely valid PDF — real magic bytes, same as scripts/smoke.mjs's own tinyPdf(). */
 export function tinyPdf(tag: string): Buffer {
   return Buffer.from(`%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF jest-${tag}-${Date.now()}`);
-}
-
-export async function uploadApplicationDocument(session: Session, docType: string, tag: string): Promise<ApiResult> {
-  const form = new FormData();
-  form.append('docType', docType);
-  form.append('file', new Blob([new Uint8Array(tinyPdf(tag))], { type: 'application/pdf' }), `${tag}.pdf`);
-  const res = await fetch(`${BASE}/portal/documents`, {
-    method: 'POST',
-    headers: { Cookie: session.cookie, 'X-CSRF-Token': session.csrfToken },
-    body: form,
-  });
-  const json = await res.json().catch(() => undefined);
-  return { status: res.status, body: json };
-}
-
-/** `POST portal/auth/verify-otp`, returning the applicant session it mints (cookie + csrfToken). */
-export async function verifyOtpSession(identifier: string, code: string): Promise<Session> {
-  const res = await fetch(`${BASE}/portal/auth/verify-otp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier, code }),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`verify-otp failed: ${res.status} ${text}`);
-  const setCookie = res.headers.get('set-cookie');
-  if (!setCookie) throw new Error('verify-otp did not set a session cookie');
-  return { cookie: setCookie.split(';')[0], csrfToken: JSON.parse(text).csrfToken };
 }
 
 /**
@@ -243,12 +131,7 @@ export async function waitForAuthToken(userId: string, purpose = 'reset', timeou
 
 export const settleForgot = () => new Promise((r) => setTimeout(r, 500));
 
-/**
- * A4: `POST portal/auth/request-otp` answers before it looks the identifier
- * up; the lookup, the `applicant_otps` row and the send run afterwards
- * (BackgroundWork). This waits until that work is done — for specs that
- * check rows or logs straight after a request. `readOtp()` waits on its own.
- */
+/** A4: waits until work routes hand to BackgroundWork is done (`__dev/settle`). */
 export async function settleBackground(): Promise<void> {
   const res = await fetch(`${BASE}/__dev/settle`, { method: 'POST' });
   if (!res.ok) throw new Error(`__dev/settle answered ${res.status}`);

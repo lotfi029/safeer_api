@@ -20,7 +20,6 @@ const s3 = {
   S3_ENDPOINT: 'https://s3.example.test',
   S3_REGION: 'auto',
   S3_BUCKET_PUBLIC: 'pub',
-  S3_BUCKET_PRIVATE: 'priv',
   S3_ACCESS_KEY_ID: 'id',
   S3_SECRET_ACCESS_KEY: 'secret',
 };
@@ -31,11 +30,10 @@ function issues(source: Record<string, string>): string[] {
 }
 
 describe('env validation', () => {
-  it('the baseline is valid, with local storage and a 300 s signed-URL TTL by default', () => {
+  it('the baseline is valid, with local storage by default', () => {
     const result = validateEnv(base);
     expect(result.success).toBe(true);
     expect(result.data!.STORAGE_DRIVER).toBe('local');
-    expect(result.data!.S3_SIGNED_URL_TTL_SECONDS).toBe(300);
   });
 
   it('STORAGE_DRIVER=s3 needs every S3 setting', () => {

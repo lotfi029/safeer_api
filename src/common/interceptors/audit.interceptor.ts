@@ -22,9 +22,8 @@ export class AuditInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest<RequestContext>();
-    // C36: a read is audited only when its handler asks to be (the
-    // applications CSV export sets `auditContext`); every other GET leaves
-    // it unset and records nothing, same as before.
+    // C36: a read is audited only when its handler asks to be (by setting
+    // `auditContext`); every other GET leaves it unset and records nothing.
     if (!isAdminRoute(req.path) || req.method === 'HEAD' || req.method === 'OPTIONS') {
       return next.handle();
     }

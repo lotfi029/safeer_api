@@ -1,11 +1,11 @@
 // test/storage.spec.ts — Phase 6 (storage abstraction, decision 3): a row
-// whose stored file has gone missing answers 404 on every download route
-// (never a 500), and readiness reports the store.
+// whose stored file has gone missing answers 404 on /files (never a 500),
+// and readiness reports the store.
 
 import { rmSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, BASE, adminApi, createApplication, deleteApplication, loginAs, uploadApplicationDocument, withDb } from './helpers';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, BASE, adminApi, loginAs, withDb } from './helpers';
 
 const STORAGE_ROOT = path.resolve(process.env.TEST_STORAGE_ROOT ?? './var/assets-test');
 const ORIGIN = BASE.replace(/\/api\/v1$/, '');
@@ -26,25 +26,6 @@ describe('storage: missing files', () => {
       expect((await fetch(`${ORIGIN}/files/${asset.publicId}`, { headers: { Cookie: admin.cookie } })).status).toBe(404);
     } finally {
       await adminApi('DELETE', `/admin/media/${asset.id}`);
-    }
-  });
-
-  it('a private document download answers 404 when its file is gone', async () => {
-    const applicant = await createApplication();
-    try {
-      const uploaded = await uploadApplicationDocument(applicant, 'id_copy', 'gone');
-      expect(uploaded.status).toBe(201);
-      const url = `${BASE}/portal/documents/${uploaded.body.id}/file`;
-      expect((await fetch(url, { headers: { Cookie: applicant.cookie } })).status).toBe(200);
-      const key: string = await withDb((conn) =>
-        conn.execute('SELECT storage_key FROM application_documents WHERE id = ?', [uploaded.body.id]).then(([r]: any) => r[0].storage_key),
-      );
-      rmSync(path.join(STORAGE_ROOT, key));
-      const res = await fetch(url, { headers: { Cookie: applicant.cookie } });
-      expect(res.status).toBe(404);
-      expect(res.headers.get('content-type')).toContain('application/problem+json');
-    } finally {
-      await deleteApplication(applicant.id);
     }
   });
 

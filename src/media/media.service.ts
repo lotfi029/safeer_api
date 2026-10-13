@@ -25,7 +25,8 @@ import { PUBLIC_STORAGE_DRIVER, type StorageDriver } from '../storage/storage-dr
  */
 // C25: + 'doc_categories' — a document is only public while its category is
 // published too, so unpublishing a category must drop the memo.
-export const ASSET_PUBLIC_MEMO_TAGS: string[] = ['home', 'pages', 'board_members', 'news', 'partners', 'documents', 'doc_categories'];
+// 022: + 'licences' — a published licence makes its document public.
+export const ASSET_PUBLIC_MEMO_TAGS: string[] = ['home', 'pages', 'board_members', 'news', 'partners', 'documents', 'doc_categories', 'licences'];
 
 // FR-F-02 governs (your decision) — 20 MB is the outer multipart body guard
 // (main.ts / multer limits); these are the real per-kind limits checked
@@ -286,8 +287,9 @@ export class MediaService {
          UNION ALL SELECT 1 FROM partners WHERE logo_asset_id = ? AND is_published = 1
          UNION ALL SELECT 1 FROM documents d JOIN doc_categories dc ON dc.id = d.category_id
            WHERE d.asset_id = ? AND d.is_published = 1 AND dc.is_published = 1
+         UNION ALL SELECT 1 FROM licences WHERE asset_id = ? AND is_published = 1
        ) AS isPublic`,
-      [assetId, assetId, assetId, assetId, assetId],
+      [assetId, assetId, assetId, assetId, assetId, assetId],
     );
     return Number(row?.isPublic) === 1;
   }
@@ -319,7 +321,7 @@ export class MediaService {
 
   /**
    * Every FK with ON DELETE RESTRICT pointing at media_assets — the same
-   * five tables as `queryIsPubliclyReadable` above. ER_ROW_IS_REFERENCED_2
+   * six tables as `queryIsPubliclyReadable` above (022 added licences). ER_ROW_IS_REFERENCED_2
    * (trap 3) is the backstop this query exists to make unnecessary; the
    * global filter still maps it if some future write path bypasses this.
    */
@@ -329,8 +331,9 @@ export class MediaService {
        UNION ALL SELECT 'board_members', id, name_ar FROM board_members WHERE photo_asset_id = ?
        UNION ALL SELECT 'posts',         id, title_ar FROM posts        WHERE cover_asset_id = ?
        UNION ALL SELECT 'partners',      id, name_ar  FROM partners     WHERE logo_asset_id = ?
-       UNION ALL SELECT 'documents',     id, title_ar FROM documents    WHERE asset_id = ?`,
-      [assetId, assetId, assetId, assetId, assetId],
+       UNION ALL SELECT 'documents',     id, title_ar FROM documents    WHERE asset_id = ?
+       UNION ALL SELECT 'licences',      id, title_ar FROM licences     WHERE asset_id = ?`,
+      [assetId, assetId, assetId, assetId, assetId, assetId],
     );
     return rows;
   }

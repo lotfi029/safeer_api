@@ -96,14 +96,19 @@ export class SiteSettings {
   @Column({ name: 'seo_description_en', type: 'varchar', length: 500, nullable: true })
   seoDescriptionEn: string | null;
 
-  @Column({ name: 'notify_email_on_status_change', type: 'boolean', default: true })
-  notifyEmailOnStatusChange: boolean;
+  /**
+   * 022: the primary published licence's number and issuer, written through
+   * by admin-licences.controller.ts on every licence write — never edited
+   * here (the admin settings DTO doesn't accept them).
+   */
+  @Column({ name: 'licence_no', type: 'varchar', length: 100, nullable: true })
+  licenceNo: string | null;
 
-  @Column({ name: 'notify_sms_on_status_change', type: 'boolean', default: true })
-  notifySmsOnStatusChange: boolean;
+  @Column({ name: 'licence_issuer_ar', type: 'varchar', length: 190, nullable: true })
+  licenceIssuerAr: string | null;
 
-  @Column({ name: 'application_ref_prefix', type: 'varchar', length: 10, default: 'SA' })
-  applicationRefPrefix: string;
+  @Column({ name: 'licence_issuer_en', type: 'varchar', length: 190, nullable: true })
+  licenceIssuerEn: string | null;
 
   /**
    * A7: HMAC of a fixed label under APP_ENCRYPTION_KEY — which key this

@@ -1,11 +1,11 @@
 // scripts/lib/dev-assets.mjs — C45 (safeer-backend-code-review.md).
 //
-// migrations/dev/003_dev_sample.sql inserts media_assets / media_variants /
-// application_documents rows whose files were written, once, by
+// migrations/dev/003_dev_sample.sql inserts media_assets / media_variants
+// rows whose files were written, once, by
 // tools/seed-from-prototype.mjs on the machine that generated it. They are
 // not in git (var/ is ignored), and regenerating them can't reproduce the
 // same storage keys (they're random UUIDs), so on any other checkout every
-// dev image and document 404ed.
+// dev image 404ed.
 //
 // After migrating a development/test database with STORAGE_DRIVER=local,
 // scripts/migrate.mjs calls ensureDevAssetFiles(): every stored key with no
@@ -52,7 +52,7 @@ async function hasTables(connection, names) {
 
 /** Returns the number of placeholder files written. */
 export async function ensureDevAssetFiles(connection, { storageRoot, log }) {
-  if (!(await hasTables(connection, ['media_assets', 'media_variants', 'application_documents']))) return 0;
+  if (!(await hasTables(connection, ['media_assets', 'media_variants']))) return 0;
   const root = path.resolve(storageRoot);
 
   const wanted = [];
@@ -66,10 +66,6 @@ export async function ensureDevAssetFiles(connection, { storageRoot, log }) {
     const asset = byId.get(String(v.asset_id));
     const ratio = asset?.width_px && asset?.height_px ? asset.height_px / asset.width_px : 1;
     wanted.push({ key: v.storage_key, make: () => placeholderImage('image/webp', v.width_px, Math.round((v.width_px || 64) * ratio)) });
-  }
-  const [documents] = await connection.query('SELECT storage_key, mime FROM application_documents');
-  for (const d of documents) {
-    wanted.push({ key: d.storage_key, make: () => (d.mime === 'application/pdf' ? placeholderPdf(d.storage_key) : placeholderImage(d.mime, 600, 400)) });
   }
 
   let written = 0;

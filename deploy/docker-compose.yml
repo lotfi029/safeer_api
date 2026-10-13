@@ -97,8 +97,8 @@ services:
         # `api`: the web container is also on the shared edge network, where
         # another project's `api` answers to that name too.
         aliases: [safeer-api]
-    # On SIGTERM the API waits up to 10 s for OTP sends it already answered
-    # for (A4); Docker's default 10 s would SIGKILL it mid-drain.
+    # On SIGTERM the API waits up to 10 s for background work it already
+    # answered for (A4); Docker's default 10 s would SIGKILL it mid-drain.
     stop_grace_period: 15s
     restart: unless-stopped
     logging: *logging

@@ -31,14 +31,6 @@ export const updateSiteSettingsSchema = z
     seoTitleEn: z.string().trim().max(191).nullable().optional(),
     seoDescriptionAr: z.string().max(500).nullable().optional(),
     seoDescriptionEn: z.string().trim().max(500).nullable().optional(),
-    notifyEmailOnStatusChange: z.boolean().optional(),
-    notifySmsOnStatusChange: z.boolean().optional(),
-    applicationRefPrefix: z
-      .string()
-      .min(1)
-      .max(10)
-      .regex(/^[A-Z]+$/, 'applicationRefPrefix must be uppercase letters only')
-      .optional(),
   })
   .strict();
 

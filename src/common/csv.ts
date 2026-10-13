@@ -1,8 +1,7 @@
 /**
- * A generic CSV-with-BOM helper — first used by `admin/newsletter/export.csv`,
- * written generic over `T` so a later export (e.g. phase 7's
- * `admin/applications/export.csv`) reuses it unchanged: just a different
- * `rows`/`columns` pair, no new helper.
+ * A generic CSV-with-BOM helper — used by `admin/newsletter/export.csv`,
+ * written generic over `T` so a later export reuses it unchanged: just a
+ * different `rows`/`columns` pair, no new helper.
  */
 export interface CsvColumn<T> {
   header: string;
@@ -11,8 +10,8 @@ export interface CsvColumn<T> {
 
 /**
  * C5: a cell starting with `=`, `+`, `-`, `@`, tab or CR is a formula to
- * Excel/LibreOffice (`=HYPERLINK(...)`, DDE). Applicant-typed text (names,
- * universities) lands in these exports, so such a value is prefixed with
+ * Excel/LibreOffice (`=HYPERLINK(...)`, DDE). Visitor-typed text (names, emails)
+ * lands in these exports, so such a value is prefixed with
  * `'` — shown literally, never evaluated — and then quoted.
  */
 const FORMULA_TRIGGER = /^[=+\-@\t\r]/;

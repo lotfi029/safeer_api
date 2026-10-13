@@ -543,7 +543,7 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
   // editor could delete any row in every collection built on this kernel.
   // Same trap as C4: a subclass that ever overrides `remove` gets a *new*
   // function object with no metadata on it and must re-apply `@Roles(...)`
-  // itself (AdminInterviewSlotsController does).
+  // itself.
   const removeDescriptor = Object.getOwnPropertyDescriptor(GeneratedCrudController.prototype, 'remove')!;
   Area(opts.deleteArea)(GeneratedCrudController.prototype, 'remove', removeDescriptor);
   Delete(':id')(GeneratedCrudController.prototype, 'remove', removeDescriptor);

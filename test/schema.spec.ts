@@ -56,7 +56,7 @@ describe('production migrate + schema:check', () => {
     expect(versions[0]).toBe('001_schema.sql');
     expect(versions).toContain('002_seed.sql');
     expect(versions).not.toContain('003_dev_sample.sql');
-    expect(await count('SELECT COUNT(*) AS n FROM applications')).toBe(0);
+    expect(await count('SELECT COUNT(*) AS n FROM contact_messages')).toBe(0);
     expect(await count('SELECT COUNT(*) AS n FROM media_assets')).toBe(0);
     expect(await count('SELECT COUNT(*) AS n FROM pages')).toBeGreaterThan(0);
 
@@ -75,7 +75,7 @@ describe('production migrate + schema:check', () => {
     await withServer(async (conn) => {
       await conn.query('ALTER TABLE users MODIFY name VARCHAR(100) NULL');
       await conn.query("ALTER TABLE partners MODIFY category ENUM('government','university') NOT NULL");
-      await conn.query('DROP INDEX ix_applications_created ON applications');
+      await conn.query('DROP INDEX ix_contact_messages_created ON contact_messages');
       await conn.query('ALTER TABLE stats ADD COLUMN surprise INT NOT NULL');
     }, DB);
     const result = schemaCheck();
@@ -83,7 +83,7 @@ describe('production migrate + schema:check', () => {
     expect(result.output).toContain('users.name: entity says NOT NULL, database says NULL');
     expect(result.output).toContain('users.name: entity length 120, database length 100');
     expect(result.output).toContain('partners.category: entity enum');
-    expect(result.output).toContain('applications: index ix_applications_created (created_at) missing');
+    expect(result.output).toContain('contact_messages: index ix_contact_messages_created (created_at) missing');
     expect(result.output).toContain('stats.surprise: NOT NULL without a default');
   });
 });

@@ -20,36 +20,6 @@ export const ErrorCode = {
   FEATURE_DISABLED: 'FEATURE_DISABLED',
   /** 7.3: distinct from FEATURE_DISABLED — the flag is on, but no payment provider is wired up yet. */
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
-  /** Phase 6 (apply flow/portal): a write to `applications` was attempted while its `status` is not `draft`/`docs_missing`. */
-  APPLICATION_LOCKED: 'APPLICATION_LOCKED',
-  /** Phase 6: `portal/auth/verify-otp` — wrong code, expired, no matching row, or the 5-attempt cap was hit. Deliberately one generic code for every failure branch (non-enumeration). */
-  OTP_INVALID: 'OTP_INVALID',
-  /** Phase 6: `portal/application/submit` — one or more of the 3 required document types has no current, non-rejected document. `extra.missing` lists the doc types still needed. */
-  DOCUMENTS_INCOMPLETE: 'DOCUMENTS_INCOMPLETE',
-  /** Phase 6: `portal/interview` — the chosen slot was already booked (or no longer open) by the time the row was locked. */
-  SLOT_ALREADY_BOOKED: 'SLOT_ALREADY_BOOKED',
-  /** Phase 6: `portal/interview-slots` and `portal/interview` — the application's `status` is not `interview`. */
-  INTERVIEW_NOT_AVAILABLE: 'INTERVIEW_NOT_AVAILABLE',
-  /**
-   * Phase 7 (admin applications): `PATCH admin/applications/:id`, the
-   * `status` bulk action, and `POST .../request-documents` all validate
-   * against `admin-applications/transitions.ts`'s allowed-transition map
-   * before writing anything. Thrown for any disallowed `from`→`to` pair,
-   * including every attempt to move into or out of `draft` from this admin
-   * surface (`draft`→`new` only ever happens through the applicant's own
-   * submit) — `extra.from`/`extra.to` name the rejected pair.
-   */
-  INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
-  /** B2 (safeer-backend-fr-review.md): `POST applications` rejects a second active (non-terminal) application for the same email or phone. Non-enumerating: the response never says which contact detail matched. */
-  APPLICATION_EXISTS: 'APPLICATION_EXISTS',
-  /** B7 (safeer-backend-fr-review.md): an application was assigned to a user who isn't `admin`/`reviewer`, or whose account is locked. */
-  INVALID_ASSIGNEE: 'INVALID_ASSIGNEE',
-  /** C18: `POST portal/documents` — the application has used up its upload quota (file count or total bytes). */
-  QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
-  /** C34: `PATCH admin/applications/:id/documents/:docId` — the document was superseded, or the application is draft/accepted/rejected. */
-  DOCUMENT_NOT_REVIEWABLE: 'DOCUMENT_NOT_REVIEWABLE',
-  /** A11: `GET admin/applications/:id/documents/:docId/file` — the document was replaced; its file no longer exists (410). */
-  DOCUMENT_SUPERSEDED: 'DOCUMENT_SUPERSEDED',
   /** C10: `admin/redirects` — the redirect would chain through another redirect, or duplicates one's source. */
   REDIRECT_CHAIN: 'REDIRECT_CHAIN',
 } as const;

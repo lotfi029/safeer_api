@@ -18,8 +18,10 @@ import { toPublicSiteSettings, type PublicSiteSettings } from '../site-settings/
  * top-level screen is added to the site, not through the CMS. `article` is
  * deliberately excluded — it's the news-detail template page (`/pages/article`
  * exists only for its meta title/description), never a nav destination.
+ * 022: `governance` took `documents`' place (the `documents` page row stays,
+ * out of the nav).
  */
-const NAV_SLUGS = ['home', 'about', 'board', 'work', 'scholarships', 'news', 'testimonials', 'partners', 'documents', 'contact'] as const;
+const NAV_SLUGS = ['home', 'about', 'board', 'work', 'news', 'testimonials', 'partners', 'governance', 'contact'] as const;
 
 export interface PublicNavItem {
   slug: string;

@@ -6,12 +6,11 @@
 // 403, and a delete probe on an id that doesn't exist answers 404 (allowed,
 // nothing there) or 403 (refused before the lookup). A coverage check fails
 // if openapi.json gains an admin route group this file doesn't probe.
-// Also: the unauthenticated 401, and staff/applicant cookies never accepted
-// on each other's routes.
+// Also: the unauthenticated 401.
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { adminApi, api, createApplication, createTempUser, deleteApplication, deleteTempUser, type Session, type StaffRole } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, type Session, type StaffRole } from './helpers';
 
 const MISSING_ID = '999999999';
 
@@ -23,9 +22,6 @@ interface Probe {
 }
 
 const PROBES: Record<string, Probe> = {
-  'admin/applications': { area: 'applications', read: '/admin/applications', delete: { path: `/admin/applications/${MISSING_ID}`, area: 'applications.delete' } },
-  'admin/interview-slots': { area: 'applications', read: '/admin/interview-slots', delete: { path: `/admin/interview-slots/${MISSING_ID}`, area: 'applications' } },
-
   'admin/pages': { area: 'content', read: '/admin/pages', delete: { path: `/admin/pages/${MISSING_ID}`, area: 'content' } },
   'admin/page-sections': { area: 'content', read: '/admin/page-sections', delete: { path: `/admin/page-sections/${MISSING_ID}`, area: 'content' } },
   'admin/news': { area: 'content', read: '/admin/news', delete: { path: `/admin/news/${MISSING_ID}`, area: 'content' } },
@@ -38,6 +34,7 @@ const PROBES: Record<string, Probe> = {
   'admin/partners': { area: 'content', read: '/admin/partners', delete: { path: `/admin/partners/${MISSING_ID}`, area: 'content' } },
   'admin/doc-categories': { area: 'content', read: '/admin/doc-categories', delete: { path: `/admin/doc-categories/${MISSING_ID}`, area: 'content' } },
   'admin/documents': { area: 'content', read: '/admin/documents', delete: { path: `/admin/documents/${MISSING_ID}`, area: 'content' } },
+  'admin/licences': { area: 'content', read: '/admin/licences', delete: { path: `/admin/licences/${MISSING_ID}`, area: 'content' } },
   'admin/media': { area: 'content', read: '/admin/media', delete: { path: `/admin/media/${MISSING_ID}`, area: 'content' } },
   'admin/redirects': { area: 'content', read: '/admin/redirects', delete: { path: `/admin/redirects/${MISSING_ID}`, area: 'redirects.delete' } },
 
@@ -49,7 +46,6 @@ const PROBES: Record<string, Probe> = {
   'admin/users': { area: 'users', read: '/admin/users', delete: { path: `/admin/users/${MISSING_ID}`, area: 'users' } },
   'admin/settings': { area: 'settings', read: '/admin/settings' },
   'admin/mail': { area: 'settings', read: '/admin/mail/settings' },
-  'admin/sms': { area: 'settings', read: '/admin/sms/settings' },
   'admin/cache': { area: 'settings', read: '/admin/cache/stats' },
   'admin/audit': { area: 'audit', read: '/admin/audit' },
 };
@@ -57,7 +53,7 @@ const PROBES: Record<string, Probe> = {
 /** Open to any signed-in staff member, with no area (scripts/lib/check-admin-roles.mjs's allow-list). */
 const ANY_STAFF = ['admin/me', 'admin/auth', 'admin/overview', 'admin/preview-token', 'admin/roles'];
 
-const ROLES: StaffRole[] = ['admin', 'reviewer', 'editor', 'support'];
+const ROLES: StaffRole[] = ['admin', 'editor', 'support'];
 
 describe('permissions matrix (generated from GET admin/roles)', () => {
   const sessions = {} as Record<StaffRole, Session>;
@@ -125,19 +121,6 @@ describe('permissions matrix (generated from GET admin/roles)', () => {
       const res = await api('GET', probe.read);
       expect({ path: probe.read, status: res.status }).toEqual({ path: probe.read, status: 401 });
       expect(res.body?.code).toBe('UNAUTHENTICATED');
-    }
-  });
-
-  it('a staff cookie is refused on a portal (applicant) route, and vice versa', async () => {
-    const applicant = await createApplication();
-    try {
-      for (const role of ROLES) {
-        expect((await api('GET', '/portal/me', { session: sessions[role] })).status).toBe(401);
-      }
-      expect((await api('GET', '/admin/applications', { session: applicant })).status).toBe(401);
-      expect((await api('GET', '/admin/me', { session: applicant })).status).toBe(401);
-    } finally {
-      await deleteApplication(applicant.id);
     }
   });
 });

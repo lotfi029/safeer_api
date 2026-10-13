@@ -92,7 +92,7 @@ jobs:
       # B0-5: refused outright if NODE_ENV=production — safe here since
       # NODE_ENV is development. Not load-bearing for the smoke suite's own
       # role-gate cases (scripts/smoke.mjs creates its own temporary
-      # editor/reviewer/support accounts by direct row insert, since
+      # editor/support accounts by direct row insert, since
       # 002_seed.sql/dev/003_dev_sample.sql seed zero users on purpose — the
       # only account either ever produces is the bootstrap admin below), but
       # left on for parity with a real dev environment.
@@ -159,8 +159,8 @@ jobs:
           mysql -h 127.0.0.1 -P 3306 -u root -e 'CREATE DATABASE safeer_prod CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
           npm run migrate
           dev_rows=$(mysql -h 127.0.0.1 -P 3306 -u root -N -e "SELECT COUNT(*) FROM safeer_prod.schema_migrations WHERE version = '003_dev_sample.sql'")
-          applications=$(mysql -h 127.0.0.1 -P 3306 -u root -N -e 'SELECT COUNT(*) FROM safeer_prod.applications')
-          test "$dev_rows" = 0 && test "$applications" = 0 || { echo "dev fixtures reached a production migrate"; exit 1; }
+          assets=$(mysql -h 127.0.0.1 -P 3306 -u root -N -e 'SELECT COUNT(*) FROM safeer_prod.media_assets')
+          test "$dev_rows" = 0 && test "$assets" = 0 || { echo "dev fixtures reached a production migrate"; exit 1; }
           npm run migrate | tee migrate-prod-2.log && grep -q 'Nothing to migrate' migrate-prod-2.log
           DB_NAME=safeer_prod NODE_ENV=development npm run schema:check
 

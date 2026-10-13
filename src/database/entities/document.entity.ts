@@ -22,6 +22,13 @@ export class SafeerDocument {
   @Column({ name: 'title_en', type: 'varchar', length: 255, nullable: true })
   titleEn: string | null;
 
+  /** A short line under the title (022) — e.g. a period or a reference. */
+  @Column({ name: 'meta_ar', type: 'varchar', length: 190, nullable: true })
+  metaAr: string | null;
+
+  @Column({ name: 'meta_en', type: 'varchar', length: 190, nullable: true })
+  metaEn: string | null;
+
   /** NULL renders as "coming soon" */
   @Column({ name: 'asset_id', type: 'bigint', unsigned: true, nullable: true })
   assetId: string | null;

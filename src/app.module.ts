@@ -13,7 +13,6 @@ import { UsersModule } from './users/users.module.js';
 import { MediaModule } from './media/media.module.js';
 import { FilesModule } from './files/files.module.js';
 import { MailModule } from './mail/mail.module.js';
-import { SmsModule } from './sms/sms.module.js';
 import { RedirectsModule } from './redirects/redirects.module.js';
 import { MaintenanceModule } from './maintenance/maintenance.module.js';
 import { PreviewModule } from './preview/preview.module.js';
@@ -30,43 +29,22 @@ import { NewsModule } from './news/news.module.js';
 import { TestimonialsModule } from './testimonials/testimonials.module.js';
 import { PartnersModule } from './partners/partners.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
+import { LicencesModule } from './licences/licences.module.js';
 import { HomeModule } from './home/home.module.js';
 import { SiteModule } from './site/site.module.js';
 import { ContactModule } from './contact/contact.module.js';
 import { MetaModule } from './meta/meta.module.js';
 import { MessagesModule } from './messages/messages.module.js';
-import { ApplicationsModule } from './applications/applications.module.js';
-import { PortalModule } from './portal/portal.module.js';
-import { AdminApplicationsModule } from './admin-applications/admin-applications.module.js';
+import { AdminOverviewModule } from './admin-overview/admin-overview.module.js';
 import { SitemapModule } from './sitemap/sitemap.module.js';
 import { TestAwareThrottlerGuard } from './common/guards/test-aware-throttler.guard.js';
 import { devModuleFor } from './dev/dev.module.js';
 import { BackgroundWorkModule } from './common/background/background-work.module.js';
 
-// Phase 2 (done): the full schema (001_schema.sql) and entities for every
-// table the project plan's "Data model" section lists, plus the infra
-// changes it calls for — four-role permission matrix (phase 1), applicant
-// sessions (SessionGuard + @ApplicantRoute(), src/auth), private document
-// storage (StorageModule), the SMS module (SmsModule, mirroring MailModule)
-// and the site-settings singleton (SiteSettingsModule, mirrored below).
-// Phase 4 (done): content modules — pages/sections, stats, about-items,
-// work-areas, board, news/news-categories, testimonials/testimonial-themes,
-// partners, doc-categories/documents, contact/newsletter, meta, plus the
-// home and site (chrome) public aggregates. PreviewModule now covers
-// `posts` (see auth/preview-token.util.ts's PreviewCollection).
-// Phase 5 (done): MessagesModule (contact inbox — reply, status, convert to
-// testimonial, delete), hand-written and admin/support-gated per the plan.
-// Phase 6 (done): ApplicationsModule (the public "start an application"
-// step — mints the reference number and the first applicant_sessions row)
-// and PortalModule (autosave/submit, OTP sign-in, private document
-// upload/download via StorageModule's PrivateFileStore, interview-slot
-// booking, notifications) — the plan's "Apply flow and portal" section.
-// Phase 7 (done): AdminApplicationsModule — the staff half of the
-// scholarship pipeline (list/counts/CSV export, single-application review,
-// the status-transition map, document accept/reject, request-documents,
-// internal notes, bulk actions, interview-slot management via
-// CrudController) plus the role-filtered admin/overview aggregate. This was
-// the last feature phase; phase 8 is docs/openapi/smoke only.
+// The modules below are the site's content, the contact inbox, auth, mail
+// and media. The scholarship feature (apply flow, applicant portal, review,
+// interviews) and SMS were removed by migration 021 (feat/governance-contact);
+// docs/backend/API-CHANGES.md lists the removed routes.
 @Module({
   imports: [
     ConfigModule,
@@ -87,7 +65,6 @@ import { BackgroundWorkModule } from './common/background/background-work.module
     MediaModule,
     FilesModule,
     MailModule,
-    SmsModule,
     RedirectsModule,
     MaintenanceModule,
     PreviewModule,
@@ -102,14 +79,13 @@ import { BackgroundWorkModule } from './common/background/background-work.module
     TestimonialsModule,
     PartnersModule,
     DocumentsModule,
+    LicencesModule,
     HomeModule,
     SiteModule,
     ContactModule,
     MetaModule,
     MessagesModule,
-    ApplicationsModule,
-    PortalModule,
-    AdminApplicationsModule,
+    AdminOverviewModule,
     // A8: the __dev routes exist only in development/test.
     devModuleFor(process.env.NODE_ENV),
     SitemapModule,

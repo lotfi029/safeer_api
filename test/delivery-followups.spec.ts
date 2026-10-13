@@ -3,8 +3,7 @@
 // scratch databases (A5, A6, A9 and A10 live next to the features they fix):
 //   A7  APP_ENCRYPTION_KEY guard: migrate and the app refuse a wrong key
 //   A8  the __dev routes don't exist in staging/production
-//   A11 019 scrubs old OTP codes from the logs and keeps an active admin;
-//       a superseded document has no download link and its route says why
+//   A11 019 scrubs old OTP codes from the logs and keeps an active admin
 //   A12 map_embed_url (allow-listed) and map_lat/lng in settings and GET /site
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -12,7 +11,8 @@ import { createHmac } from 'node:crypto';
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { adminApi, api, createApplication, deleteApplication, uploadApplicationDocument, withDb } from './helpers';
+import { encryptSecret } from '../src/mail/mail-crypto';
+import { adminApi, api, withDb } from './helpers';
 import { ROOT, dbEnv, dropDatabase, recreateDatabase, runScript, withServer } from './scripts.helpers';
 
 const APP_ENV: Record<string, string> = JSON.parse(process.env.TEST_APP_ENV ?? '{}');
@@ -76,16 +76,25 @@ describe('A7: APP_ENCRYPTION_KEY guard', () => {
   });
 
   it('with no check value yet (a database from before 018), an encrypted value decides — and the right key records it', async () => {
-    const [[encrypted]]: any = await withDb((conn) => conn.query('SELECT COUNT(*) AS n FROM applications WHERE id_number_encrypted IS NOT NULL'));
-    expect(Number(encrypted.n)).toBeGreaterThan(0); // dev fixtures, encrypted by 012
-    await withDb((conn) => conn.query('UPDATE site_settings SET encryption_key_check = NULL WHERE id = 1'));
+    // The mail password is the one encrypted value left once 021 dropped
+    // applications.id_number_encrypted.
+    const [[before]]: any = await withDb((conn) => conn.query('SELECT password_encrypted AS v FROM mail_settings WHERE id = 1'));
+    await withDb((conn) =>
+      conn.query('UPDATE site_settings SET encryption_key_check = NULL WHERE id = 1').then(() =>
+        conn.query('UPDATE mail_settings SET password_encrypted = ? WHERE id = 1', [encryptSecret('a7-probe', RIGHT_KEY)]),
+      ),
+    );
     try {
       const wrong = migrate(WRONG_KEY);
       expect(wrong.status).toBe(1);
       expect(wrong.output).toMatch(/APP_ENCRYPTION_KEY does not match/);
       expect(migrate(RIGHT_KEY).status).toBe(0);
     } finally {
-      await withDb((conn) => conn.query('UPDATE site_settings SET encryption_key_check = ? WHERE id = 1', [kcv(RIGHT_KEY)]));
+      await withDb((conn) =>
+        conn
+          .query('UPDATE site_settings SET encryption_key_check = ? WHERE id = 1', [kcv(RIGHT_KEY)])
+          .then(() => conn.query('UPDATE mail_settings SET password_encrypted = ? WHERE id = 1', [before.v])),
+      );
     }
   });
 
@@ -110,7 +119,6 @@ describe('A8: no __dev routes outside development/test', () => {
       expect((await fetch(`${app.base}/site`)).status).toBe(200);
       // Nest's own "Cannot GET …" for an unmapped route — not the hook's "Not found".
       for (const [method, route] of [
-        ['GET', '__dev/otp/1'],
         ['POST', '__dev/settle'],
         ['POST', '__dev/maintenance/run'],
       ]) {
@@ -181,31 +189,6 @@ describe('A11: upgrade-path gaps', () => {
       });
     }, DB);
   }, 120_000);
-
-  it('a superseded document has no download path, and its file route answers 410 DOCUMENT_SUPERSEDED', async () => {
-    const applicant = await createApplication();
-    try {
-      expect((await uploadApplicationDocument(applicant, 'id_copy', 'a11-first')).status).toBe(201);
-      expect((await uploadApplicationDocument(applicant, 'id_copy', 'a11-second')).status).toBe(201);
-      const [rows]: any = await withDb((conn) =>
-        conn.query('SELECT id, superseded_at FROM application_documents WHERE application_id = ? ORDER BY id', [applicant.id]),
-      );
-      const [old, current] = rows;
-      expect(old.superseded_at).not.toBeNull();
-
-      const detail = await adminApi('GET', `/admin/applications/${applicant.id}`);
-      expect(detail.body.documents.map((d: any) => [String(d.id), d.downloadPath])).toEqual([
-        [String(current.id), `admin/applications/${applicant.id}/documents/${current.id}/file`],
-      ]);
-      expect((await adminApi('GET', `/${detail.body.documents[0].downloadPath}`)).status).toBe(200);
-
-      const gone = await adminApi('GET', `/admin/applications/${applicant.id}/documents/${old.id}/file`);
-      expect(gone.status).toBe(410);
-      expect(gone.body.code).toBe('DOCUMENT_SUPERSEDED');
-    } finally {
-      await deleteApplication(applicant.id);
-    }
-  });
 });
 
 describe('A12: contact-page map', () => {

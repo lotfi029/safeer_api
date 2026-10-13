@@ -14,7 +14,7 @@ import { readString } from '../common/query/list-params.js';
 import { AboutItem, type AboutItemKind } from '../database/entities/about-item.entity.js';
 import { toPublicAboutItem, type PublicAboutItem } from '../home/public-home.js';
 
-export const ABOUT_ITEM_KINDS: readonly AboutItemKind[] = ['vision', 'mission', 'goal', 'care_pillar', 'scholarship_step', 'requirement'];
+export const ABOUT_ITEM_KINDS: readonly AboutItemKind[] = ['vision', 'mission', 'goal', 'care_pillar'];
 
 /** Parses `?kind=a,b` — every value must be a known kind (C42: an unknown value is a 400, never a cached empty result). */
 export function parseKinds(raw: string | undefined): AboutItemKind[] {
@@ -30,8 +30,8 @@ export function parseKinds(raw: string | undefined): AboutItemKind[] {
 /**
  * B18: `GET about-items?kind=vision,mission,…` — the published items of the
  * requested kinds (all kinds by default), grouped by kind and sorted by
- * `sortOrder`, bodies rendered to sanitized HTML (C26). The about and
- * scholarships pages build their cards and lists from it (their section
+ * `sortOrder`, bodies rendered to sanitized HTML (C26). The about page
+ * builds its cards and lists from it (their section
  * headings come from `GET pages/:slug`). Cached under `about_items`, the
  * tag every admin/about-items write purges.
  */

@@ -6,6 +6,8 @@ export const createDocumentSchema = z
     categoryId: z.string().min(1),
     titleAr: z.string().min(1).max(255),
     titleEn: z.string().trim().max(255).nullable().optional(),
+    metaAr: z.string().trim().max(190).nullable().optional(),
+    metaEn: z.string().trim().max(190).nullable().optional(),
     // NULL renders as "coming soon" — deliberately nullable, not required.
     assetId: z.string().nullable().optional(),
     docDate: z

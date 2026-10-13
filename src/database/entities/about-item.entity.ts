@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
-export type AboutItemKind = 'vision' | 'mission' | 'goal' | 'care_pillar' | 'scholarship_step' | 'requirement';
+export type AboutItemKind = 'vision' | 'mission' | 'goal' | 'care_pillar';
 
 @Entity('about_items')
 @Index('ix_about_kind', ['kind', 'isPublished', 'sortOrder'])
@@ -10,7 +10,7 @@ export class AboutItem {
 
   @Column({
     type: 'enum',
-    enum: ['vision', 'mission', 'goal', 'care_pillar', 'scholarship_step', 'requirement'] as AboutItemKind[],
+    enum: ['vision', 'mission', 'goal', 'care_pillar'] as AboutItemKind[],
   })
   kind: AboutItemKind;
 

@@ -14,7 +14,7 @@
 //   0 3 * * * cd /path/to/safeer_api && NODE_ENV=production node scripts/backup-storage.mjs /path/to/backups >> /var/log/safeer-storage-backup.log 2>&1
 //
 // S3 mode: prints a message and exits 0 — nothing to do here. Back up the
-// S3_BUCKET_PRIVATE/S3_BUCKET_PUBLIC buckets with the provider's own
+// S3_BUCKET_PUBLIC bucket with the provider's own
 // mechanism (versioning, cross-region replication, a scheduled export),
 // documented in docs/backend/DEPLOYMENT-HOSTINGER.md.
 
@@ -41,7 +41,7 @@ async function main() {
 
   if (env.STORAGE_DRIVER === 's3') {
     console.log(
-      'STORAGE_DRIVER=s3 — nothing to back up here. Back up the S3_BUCKET_PRIVATE/S3_BUCKET_PUBLIC buckets ' +
+      'STORAGE_DRIVER=s3 — nothing to back up here. Back up the S3_BUCKET_PUBLIC bucket ' +
         "with the provider's own mechanism (versioning, replication, a scheduled export).",
     );
     return;

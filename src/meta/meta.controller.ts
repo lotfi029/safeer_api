@@ -6,6 +6,8 @@ import { CacheTags } from '../cache/cache-tags.decorator.js';
 import { CacheKeyParams } from '../cache/cache-key-params.decorator.js';
 import { declarePurger } from '../cache/cache-tag-registry.js';
 import { COUNTRIES, type MetaCountry } from './data/countries.js';
+import { CONTACT_SUBJECTS } from '../database/entities/contact-message.entity.js';
+import { CONTACT_SUBJECT_LABELS } from '../common/labels.js';
 
 interface EnumOption {
   value: string;
@@ -14,33 +16,11 @@ interface EnumOption {
 }
 
 /**
- * ar/en labels for every enum a public form (the apply flow, contact) needs
- * to render as a dropdown — values pulled straight from the phase-2 entity
- * `enum: [...]` lists (application.entity.ts, application-document.entity.ts
- * has no public form use, partner.entity.ts, contact-message.entity.ts) so
- * this can never drift from what the database actually accepts.
+ * ar/en labels for every enum a public page or form needs to render — the
+ * values match the entity `enum: [...]` lists (partner.entity.ts,
+ * contact-message.entity.ts) so this can't drift from what the database
+ * accepts.
  */
-const APPLICATION_STATUS: EnumOption[] = [
-  { value: 'draft', labelAr: 'مسودة', labelEn: 'Draft' },
-  { value: 'new', labelAr: 'جديد', labelEn: 'New' },
-  { value: 'under_review', labelAr: 'قيد المراجعة', labelEn: 'Under review' },
-  { value: 'docs_missing', labelAr: 'مستندات ناقصة', labelEn: 'Documents missing' },
-  { value: 'interview', labelAr: 'مقابلة', labelEn: 'Interview' },
-  { value: 'accepted', labelAr: 'مقبول', labelEn: 'Accepted' },
-  { value: 'rejected', labelAr: 'مرفوض', labelEn: 'Rejected' },
-];
-
-const DEGREE_LEVEL: EnumOption[] = [
-  { value: 'bachelor', labelAr: 'بكالوريوس', labelEn: 'Bachelor' },
-  { value: 'master', labelAr: 'ماجستير', labelEn: 'Master' },
-  { value: 'phd', labelAr: 'دكتوراه', labelEn: 'PhD' },
-];
-
-const GENDER: EnumOption[] = [
-  { value: 'male', labelAr: 'ذكر', labelEn: 'Male' },
-  { value: 'female', labelAr: 'أنثى', labelEn: 'Female' },
-];
-
 const PARTNER_CATEGORY: EnumOption[] = [
   { value: 'government', labelAr: 'جهة حكومية', labelEn: 'Government' },
   { value: 'university', labelAr: 'جامعة', labelEn: 'University' },
@@ -48,12 +28,11 @@ const PARTNER_CATEGORY: EnumOption[] = [
   { value: 'supporter', labelAr: 'داعم', labelEn: 'Supporter' },
 ];
 
-const CONTACT_SUBJECT: EnumOption[] = [
-  { value: 'scholarship', labelAr: 'المنح الدراسية', labelEn: 'Scholarships' },
-  { value: 'partnership', labelAr: 'الشراكات', labelEn: 'Partnership' },
-  { value: 'feedback', labelAr: 'ملاحظات', labelEn: 'Feedback' },
-  { value: 'other', labelAr: 'أخرى', labelEn: 'Other' },
-];
+const CONTACT_SUBJECT: EnumOption[] = CONTACT_SUBJECTS.map((value) => ({
+  value,
+  labelAr: CONTACT_SUBJECT_LABELS[value].ar,
+  labelEn: CONTACT_SUBJECT_LABELS[value].en,
+}));
 
 /**
  * Static reference data every public form reads — never DB-backed, so it is
@@ -87,9 +66,6 @@ export class MetaController {
   @CacheKeyParams()
   enums(): Record<string, EnumOption[]> {
     return {
-      applicationStatus: APPLICATION_STATUS,
-      degreeLevel: DEGREE_LEVEL,
-      gender: GENDER,
       partnerCategory: PARTNER_CATEGORY,
       contactSubject: CONTACT_SUBJECT,
     };

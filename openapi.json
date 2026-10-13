@@ -1039,282 +1039,6 @@
         ]
       }
     },
-    "/admin/sms/settings": {
-      "get": {
-        "operationId": "SmsSettingsController_get",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "SmsSettings"
-        ]
-      },
-      "put": {
-        "operationId": "SmsSettingsController_update",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateSmsSettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "SmsSettings"
-        ]
-      }
-    },
-    "/admin/sms/test": {
-      "post": {
-        "operationId": "SmsTestController_test",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TestSmsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "SmsTest"
-        ]
-      }
-    },
-    "/admin/sms/templates": {
-      "get": {
-        "operationId": "SmsTemplatesController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "SmsTemplates"
-        ]
-      }
-    },
-    "/admin/sms/templates/{key}": {
-      "get": {
-        "operationId": "SmsTemplatesController_get",
-        "parameters": [
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "SmsTemplates"
-        ]
-      },
-      "put": {
-        "operationId": "SmsTemplatesController_update",
-        "parameters": [
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateSmsTemplateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "SmsTemplates"
-        ]
-      }
-    },
-    "/admin/sms/templates/{key}/variables": {
-      "get": {
-        "operationId": "SmsTemplatesController_variables",
-        "parameters": [
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "SmsTemplates"
-        ]
-      }
-    },
-    "/admin/sms/templates/{key}/preview": {
-      "post": {
-        "operationId": "SmsTemplatesController_preview",
-        "parameters": [
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PreviewSmsTemplateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "SmsTemplates"
-        ]
-      }
-    },
-    "/admin/sms/log": {
-      "get": {
-        "operationId": "SmsLogController_list",
-        "parameters": [
-          {
-            "name": "template",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "SmsLog"
-        ]
-      }
-    },
     "/admin/redirects": {
       "post": {
         "operationId": "RedirectsController_create",
@@ -2302,7 +2026,7 @@
             "name": "kind",
             "required": false,
             "in": "query",
-            "description": "Comma-separated: vision, mission, goal, care_pillar, scholarship_step, requirement",
+            "description": "Comma-separated: vision, mission, goal, care_pillar",
             "schema": {}
           }
         ],
@@ -4585,6 +4309,43 @@
         ]
       }
     },
+    "/documents/sections": {
+      "get": {
+        "operationId": "DocumentsController_sections",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Documents"
+        ]
+      }
+    },
+    "/documents/sections/{slug}": {
+      "get": {
+        "operationId": "DocumentsController_section",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Documents"
+        ]
+      }
+    },
     "/admin/doc-categories": {
       "get": {
         "operationId": "AdminDocCategoriesController_list",
@@ -4987,6 +4748,284 @@
         ],
         "tags": [
           "AdminDocuments"
+        ]
+      }
+    },
+    "/licences": {
+      "get": {
+        "operationId": "LicencesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Licences"
+        ]
+      }
+    },
+    "/admin/licences": {
+      "post": {
+        "operationId": "AdminLicencesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLicenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminLicences"
+        ]
+      },
+      "get": {
+        "operationId": "AdminLicencesController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "published",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminLicences"
+        ]
+      }
+    },
+    "/admin/licences/{id}": {
+      "patch": {
+        "operationId": "AdminLicencesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLicenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminLicences"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminLicencesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminLicences"
+        ]
+      },
+      "get": {
+        "operationId": "AdminLicencesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminLicences"
+        ]
+      }
+    },
+    "/admin/licences/{id}/publish": {
+      "patch": {
+        "operationId": "AdminLicencesController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishLicenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminLicences"
+        ]
+      }
+    },
+    "/admin/licences/{id}/primary": {
+      "patch": {
+        "operationId": "AdminLicencesController_makePrimary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminLicences"
+        ]
+      }
+    },
+    "/admin/licences/reorder": {
+      "post": {
+        "operationId": "AdminLicencesController_reorder",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/admin_licencesReorderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "AdminLicences"
         ]
       }
     },
@@ -5467,919 +5506,6 @@
         ]
       }
     },
-    "/applications": {
-      "post": {
-        "operationId": "ApplicationsController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateApplicationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Applications"
-        ]
-      }
-    },
-    "/portal/me": {
-      "get": {
-        "operationId": "PortalController_me",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Portal"
-        ]
-      }
-    },
-    "/portal/notifications": {
-      "get": {
-        "operationId": "PortalController_notifications",
-        "parameters": [
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Portal"
-        ]
-      }
-    },
-    "/portal/application": {
-      "patch": {
-        "operationId": "PortalApplicationController_patch",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateApplicationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalApplication"
-        ]
-      }
-    },
-    "/portal/application/corrections": {
-      "patch": {
-        "operationId": "PortalApplicationController_correct",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApplicationCorrectionsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalApplication"
-        ]
-      }
-    },
-    "/portal/application/submit": {
-      "post": {
-        "operationId": "PortalApplicationController_submit",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubmitApplicationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalApplication"
-        ]
-      }
-    },
-    "/portal/documents": {
-      "get": {
-        "operationId": "PortalDocumentsController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalDocuments"
-        ]
-      },
-      "post": {
-        "operationId": "PortalDocumentsController_upload",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalDocuments"
-        ]
-      }
-    },
-    "/portal/documents/{id}/file": {
-      "get": {
-        "operationId": "PortalDocumentsController_streamFile",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalDocuments"
-        ]
-      }
-    },
-    "/portal/documents/{id}": {
-      "delete": {
-        "operationId": "PortalDocumentsController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalDocuments"
-        ]
-      }
-    },
-    "/portal/interview-slots": {
-      "get": {
-        "operationId": "PortalInterviewController_listSlots",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalInterview"
-        ]
-      }
-    },
-    "/portal/interview": {
-      "post": {
-        "operationId": "PortalInterviewController_book",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BookInterviewDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalInterview"
-        ]
-      },
-      "delete": {
-        "operationId": "PortalInterviewController_cancel",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalInterview"
-        ]
-      }
-    },
-    "/portal/auth/request-otp": {
-      "post": {
-        "operationId": "PortalAuthController_requestOtp",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RequestOtpDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalAuth"
-        ]
-      }
-    },
-    "/portal/auth/verify-otp": {
-      "post": {
-        "operationId": "PortalAuthController_verifyOtp",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyOtpDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalAuth"
-        ]
-      }
-    },
-    "/portal/auth/logout": {
-      "post": {
-        "operationId": "PortalAuthController_logout",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "PortalAuth"
-        ]
-      }
-    },
-    "/admin/applications": {
-      "get": {
-        "operationId": "AdminApplicationsController_list",
-        "parameters": [
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "reviewerId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/applications/counts": {
-      "get": {
-        "operationId": "AdminApplicationsController_counts",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/applications/assignees": {
-      "get": {
-        "operationId": "AdminApplicationsController_assignees",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/applications/export.csv": {
-      "get": {
-        "operationId": "AdminApplicationsController_exportCsv",
-        "parameters": [
-          {
-            "name": "reviewerId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/applications/bulk": {
-      "post": {
-        "operationId": "AdminApplicationsController_bulk",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BulkActionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/applications/{id}": {
-      "get": {
-        "operationId": "AdminApplicationsController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      },
-      "patch": {
-        "operationId": "AdminApplicationsController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateApplicationAdminDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      },
-      "delete": {
-        "operationId": "AdminApplicationsController_anonymise",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/applications/{id}/request-documents": {
-      "post": {
-        "operationId": "AdminApplicationsController_requestDocuments",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RequestDocumentsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/applications/{id}/documents/{docId}": {
-      "patch": {
-        "operationId": "AdminApplicationsController_reviewDocument",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "docId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReviewDocumentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/applications/{id}/documents/{docId}/file": {
-      "get": {
-        "operationId": "AdminApplicationsController_streamDocument",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "docId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/applications/{id}/notes": {
-      "post": {
-        "operationId": "AdminApplicationsController_addNote",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateApplicationNoteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminApplications"
-        ]
-      }
-    },
-    "/admin/interview-slots/{id}": {
-      "patch": {
-        "operationId": "AdminInterviewSlotsController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/admin_interview_slotsUpdateSlotDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminInterviewSlots"
-        ]
-      },
-      "delete": {
-        "operationId": "AdminInterviewSlotsController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminInterviewSlots"
-        ]
-      },
-      "get": {
-        "operationId": "AdminInterviewSlotsController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminInterviewSlots"
-        ]
-      }
-    },
-    "/admin/interview-slots": {
-      "get": {
-        "operationId": "AdminInterviewSlotsController_list",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "published",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminInterviewSlots"
-        ]
-      },
-      "post": {
-        "operationId": "AdminInterviewSlotsController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/admin_interview_slotsCreateDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "AdminInterviewSlots"
-        ]
-      }
-    },
     "/admin/overview": {
       "get": {
         "operationId": "AdminOverviewController_get",
@@ -6489,7 +5615,6 @@
             "type": "string",
             "enum": [
               "admin",
-              "reviewer",
               "editor",
               "support"
             ]
@@ -6705,7 +5830,6 @@
             "type": "string",
             "enum": [
               "admin",
-              "reviewer",
               "editor",
               "support"
             ]
@@ -6743,101 +5867,6 @@
         "required": [
           "altAr"
         ],
-        "additionalProperties": false
-      },
-      "UpdateSmsSettingsDto": {
-        "type": "object",
-        "properties": {
-          "isEnabled": {
-            "type": "boolean"
-          },
-          "driver": {
-            "type": "string",
-            "enum": [
-              "log",
-              "http",
-              "unifonic"
-            ]
-          },
-          "providerUrl": {
-            "type": "string",
-            "maxLength": 500,
-            "format": "uri",
-            "nullable": true
-          },
-          "token": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255
-          },
-          "senderName": {
-            "type": "string",
-            "maxLength": 120,
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "TestSmsDto": {
-        "type": "object",
-        "properties": {
-          "to": {
-            "type": "string",
-            "minLength": 3,
-            "maxLength": 40
-          }
-        },
-        "required": [
-          "to"
-        ],
-        "additionalProperties": false
-      },
-      "UpdateSmsTemplateDto": {
-        "type": "object",
-        "properties": {
-          "nameAr": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
-          "nameEn": {
-            "type": "string",
-            "maxLength": 191,
-            "nullable": true
-          },
-          "bodyAr": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 480
-          },
-          "bodyEn": {
-            "type": "string",
-            "maxLength": 480,
-            "nullable": true
-          },
-          "isEnabled": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "PreviewSmsTemplateDto": {
-        "type": "object",
-        "properties": {
-          "vars": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "locale": {
-            "type": "string",
-            "enum": [
-              "ar",
-              "en"
-            ]
-          }
-        },
         "additionalProperties": false
       },
       "CreateRedirectDto": {
@@ -7080,18 +6109,6 @@
             "type": "string",
             "maxLength": 500,
             "nullable": true
-          },
-          "notifyEmailOnStatusChange": {
-            "type": "boolean"
-          },
-          "notifySmsOnStatusChange": {
-            "type": "boolean"
-          },
-          "applicationRefPrefix": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 10,
-            "pattern": "^[A-Z]+$"
           }
         },
         "additionalProperties": false
@@ -7547,9 +6564,7 @@
               "vision",
               "mission",
               "goal",
-              "care_pillar",
-              "scholarship_step",
-              "requirement"
+              "care_pillar"
             ]
           },
           "icon": {
@@ -7621,9 +6636,7 @@
               "vision",
               "mission",
               "goal",
-              "care_pillar",
-              "scholarship_step",
-              "requirement"
+              "care_pillar"
             ]
           },
           "icon": {
@@ -8656,6 +7669,13 @@
             "maxLength": 191,
             "nullable": true
           },
+          "sectionGroup": {
+            "type": "string",
+            "enum": [
+              "governance",
+              "other"
+            ]
+          },
           "isPublished": {
             "type": "boolean"
           },
@@ -8712,6 +7732,13 @@
             "maxLength": 191,
             "nullable": true
           },
+          "sectionGroup": {
+            "type": "string",
+            "enum": [
+              "governance",
+              "other"
+            ]
+          },
           "isPublished": {
             "type": "boolean"
           },
@@ -8747,6 +7774,16 @@
           "titleEn": {
             "type": "string",
             "maxLength": 255,
+            "nullable": true
+          },
+          "metaAr": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "metaEn": {
+            "type": "string",
+            "maxLength": 190,
             "nullable": true
           },
           "assetId": {
@@ -8812,6 +7849,16 @@
             "maxLength": 255,
             "nullable": true
           },
+          "metaAr": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "metaEn": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
           "assetId": {
             "type": "string",
             "nullable": true
@@ -8841,6 +7888,154 @@
         },
         "additionalProperties": false
       },
+      "CreateLicenceDto": {
+        "type": "object",
+        "properties": {
+          "titleAr": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 191
+          },
+          "titleEn": {
+            "type": "string",
+            "maxLength": 191,
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "issuerAr": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "issuerEn": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "issuedOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "expiresOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "assetId": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "nullable": true
+          },
+          "isPrimary": {
+            "type": "boolean"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "titleAr"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateLicenceDto": {
+        "type": "object",
+        "properties": {
+          "titleAr": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 191
+          },
+          "titleEn": {
+            "type": "string",
+            "maxLength": 191,
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "issuerAr": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "issuerEn": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "issuedOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "expiresOn": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true
+          },
+          "assetId": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "nullable": true
+          },
+          "isPrimary": {
+            "type": "boolean"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false
+      },
+      "PublishLicenceDto": {
+        "type": "object",
+        "properties": {
+          "isPublished": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "admin_licencesReorderDto": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sortOrder": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "id",
+            "sortOrder"
+          ]
+        }
+      },
       "ContactDto": {
         "type": "object",
         "properties": {
@@ -8864,8 +8059,9 @@
           "subject": {
             "type": "string",
             "enum": [
-              "scholarship",
+              "inquiry",
               "partnership",
+              "support",
               "feedback",
               "other"
             ]
@@ -8998,626 +8194,6 @@
         "required": [
           "quoteAr"
         ],
-        "additionalProperties": false
-      },
-      "CreateApplicationDto": {
-        "type": "object",
-        "properties": {
-          "firstName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
-          },
-          "middleName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
-          },
-          "birthDate": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-          },
-          "phone": {
-            "type": "string",
-            "minLength": 5,
-            "maxLength": 40
-          },
-          "nationality": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 2,
-            "pattern": "^[A-Za-z]{2}$"
-          },
-          "idNumber": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 40,
-            "nullable": true
-          },
-          "email": {
-            "type": "string",
-            "maxLength": 191,
-            "format": "email",
-            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-          },
-          "currentJob": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191,
-            "nullable": true
-          },
-          "gender": {
-            "type": "string",
-            "enum": [
-              "male",
-              "female"
-            ]
-          }
-        },
-        "required": [
-          "firstName",
-          "lastName",
-          "birthDate",
-          "phone",
-          "nationality",
-          "email",
-          "gender"
-        ],
-        "additionalProperties": false
-      },
-      "UpdateApplicationDto": {
-        "type": "object",
-        "properties": {
-          "firstName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
-          },
-          "middleName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
-          },
-          "birthDate": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-          },
-          "phone": {
-            "type": "string",
-            "minLength": 5,
-            "maxLength": 40
-          },
-          "nationality": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 2,
-            "pattern": "^[A-Za-z]{2}$"
-          },
-          "idNumber": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 40,
-            "nullable": true
-          },
-          "email": {
-            "type": "string",
-            "maxLength": 191,
-            "format": "email",
-            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-          },
-          "currentJob": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191,
-            "nullable": true
-          },
-          "gender": {
-            "type": "string",
-            "enum": [
-              "male",
-              "female"
-            ]
-          },
-          "university": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
-          "major": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
-          "degreeLevel": {
-            "type": "string",
-            "enum": [
-              "bachelor",
-              "master",
-              "phd"
-            ]
-          },
-          "scholarshipNote": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 5000,
-            "nullable": true
-          },
-          "consent": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "ApplicationCorrectionsDto": {
-        "type": "object",
-        "properties": {
-          "firstName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
-          },
-          "middleName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
-          },
-          "birthDate": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-          },
-          "nationality": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 2,
-            "pattern": "^[A-Za-z]{2}$"
-          },
-          "idNumber": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 40,
-            "nullable": true
-          },
-          "university": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
-          "major": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
-          "degreeLevel": {
-            "type": "string",
-            "enum": [
-              "bachelor",
-              "master",
-              "phd"
-            ]
-          }
-        },
-        "additionalProperties": false
-      },
-      "SubmitApplicationDto": {
-        "type": "object",
-        "properties": {
-          "firstName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
-          },
-          "middleName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 120,
-            "pattern": "^(?:(?=[\\p{Script=Arabic}\\p{Script=Latin}])\\p{L}|\\p{M}|['’ -])+$"
-          },
-          "birthDate": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-          },
-          "phone": {
-            "type": "string",
-            "minLength": 5,
-            "maxLength": 40
-          },
-          "nationality": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 2,
-            "pattern": "^[A-Za-z]{2}$"
-          },
-          "idNumber": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 40,
-            "nullable": true
-          },
-          "email": {
-            "type": "string",
-            "maxLength": 191,
-            "format": "email",
-            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-          },
-          "currentJob": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191,
-            "nullable": true
-          },
-          "gender": {
-            "type": "string",
-            "enum": [
-              "male",
-              "female"
-            ]
-          },
-          "university": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
-          "major": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
-          "degreeLevel": {
-            "type": "string",
-            "enum": [
-              "bachelor",
-              "master",
-              "phd"
-            ]
-          },
-          "scholarshipNote": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 5000,
-            "nullable": true
-          },
-          "consent": {
-            "type": "boolean",
-            "enum": [
-              true
-            ]
-          }
-        },
-        "required": [
-          "firstName",
-          "lastName",
-          "birthDate",
-          "phone",
-          "nationality",
-          "email",
-          "gender",
-          "university",
-          "major",
-          "degreeLevel",
-          "consent"
-        ],
-        "additionalProperties": false
-      },
-      "BookInterviewDto": {
-        "type": "object",
-        "properties": {
-          "slotId": {
-            "type": "string",
-            "pattern": "^\\d+$"
-          }
-        },
-        "required": [
-          "slotId"
-        ],
-        "additionalProperties": false
-      },
-      "RequestOtpDto": {
-        "type": "object",
-        "properties": {
-          "identifier": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
-          "channel": {
-            "type": "string",
-            "enum": [
-              "sms",
-              "email"
-            ]
-          }
-        },
-        "required": [
-          "identifier"
-        ],
-        "additionalProperties": false
-      },
-      "VerifyOtpDto": {
-        "type": "object",
-        "properties": {
-          "identifier": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 191
-          },
-          "code": {
-            "type": "string",
-            "pattern": "^\\d{6}$"
-          }
-        },
-        "required": [
-          "identifier",
-          "code"
-        ],
-        "additionalProperties": false
-      },
-      "BulkActionDto": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "minItems": 1,
-            "maxItems": 200,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^\\d+$"
-            }
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "assign",
-              "status",
-              "request_documents"
-            ]
-          },
-          "reviewerId": {
-            "type": "string",
-            "pattern": "^\\d+$",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "draft",
-              "new",
-              "under_review",
-              "docs_missing",
-              "interview",
-              "accepted",
-              "rejected"
-            ]
-          },
-          "docTypes": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "id_copy",
-                "certificate",
-                "admission_letter",
-                "other"
-              ]
-            }
-          },
-          "message": {
-            "type": "string",
-            "maxLength": 2000,
-            "nullable": true
-          }
-        },
-        "required": [
-          "ids",
-          "action"
-        ],
-        "additionalProperties": false
-      },
-      "UpdateApplicationAdminDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "draft",
-              "new",
-              "under_review",
-              "docs_missing",
-              "interview",
-              "accepted",
-              "rejected"
-            ]
-          },
-          "assignedReviewerId": {
-            "type": "string",
-            "pattern": "^\\d+$",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "RequestDocumentsDto": {
-        "type": "object",
-        "properties": {
-          "docTypes": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "id_copy",
-                "certificate",
-                "admission_letter",
-                "other"
-              ]
-            }
-          },
-          "message": {
-            "type": "string",
-            "maxLength": 2000,
-            "nullable": true
-          }
-        },
-        "required": [
-          "docTypes"
-        ],
-        "additionalProperties": false
-      },
-      "ReviewDocumentDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "accepted",
-              "rejected"
-            ]
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "additionalProperties": false
-      },
-      "CreateApplicationNoteDto": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 5000
-          }
-        },
-        "required": [
-          "body"
-        ],
-        "additionalProperties": false
-      },
-      "admin_interview_slotsUpdateSlotDto": {
-        "type": "object",
-        "properties": {
-          "startsAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-          },
-          "endsAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-          },
-          "locationAr": {
-            "type": "string",
-            "maxLength": 255,
-            "nullable": true
-          },
-          "locationEn": {
-            "type": "string",
-            "maxLength": 255,
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "admin_interview_slotsCreateDto": {
-        "type": "object",
-        "properties": {
-          "startsAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-          },
-          "endsAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-          },
-          "locationAr": {
-            "type": "string",
-            "maxLength": 255,
-            "nullable": true
-          },
-          "locationEn": {
-            "type": "string",
-            "maxLength": 255,
-            "nullable": true
-          }
-        },
-        "required": [
-          "startsAt",
-          "endsAt"
-        ],
-        "additionalProperties": false
-      },
-      "admin_interview_slotsReorderDto": {
-        "minItems": 1,
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "sortOrder": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            }
-          },
-          "required": [
-            "id",
-            "sortOrder"
-          ]
-        }
-      },
-      "admin_interview_slotsPublishDto": {
-        "type": "object",
-        "properties": {
-          "isPublished": {
-            "type": "boolean"
-          }
-        },
         "additionalProperties": false
       }
     }

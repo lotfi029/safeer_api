@@ -113,8 +113,8 @@ Fill in the three files. Each variable's comment says how to generate it.
   - `BOOTSTRAP_ADMIN_EMAIL` (the real first admin) and `BOOTSTRAP_ADMIN_PASSWORD`
 
 > **`APP_ENCRYPTION_KEY`: store a copy offline before the first start**
-> (the association's password manager). It encrypts applicant ID numbers and
-> the SMTP/SMS secrets. Lose it and that data is unreadable, including in
+> (the association's password manager). It encrypts the stored SMTP
+> password and keys the signed newsletter links. Lose it and that data is unreadable, including in
 > every backup. Never reuse the value in `.github/workflows/ci.yml`; it is
 > public. See [APP_ENCRYPTION_KEY](DEPLOYMENT-HOSTINGER.md#app_encryption_key).
 
@@ -250,17 +250,13 @@ On `new.safeer-sa.org`:
 1. Configure SMTP in the admin (Settings → Mail) and send the test mail.
    Without mail, invites and password resets can't go out.
 2. One real journey, end to end:
-   1. apply
-   2. OTP by email
-   3. upload the documents and submit
-   4. review in the admin
-   5. book an interview
-   6. record the decision
+   1. send the contact form (each subject is in `GET meta/enums`)
+   2. read and reply to it in the admin inbox
+   3. publish a governance document and a licence (with its file), make the
+      licence primary, and check the footer's licence number (`GET /site`)
 3. Invite one staff account and accept it from the emailed link (this checks
    that `SITE_URL` reached `FRONTEND_BASE_URL`).
-4. **Delete the test application** from the admin
-   (`DELETE admin/applications/:id`, which anonymises it). Remove any other
-   test data before cutover.
+4. Remove the test data before cutover.
 
 ## 6. Backups
 
@@ -268,7 +264,7 @@ On `new.safeer-sa.org`:
 (mode 700, files 600). It deletes anything older than 14 days.
 
 - a `mysqldump --single-transaction` of `safeer`, gzip
-- a tar of the `storage` volume (uploads and applicant documents)
+- a tar of the `storage` volume (uploads)
 
 Its header holds the full restore procedure.
 
@@ -279,8 +275,8 @@ Its header holds the full restore procedure.
 
 - **Offsite.** Set `OFFSITE_HOOK=/srv/safeer/offsite.sh` in the cron line.
   It's called with the two new files; for example, `rclone copy` to an
-  encrypted (`crypt`) remote. The files contain applicant personal data, so
-  never send them anywhere unencrypted. Backups keep deleted data for their
+  encrypted (`crypt`) remote. The files contain personal data (contact
+  messages, staff accounts), so never send them anywhere unencrypted. Backups keep deleted data for their
   14 days; the privacy notice should say so.
 - **Test restore (do it once before go-live, then after any change to
   backup.sh).** Restore the latest dump into a scratch schema and compare:
@@ -290,7 +286,7 @@ Its header holds the full restore procedure.
     "CREATE DATABASE safeer_restore_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
   gunzip -c "$f" | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" safeer_restore_test'
   docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e \
-    "SELECT COUNT(*) FROM safeer.applications; SELECT COUNT(*) FROM safeer_restore_test.applications;"'
+    "SELECT COUNT(*) FROM safeer.contact_messages; SELECT COUNT(*) FROM safeer_restore_test.contact_messages;"'
   docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "DROP DATABASE safeer_restore_test"'
   tar -tzf $(ls -t backups/safeer-storage-*.tar.gz | head -1) | head
   ```
@@ -356,7 +352,50 @@ to `safeer_app` before the new API needs it.
 **By hand** (a release tag, or a rollback): `./deploy.sh api v1.1.0` /
 `./deploy.sh web v1.1.0`. Then the short form of §4: `/healthz`,
 `/api/v1/site`, and the admin sign-in. On SIGTERM the API waits up to 10 s
-for in-flight OTP sends; compose allows it 15 s.
+for background work in flight; compose allows it 15 s.
+
+### Upgrading past 021/022 (governance and contact)
+
+Migrations 021 and 022 remove the scholarship feature, SMS and the
+`reviewer` role, and add the governance sections and licences. Like any
+release with a migration, the automatic `api <tag>` refuses until someone
+runs `migrate` (above). Before that:
+
+1. **Reassign every `reviewer` account** (Users in the admin: role editor,
+   support or admin). 021 checks first and stops with
+   `Check constraint '021_reassign_reviewer_users_first' is violated` before
+   changing anything; `SELECT id, email FROM users WHERE role = 'reviewer'`
+   lists them. Re-run `./deploy.sh migrate <tag>` once they're gone.
+2. `./deploy.sh migrate <tag>` takes the backup first — keep that dump: it
+   is the only copy of the applications, their documents' metadata and the
+   SMS settings once 021 drops those tables.
+3. `./deploy.sh api <tag>`, then `web`.
+
+After it:
+
+- **`app.env`:** `APPLICANT_SESSION_COOKIE_NAME`,
+  `APPLICANT_SESSION_IDLE_HOURS`, `APPLICANT_SESSION_ABSOLUTE_DAYS`,
+  `S3_BUCKET_PRIVATE` and `S3_SIGNED_URL_TTL_SECONDS` are no longer read.
+  Delete them (a leftover value is ignored, not an error).
+- **Applicant files** stay on the `storage` volume under
+  `private/applications/` (or in the private S3 bucket). Nothing reads them
+  any more; they are personal data, so delete them once the pre-021 backup is
+  safe: `docker compose exec api sh -c 'rm -rf "$STORAGE_ROOT/private/applications"'`.
+- **Grants:** `migrate` re-applies `deploy/create-app-db-user.sql`, which now
+  grants `licences` and no longer names the dropped tables. The old
+  table-level grants on the dropped tables stay in `mysql.tables_priv`
+  (MySQL keeps them after a `DROP TABLE`); they're harmless, and
+  `SHOW GRANTS FOR 'safeer_app'@'%'` shows them. To tidy up, `REVOKE ALL ON
+  safeer.<table> FROM 'safeer_app'@'%'` for each of `applications`,
+  `application_documents`, `application_notes`, `application_events`,
+  `interview_slots`, `applicant_sessions`, `applicant_otps`, `counters`,
+  `sms_settings`, `sms_templates`, `sms_log`.
+- **Content:** the home page buttons that led to `/apply` and
+  `/scholarships` now lead to `/contact`, but their labels still say
+  "apply" — edit them in the admin (Pages → home). 022 moved the documents
+  filed under "Licences" into the new licences table; give each a number and
+  issuer, and mark the primary one (`PATCH admin/licences/:id/primary`) so
+  the footer shows the licence number.
 
 ## 9. Rollback
 
@@ -394,7 +433,8 @@ for in-flight OTP sends; compose allows it 15 s.
   [Data retention](DEPLOYMENT-HOSTINGER.md#data-retention-c27).
 - **Migrations** (immutability, the lock, `migrate:status`):
   [Migrations](DEPLOYMENT-HOSTINGER.md#migrations).
-- **SMS (Unifonic)** and **S3 storage**: configured in the admin, or in
-  `app.env` for S3. See the same-named sections of `DEPLOYMENT-HOSTINGER.md`.
+- **S3 storage**: configured in `app.env`. See the same-named section of
+  `DEPLOYMENT-HOSTINGER.md` (one bucket now; its private-bucket and SMS
+  parts predate 021).
 - **One API process.** The in-process cache requires a single instance
   (ARCHITECTURE.md). Don't `docker compose up --scale api=2`.

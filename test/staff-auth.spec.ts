@@ -294,15 +294,20 @@ describe('staff auth', () => {
     });
   });
 
-  it('B7: a disabled account is not a valid assignee', async () => {
-    const reviewer = await createTempUser('reviewer');
-    try {
-      await adminApi('PATCH', `/admin/users/${reviewer.id}`, { body: { status: 'disabled' } });
-      const assignees = await adminApi('GET', '/admin/applications/assignees');
-      expect(assignees.body.some((u: any) => u.id === reviewer.id)).toBe(false);
-    } finally {
-      await deleteTempUser(reviewer.id);
-    }
+  describe('the reviewer role is gone (021)', () => {
+    it('inviting or promoting someone to reviewer is a 400', async () => {
+      const email = `jest-reviewer-${Date.now()}@example.com`;
+      const invite = await adminApi('POST', '/admin/auth/invite', { body: { email, name: 'Reviewer Person', role: 'reviewer' } });
+      expect(invite.status).toBe(400);
+      expect(await withDb((conn) => conn.execute('SELECT COUNT(*) AS n FROM users WHERE email = ?', [email]).then(([r]: any) => Number(r[0].n)))).toBe(0);
+
+      const editor = await createTempUser('editor');
+      try {
+        expect((await adminApi('PATCH', `/admin/users/${editor.id}`, { body: { role: 'reviewer' } })).status).toBe(400);
+        expect((await adminApi('GET', '/admin/roles')).body.roles).toEqual(['admin', 'editor', 'support']);
+      } finally {
+        await deleteTempUser(editor.id);
+      }
+    });
   });
 });
-
