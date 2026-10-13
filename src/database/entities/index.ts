@@ -25,6 +25,7 @@ import { Partner } from './partner.entity.js';
 import { DocCategory } from './doc-category.entity.js';
 import { SafeerDocument } from './document.entity.js';
 import { Licence } from './licence.entity.js';
+import { OrgPosition } from './org-position.entity.js';
 import { ContactMessage } from './contact-message.entity.js';
 import { MessageReply } from './message-reply.entity.js';
 
@@ -56,6 +57,7 @@ export {
   DocCategory,
   SafeerDocument,
   Licence,
+  OrgPosition,
   ContactMessage,
   MessageReply,
 };
@@ -92,6 +94,7 @@ export const entities = [
   DocCategory,
   SafeerDocument,
   Licence,
+  OrgPosition,
   ContactMessage,
   MessageReply,
 ];
