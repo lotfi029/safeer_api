@@ -1,7 +1,9 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import type { Locale } from '../../common/request-context.js';
 
-export type ContactMessageSubject = 'scholarship' | 'partnership' | 'feedback' | 'other';
+/** The contact form's subjects (021: `scholarship` became `inquiry`; `support` is support and donations). */
+export const CONTACT_SUBJECTS = ['inquiry', 'partnership', 'support', 'feedback', 'other'] as const;
+export type ContactMessageSubject = (typeof CONTACT_SUBJECTS)[number];
 export type ContactMessageStatus = 'unread' | 'read' | 'archived';
 
 @Entity('contact_messages')
@@ -20,8 +22,7 @@ export class ContactMessage {
   @Column({ type: 'varchar', length: 191 })
   email: string;
 
-  // 021: the database's subjects; the type (and the DTO) follow in A5.
-  @Column({ type: 'enum', enum: ['inquiry', 'partnership', 'support', 'feedback', 'other'] })
+  @Column({ type: 'enum', enum: [...CONTACT_SUBJECTS] })
   subject: ContactMessageSubject;
 
   @Column({ type: 'text' })

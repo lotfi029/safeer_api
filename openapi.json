@@ -7562,8 +7562,9 @@
           "subject": {
             "type": "string",
             "enum": [
-              "scholarship",
+              "inquiry",
               "partnership",
+              "support",
               "feedback",
               "other"
             ]

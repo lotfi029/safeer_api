@@ -73,7 +73,7 @@ describe('C23: labels in mail', () => {
       });
       expect(sent.status).toBe(201);
       const notify = await sink.waitFor((m) => m.to.includes('inbox@example.com') && (m.html + m.text).includes(email));
-      expect(notify.html + notify.text).toContain('طلب شراكة');
+      expect(notify.html + notify.text).toContain('شراكة');
       expect(notify.html + notify.text).not.toMatch(/\bpartnership\b/);
       await withDb((conn) => conn.execute('DELETE FROM contact_messages WHERE email = ?', [email]));
 

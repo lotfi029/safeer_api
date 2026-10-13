@@ -6,6 +6,8 @@ import { CacheTags } from '../cache/cache-tags.decorator.js';
 import { CacheKeyParams } from '../cache/cache-key-params.decorator.js';
 import { declarePurger } from '../cache/cache-tag-registry.js';
 import { COUNTRIES, type MetaCountry } from './data/countries.js';
+import { CONTACT_SUBJECTS } from '../database/entities/contact-message.entity.js';
+import { CONTACT_SUBJECT_LABELS } from '../common/labels.js';
 
 interface EnumOption {
   value: string;
@@ -26,12 +28,11 @@ const PARTNER_CATEGORY: EnumOption[] = [
   { value: 'supporter', labelAr: 'داعم', labelEn: 'Supporter' },
 ];
 
-const CONTACT_SUBJECT: EnumOption[] = [
-  { value: 'scholarship', labelAr: 'المنح الدراسية', labelEn: 'Scholarships' },
-  { value: 'partnership', labelAr: 'الشراكات', labelEn: 'Partnership' },
-  { value: 'feedback', labelAr: 'ملاحظات', labelEn: 'Feedback' },
-  { value: 'other', labelAr: 'أخرى', labelEn: 'Other' },
-];
+const CONTACT_SUBJECT: EnumOption[] = CONTACT_SUBJECTS.map((value) => ({
+  value,
+  labelAr: CONTACT_SUBJECT_LABELS[value].ar,
+  labelEn: CONTACT_SUBJECT_LABELS[value].en,
+}));
 
 /**
  * Static reference data every public form reads — never DB-backed, so it is

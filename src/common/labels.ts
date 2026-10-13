@@ -1,5 +1,6 @@
 import type { Locale } from './request-context.js';
 import type { UserRole } from '../database/entities/user.entity.js';
+import type { ContactMessageSubject } from '../database/entities/contact-message.entity.js';
 
 /**
  * C23: human labels for the codes that go into mail variables — an Arabic
@@ -15,11 +16,13 @@ const ROLE_LABELS: Labels<UserRole> = {
   support: { ar: 'دعم ومراسلات', en: 'Support' },
 };
 
-const CONTACT_SUBJECT_LABELS: Labels<'scholarship' | 'partnership' | 'feedback' | 'other'> = {
-  scholarship: { ar: 'استفسار عن المنح', en: 'Scholarship enquiry' },
-  partnership: { ar: 'طلب شراكة', en: 'Partnership request' },
-  feedback: { ar: 'ملاحظة أو اقتراح', en: 'Feedback' },
-  other: { ar: 'موضوع آخر', en: 'Other' },
+/** The contact form's subjects — also served by GET meta/enums (contactSubject). */
+export const CONTACT_SUBJECT_LABELS: Labels<ContactMessageSubject> = {
+  inquiry: { ar: 'استفسار', en: 'Inquiry' },
+  partnership: { ar: 'شراكة', en: 'Partnership' },
+  support: { ar: 'دعم وتبرع', en: 'Support and donations' },
+  feedback: { ar: 'ملاحظات', en: 'Feedback' },
+  other: { ar: 'أخرى', en: 'Other' },
 };
 
 export const contactSubjectLabel = (subject: string, locale: Locale): string =>
