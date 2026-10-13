@@ -30,6 +30,7 @@ import { TestimonialsModule } from './testimonials/testimonials.module.js';
 import { PartnersModule } from './partners/partners.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
 import { LicencesModule } from './licences/licences.module.js';
+import { OrgChartModule } from './org-chart/org-chart.module.js';
 import { HomeModule } from './home/home.module.js';
 import { SiteModule } from './site/site.module.js';
 import { ContactModule } from './contact/contact.module.js';
@@ -80,6 +81,7 @@ import { BackgroundWorkModule } from './common/background/background-work.module
     PartnersModule,
     DocumentsModule,
     LicencesModule,
+    OrgChartModule,
     HomeModule,
     SiteModule,
     ContactModule,
