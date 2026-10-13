@@ -97,6 +97,20 @@ export class SiteSettings {
   seoDescriptionEn: string | null;
 
   /**
+   * 022: the primary published licence's number and issuer, written through
+   * by admin-licences.controller.ts on every licence write — never edited
+   * here (the admin settings DTO doesn't accept them).
+   */
+  @Column({ name: 'licence_no', type: 'varchar', length: 100, nullable: true })
+  licenceNo: string | null;
+
+  @Column({ name: 'licence_issuer_ar', type: 'varchar', length: 190, nullable: true })
+  licenceIssuerAr: string | null;
+
+  @Column({ name: 'licence_issuer_en', type: 'varchar', length: 190, nullable: true })
+  licenceIssuerEn: string | null;
+
+  /**
    * A7: HMAC of a fixed label under APP_ENCRYPTION_KEY — which key this
    * database's encrypted data belongs to. Written once, on first use, by
    * migrate or at boot (src/database/encryption-key-check.ts); never part of

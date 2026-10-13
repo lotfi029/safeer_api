@@ -36,6 +36,10 @@ export interface PublicSiteSettings {
   seoTitleEn: string | null;
   seoDescriptionAr: string | null;
   seoDescriptionEn: string | null;
+  /** 022: the primary published licence's number and issuer (null when there is none). */
+  licenceNo: string | null;
+  licenceIssuerAr: string | null;
+  licenceIssuerEn: string | null;
 }
 
 export function toPublicSiteSettings(settings: SiteSettings): PublicSiteSettings {
@@ -68,5 +72,8 @@ export function toPublicSiteSettings(settings: SiteSettings): PublicSiteSettings
     seoTitleEn: settings.seoTitleEn,
     seoDescriptionAr: settings.seoDescriptionAr,
     seoDescriptionEn: settings.seoDescriptionEn,
+    licenceNo: settings.licenceNo,
+    licenceIssuerAr: settings.licenceIssuerAr,
+    licenceIssuerEn: settings.licenceIssuerEn,
   };
 }
