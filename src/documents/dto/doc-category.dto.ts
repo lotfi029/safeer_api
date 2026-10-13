@@ -1,12 +1,14 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { slugSchema } from '../../common/validation/slug.js';
+import { DOC_SECTION_GROUPS } from '../../database/entities/doc-category.entity.js';
 
 export const createDocCategorySchema = z
   .object({
     slug: slugSchema().max(64), // C14
     nameAr: z.string().min(1).max(191),
     nameEn: z.string().trim().max(191).nullable().optional(),
+    sectionGroup: z.enum(DOC_SECTION_GROUPS).optional(),
     isPublished: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   })

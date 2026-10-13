@@ -4309,6 +4309,43 @@
         ]
       }
     },
+    "/documents/sections": {
+      "get": {
+        "operationId": "DocumentsController_sections",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Documents"
+        ]
+      }
+    },
+    "/documents/sections/{slug}": {
+      "get": {
+        "operationId": "DocumentsController_section",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Documents"
+        ]
+      }
+    },
     "/admin/doc-categories": {
       "get": {
         "operationId": "AdminDocCategoriesController_list",
@@ -7354,6 +7391,13 @@
             "maxLength": 191,
             "nullable": true
           },
+          "sectionGroup": {
+            "type": "string",
+            "enum": [
+              "governance",
+              "other"
+            ]
+          },
           "isPublished": {
             "type": "boolean"
           },
@@ -7410,6 +7454,13 @@
             "maxLength": 191,
             "nullable": true
           },
+          "sectionGroup": {
+            "type": "string",
+            "enum": [
+              "governance",
+              "other"
+            ]
+          },
           "isPublished": {
             "type": "boolean"
           },
@@ -7445,6 +7496,16 @@
           "titleEn": {
             "type": "string",
             "maxLength": 255,
+            "nullable": true
+          },
+          "metaAr": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "metaEn": {
+            "type": "string",
+            "maxLength": 190,
             "nullable": true
           },
           "assetId": {
@@ -7508,6 +7569,16 @@
           "titleEn": {
             "type": "string",
             "maxLength": 255,
+            "nullable": true
+          },
+          "metaAr": {
+            "type": "string",
+            "maxLength": 190,
+            "nullable": true
+          },
+          "metaEn": {
+            "type": "string",
+            "maxLength": 190,
             "nullable": true
           },
           "assetId": {
