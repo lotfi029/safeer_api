@@ -20,8 +20,6 @@ import { MessagesModule } from '../messages/messages.module.js';
 import { AdminApplicationsController } from './admin-applications.controller.js';
 import { AdminApplicationsService } from './admin-applications.service.js';
 import { AdminInterviewSlotsController } from './admin-interview-slots.controller.js';
-import { AdminOverviewController } from './admin-overview.controller.js';
-import { AdminOverviewService } from './admin-overview.service.js';
 
 /**
  * Phase 7 — the admin/reviewer half of the scholarship pipeline: listing,
@@ -54,7 +52,7 @@ import { AdminOverviewService } from './admin-overview.service.js';
     ConfigModule,
     MessagesModule,
   ],
-  controllers: [AdminApplicationsController, AdminInterviewSlotsController, AdminOverviewController],
-  providers: [AdminApplicationsService, AdminOverviewService],
+  controllers: [AdminApplicationsController, AdminInterviewSlotsController],
+  providers: [AdminApplicationsService],
 })
 export class AdminApplicationsModule {}

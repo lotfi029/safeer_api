@@ -76,11 +76,18 @@ describe('C20: dashboard overview', () => {
     }
   });
 
-  it('reviewer gets application figures but no audit feed', async () => {
+  it('the overview carries no application blocks for any role', async () => {
+    const res = await adminApi('GET', '/admin/overview');
+    expect(res.status).toBe(200);
+    expect(Object.keys(res.body).sort()).toEqual(['badges', 'contentAlerts', 'recentAuditLog', 'statCards']);
+    expect(res.body.statCards.newApplications).toBeUndefined();
+    expect(res.body.badges.newApplications).toBeUndefined();
+  });
+
+  it('reviewer gets no audit feed', async () => {
     const user = await createTempUser('reviewer');
     try {
       const res = await api('GET', '/admin/overview', { session: user });
-      expect(Array.isArray(res.body.latestApplications)).toBe(true);
       expect(res.body.recentAuditLog).toEqual([]);
     } finally {
       await deleteTempUser(user.id);

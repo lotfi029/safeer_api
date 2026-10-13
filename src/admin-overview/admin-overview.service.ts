@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
-import { Application } from '../database/entities/application.entity.js';
+import { Repository } from 'typeorm';
 import { AuditLog } from '../database/entities/audit-log.entity.js';
 import { Partner } from '../database/entities/partner.entity.js';
 import { Post } from '../database/entities/post.entity.js';
@@ -14,48 +13,25 @@ import { AREA_ROLES, type Area } from '../auth/role-matrix.js';
 const hasArea = (area: Area, role: UserRole): boolean => (AREA_ROLES[area] as readonly UserRole[]).includes(role);
 
 const RECENT_AUDIT_LIMIT = 20;
-const SERIES_MONTHS = 6;
-const LATEST_APPLICATIONS_LIMIT = 4;
-
-interface MonthBucket {
-  month: string; // 'YYYY-MM'
-  start: Date;
-  end: Date; // exclusive
-}
-
-/** UTC calendar months (C9: every stored timestamp is UTC, so the buckets are too). */
-function lastNMonths(n: number): MonthBucket[] {
-  const now = new Date();
-  const buckets: MonthBucket[] = [];
-  for (let i = n - 1; i >= 0; i--) {
-    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i + 1, 1));
-    buckets.push({ month: `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}`, start, end });
-  }
-  return buckets;
-}
 
 /**
  * `GET admin/overview` (project plan "Admin overview"). Reachable by any
  * staff role — `AdminOverviewController` carries no `@Roles()` — but the
  * response shape itself narrows by `req.user.role`:
- * - applications-related blocks (the 3 application stat cards, the 6-month
- *   series, the latest-applications list, the applications sidebar badge)
- *   are omitted for `editor`.
  * - messages-related blocks (the unread-messages stat card and sidebar
  *   badge) only for the inbox area's roles (admin, support — A5).
- * - B6/C20: `recentAuditLog` is admin-only, and never carries `diff` or IP hashes —
- *   every other role gets an empty array. The feed includes application
- *   references, status changes, and reviewer/user actions across every
- *   collection, which is more than editor/reviewer/support's own areas
- *   should see, and `GET admin/audit` (the full log) is already
- *   admin-only, so the overview's own summary matches that.
+ * - B6/C20: `recentAuditLog` is admin-only, and never carries `diff` or IP
+ *   hashes — every other role gets an empty array. `GET admin/audit` (the
+ *   full log) is already admin-only, so the overview's own summary matches.
  * Content alerts are never role-filtered.
+ *
+ * The scholarship blocks (application stat cards, the 6-month series, the
+ * latest applications and the applications badge) went with the
+ * applications feature — see docs/backend/API-CHANGES.md.
  */
 @Injectable()
 export class AdminOverviewService {
   constructor(
-    @InjectRepository(Application) private readonly applicationRepo: Repository<Application>,
     @InjectRepository(AuditLog) private readonly auditRepo: Repository<AuditLog>,
     @InjectRepository(Partner) private readonly partnerRepo: Repository<Partner>,
     @InjectRepository(Post) private readonly postRepo: Repository<Post>,
@@ -67,11 +43,9 @@ export class AdminOverviewService {
     // C20 + A5: each block only for the roles that own its area — the same
     // matrix @Area() applies to the routes behind it. Message figures are
     // the inbox area's (admin, support): editors don't see the inbox.
-    const includeApplications = hasArea('applications', role);
     const includeMessages = hasArea('inbox', role);
 
-    const [applicationsBlock, messagesBlock, contentAlerts, recentAuditLog] = await Promise.all([
-      includeApplications ? this.applicationsBlock() : null,
+    const [messagesBlock, contentAlerts, recentAuditLog] = await Promise.all([
       includeMessages ? this.messages.countUnread() : null,
       this.contentAlerts(),
       role === 'admin' ? this.recentAuditLog() : Promise.resolve([]),
@@ -79,72 +53,13 @@ export class AdminOverviewService {
 
     const statCards: Record<string, number> = {};
     const badges: Record<string, number> = {};
-    if (applicationsBlock) {
-      statCards.newApplications = applicationsBlock.newCount;
-      statCards.underReview = applicationsBlock.underReviewCount;
-      statCards.acceptedThisMonth = applicationsBlock.acceptedThisMonthCount;
-      badges.newApplications = applicationsBlock.newCount;
-    }
     if (messagesBlock !== null) {
       statCards.unreadMessages = messagesBlock;
       badges.unreadMessages = messagesBlock;
     }
 
-    return {
-      statCards,
-      ...(applicationsBlock ? { series: applicationsBlock.series, latestApplications: applicationsBlock.latestApplications } : {}),
-      contentAlerts,
-      badges,
-      recentAuditLog,
-    };
+    return { statCards, contentAlerts, badges, recentAuditLog };
   }
-
-  private async applicationsBlock() {
-    const months = lastNMonths(SERIES_MONTHS);
-    const currentMonth = months[months.length - 1];
-
-    const [newCount, underReviewCount, series, latestApplications] = await Promise.all([
-      this.applicationRepo.count({ where: { status: 'new' } }),
-      this.applicationRepo.count({ where: { status: 'under_review' } }),
-      Promise.all(
-        months.map(async (bucket) => {
-          const [received, accepted] = await Promise.all([
-            this.countInRange('submittedAt', bucket.start, bucket.end),
-            this.countInRange('decidedAt', bucket.start, bucket.end, 'accepted'),
-          ]);
-          return { month: bucket.month, received, accepted };
-        }),
-      ),
-      this.applicationRepo.find({
-        where: { submittedAt: Not(IsNull()) },
-        order: { submittedAt: 'DESC' },
-        take: LATEST_APPLICATIONS_LIMIT,
-      }),
-    ]);
-
-    const acceptedThisMonthCount = await this.countInRange('decidedAt', currentMonth.start, currentMonth.end, 'accepted');
-
-    return {
-      newCount,
-      underReviewCount,
-      acceptedThisMonthCount,
-      series,
-      latestApplications: latestApplications.map((a) => ({
-        id: a.id,
-        reference: a.reference,
-        name: [a.firstName, a.middleName, a.lastName].filter(Boolean).join(' '),
-        status: a.status,
-        submittedAt: a.submittedAt,
-      })),
-    };
-  }
-
-  private async countInRange(column: 'submittedAt' | 'decidedAt', start: Date, end: Date, status?: 'accepted'): Promise<number> {
-    const qb = this.applicationRepo.createQueryBuilder('a').where(`a.${column} >= :start AND a.${column} < :end`, { start, end });
-    if (status) qb.andWhere('a.status = :status', { status });
-    return qb.getCount();
-  }
-
   /**
    * `pages.needs_review` exists on the entity (phase 2's schema already
    * anticipated this alert), so it's a real signal, not a substitute — see

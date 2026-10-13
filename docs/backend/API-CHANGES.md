@@ -210,3 +210,30 @@ application's locale.
   `safeer-web`'s `API_INTERNAL_URL` is `http://safeer-api:3900` (the api service's alias; the plain name `api` collides with other projects on the shared edge network) on the private
   Compose network (`deploy/docker-compose.yml`).
 
+
+## Governance and contact (branch `feat/governance-contact`)
+
+The owner removed the scholarship feature (application form, applicant
+portal, review, interviews, the `scholarships` page), SMS and the `reviewer`
+role, kept the contact form with new subjects, and added governance sections
+and licences. Each item below names its commit (A1–A8).
+
+### Admin overview (A1)
+
+`GET admin/overview` moved to its own module (`src/admin-overview/`). The
+response is now exactly:
+
+```json
+{
+  "statCards": { "unreadMessages": 3 },
+  "contentAlerts": { "noPublishedPartners": false, "legacyPostsCount": 0, "pagesNeedingReviewCount": 0 },
+  "badges": { "unreadMessages": 3 },
+  "recentAuditLog": []
+}
+```
+
+Removed fields: `statCards.newApplications`, `statCards.underReview`,
+`statCards.acceptedThisMonth`, `badges.newApplications`, `series` (the
+6-month received/accepted chart) and `latestApplications`. The role rules
+are unchanged: `unreadMessages` only for admin and support, `recentAuditLog`
+non-empty only for admin.

@@ -38,6 +38,7 @@ import { MessagesModule } from './messages/messages.module.js';
 import { ApplicationsModule } from './applications/applications.module.js';
 import { PortalModule } from './portal/portal.module.js';
 import { AdminApplicationsModule } from './admin-applications/admin-applications.module.js';
+import { AdminOverviewModule } from './admin-overview/admin-overview.module.js';
 import { SitemapModule } from './sitemap/sitemap.module.js';
 import { TestAwareThrottlerGuard } from './common/guards/test-aware-throttler.guard.js';
 import { devModuleFor } from './dev/dev.module.js';
@@ -110,6 +111,7 @@ import { BackgroundWorkModule } from './common/background/background-work.module
     ApplicationsModule,
     PortalModule,
     AdminApplicationsModule,
+    AdminOverviewModule,
     // A8: the __dev routes exist only in development/test.
     devModuleFor(process.env.NODE_ENV),
     SitemapModule,
