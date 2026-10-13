@@ -10,8 +10,7 @@ export class AboutItem {
 
   @Column({
     type: 'enum',
-    // The database still allows the retired scholarship kinds until 021 drops them.
-    enum: ['vision', 'mission', 'goal', 'care_pillar', 'scholarship_step', 'requirement'],
+    enum: ['vision', 'mission', 'goal', 'care_pillar'] as AboutItemKind[],
   })
   kind: AboutItemKind;
 

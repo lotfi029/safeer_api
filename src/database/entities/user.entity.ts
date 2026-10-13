@@ -34,8 +34,7 @@ export class User {
   @Column({ name: 'password_hash', type: 'varchar', length: 255, select: false })
   passwordHash: string;
 
-  // The database still allows `reviewer` until 021 drops it.
-  @Column({ type: 'enum', enum: ['admin', 'reviewer', 'editor', 'support'], default: 'editor' })
+  @Column({ type: 'enum', enum: ['admin', 'editor', 'support'] as UserRole[], default: 'editor' })
   role: UserRole;
 
   /**

@@ -56,7 +56,7 @@ describe('production migrate + schema:check', () => {
     expect(versions[0]).toBe('001_schema.sql');
     expect(versions).toContain('002_seed.sql');
     expect(versions).not.toContain('003_dev_sample.sql');
-    expect(await count('SELECT COUNT(*) AS n FROM applications')).toBe(0);
+    expect(await count('SELECT COUNT(*) AS n FROM contact_messages')).toBe(0);
     expect(await count('SELECT COUNT(*) AS n FROM media_assets')).toBe(0);
     expect(await count('SELECT COUNT(*) AS n FROM pages')).toBeGreaterThan(0);
 

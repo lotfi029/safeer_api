@@ -20,7 +20,8 @@ export class ContactMessage {
   @Column({ type: 'varchar', length: 191 })
   email: string;
 
-  @Column({ type: 'enum', enum: ['scholarship', 'partnership', 'feedback', 'other'] as ContactMessageSubject[] })
+  // 021: the database's subjects; the type (and the DTO) follow in A5.
+  @Column({ type: 'enum', enum: ['inquiry', 'partnership', 'support', 'feedback', 'other'] })
   subject: ContactMessageSubject;
 
   @Column({ type: 'text' })

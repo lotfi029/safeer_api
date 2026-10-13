@@ -48,9 +48,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.media_variants      TO 'safeer_ap
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.mail_settings       TO 'safeer_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.mail_templates      TO 'safeer_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.mail_log            TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.sms_settings        TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.sms_templates       TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.sms_log             TO 'safeer_app'@'%';
 
 -- 3.4 Site
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.site_settings       TO 'safeer_app'@'%';
@@ -78,16 +75,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.partners            TO 'safeer_ap
 -- 3.7 Documents
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.doc_categories      TO 'safeer_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.documents           TO 'safeer_app'@'%';
-
--- 3.8 Scholarships (the apply flow, admin review, and the OTP student portal)
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.applications          TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.application_documents TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.application_notes     TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.application_events    TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.interview_slots       TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.applicant_sessions    TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.applicant_otps        TO 'safeer_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.counters              TO 'safeer_app'@'%';
 
 -- Deliberately no grant at all on schema_migrations or typeorm_metadata —
 -- the running app never touches either table; only `npm run migrate` does,

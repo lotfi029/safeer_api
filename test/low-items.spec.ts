@@ -1,7 +1,7 @@
 // test/low-items.spec.ts — Phase 5 of the fix plan:
 //   B10 admin pages carry sectionsCount (factory listEnrich hook)
 //   B17 GET admin/roles returns the matrix RolesGuard enforces
-//   B18 public GET about-items + the about/scholarships sections (014)
+//   B18 public GET about-items + the about sections (014)
 //   C30 parallel readiness probes never collide
 //   C33 idle sessions aren't listed; changePassword is throttled
 //   C39 whitespace-only English falls back to Arabic; per-language read time
@@ -36,13 +36,13 @@ describe('B10: admin pages list', () => {
     const bySlug = Object.fromEntries(res.body.data.map((p: any) => [p.slug, p]));
     expect(bySlug.home.sectionsCount).toBe(9);
     expect(bySlug.about.sectionsCount).toBe(4);
-    expect(bySlug.scholarships.sectionsCount).toBe(5);
+    expect(bySlug.scholarships).toBeUndefined(); // 021
     expect(bySlug.contact.sectionsCount).toBe(0);
     expect(typeof bySlug.home.updatedAt).toBe('string');
 
-    const searched = await adminApi('GET', '/admin/pages?q=scholarships');
-    expect(searched.body.data.map((p: any) => p.slug)).toEqual(['scholarships']);
-    expect(searched.body.data[0].sectionsCount).toBe(5);
+    const searched = await adminApi('GET', '/admin/pages?q=about');
+    expect(searched.body.data.map((p: any) => p.slug)).toEqual(['about']);
+    expect(searched.body.data[0].sectionsCount).toBe(4);
   });
 });
 
@@ -106,13 +106,14 @@ describe('B18: about items and inner-page sections', () => {
     }
   });
 
-  it('the about and scholarships pages carry their prototype sections', async () => {
+  it('the about page carries its prototype sections; the scholarships page is gone (021)', async () => {
     const about = await api('GET', '/pages/about?lang=ar');
     expect(about.body.sections.map((s: any) => s.sectionKey)).toEqual(['intro', 'vision_mission', 'goals', 'governance']);
-    const scholarships = await api('GET', '/pages/scholarships?lang=en');
-    expect(scholarships.body.sections.map((s: any) => s.sectionKey)).toEqual(['hero', 'pillars', 'steps', 'requirements', 'cta']);
-    const cta = scholarships.body.sections.find((s: any) => (s.sectionKey) === 'cta');
-    expect(cta.heading).toBe('Ready to apply?');
+    expect((await api('GET', '/pages/scholarships?lang=en')).status).toBe(404);
+    // 021 pointed the home buttons that led to /apply or /scholarships at /contact.
+    const home = await api('GET', '/pages/home?lang=en');
+    const urls = home.body.sections.flatMap((s: any) => [s.primaryButtonUrl, s.secondaryButtonUrl]).filter(Boolean);
+    expect(urls.filter((u: string) => /^\/(apply|portal|scholarships)/.test(u))).toEqual([]);
   });
 });
 
