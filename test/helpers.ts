@@ -87,7 +87,7 @@ export async function withDb<T>(fn: (conn: Connection) => Promise<T>): Promise<T
   }
 }
 
-export type StaffRole = 'admin' | 'reviewer' | 'editor' | 'support';
+export type StaffRole = 'admin' | 'editor' | 'support';
 
 /** A throwaway staff account, created by a direct row insert (see scripts/smoke.mjs's own long comment on why: no invite/accept token round-trip needed for a script's own fixture). */
 export async function createTempUser(role: StaffRole): Promise<Session & { id: string; email: string }> {
@@ -107,17 +107,6 @@ export async function createTempUser(role: StaffRole): Promise<Session & { id: s
 
 export async function deleteTempUser(id: string): Promise<void> {
   await withDb((conn) => conn.execute('DELETE FROM users WHERE id = ?', [id]));
-}
-
-export async function withSmsEnabled<T>(fn: () => Promise<T>): Promise<T> {
-  const before = await adminApi('GET', '/admin/sms/settings');
-  const enabled = await adminApi('PUT', '/admin/sms/settings', { body: { isEnabled: true, driver: 'log' } });
-  if (enabled.status !== 200) throw new Error(`enabling SMS (log driver) failed: ${enabled.status}`);
-  try {
-    return await fn();
-  } finally {
-    await adminApi('PUT', '/admin/sms/settings', { body: { isEnabled: before.body.isEnabled, driver: before.body.driver } });
-  }
 }
 
 /** A minimal but genuinely valid PDF — real magic bytes, same as scripts/smoke.mjs's own tinyPdf(). */

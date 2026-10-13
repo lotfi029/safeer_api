@@ -1,16 +1,14 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from 'typeorm';
 
 /**
- * Four roles (Safeer infra change §1, unlike african_api's two): admin has
- * full access; reviewer handles scholarship applications; editor manages
- * site content; support handles messages/testimonials/newsletter. See the
- * permission-matrix table in the project plan for which controllers each
- * role is `@Roles()`-gated on — later phases apply that table as those
- * controllers land.
+ * Three roles: admin has full access; editor manages site content; support
+ * handles messages/testimonials/newsletter. src/auth/role-matrix.ts is the
+ * one source of truth for which routes each role reaches. (The fourth,
+ * `reviewer`, went with the scholarship feature — migration 021.)
  */
 export type UserStatus = 'active' | 'disabled' | 'invited';
 
-export type UserRole = 'admin' | 'reviewer' | 'editor' | 'support';
+export type UserRole = 'admin' | 'editor' | 'support';
 
 @Entity('users')
 @Unique('uq_users_email', ['email'])
@@ -36,7 +34,8 @@ export class User {
   @Column({ name: 'password_hash', type: 'varchar', length: 255, select: false })
   passwordHash: string;
 
-  @Column({ type: 'enum', enum: ['admin', 'reviewer', 'editor', 'support'] as UserRole[], default: 'editor' })
+  // The database still allows `reviewer` until 021 drops it.
+  @Column({ type: 'enum', enum: ['admin', 'reviewer', 'editor', 'support'], default: 'editor' })
   role: UserRole;
 
   /**

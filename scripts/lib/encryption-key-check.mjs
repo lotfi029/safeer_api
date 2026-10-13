@@ -1,7 +1,7 @@
 // scripts/lib/encryption-key-check.mjs — safeer-delivery-review.md A7.
 //
-// APP_ENCRYPTION_KEY encrypts the mail/SMS provider secrets (and, from
-// migration 012 until 021 dropped the table, applications.id_number). A
+// APP_ENCRYPTION_KEY encrypts the stored mail password (and, until 021
+// dropped them, the SMS token and applications.id_number). A
 // migrate (or app) run with a different key than the one the data was
 // encrypted with would silently write rows nobody can read back — 012 did
 // exactly that, then 013 dropped the plaintext.
@@ -48,7 +48,6 @@ async function columnExists(connection, table, column) {
 /** Values already encrypted under the database's key, one per place that holds them. */
 const ENCRYPTED_PROBES = [
   ['mail_settings', 'password_encrypted'],
-  ['sms_settings', 'token_encrypted'],
 ];
 
 const MISMATCH =

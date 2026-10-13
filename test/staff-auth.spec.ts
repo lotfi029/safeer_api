@@ -293,4 +293,21 @@ describe('staff auth', () => {
       });
     });
   });
+
+  describe('the reviewer role is gone (021)', () => {
+    it('inviting or promoting someone to reviewer is a 400', async () => {
+      const email = `jest-reviewer-${Date.now()}@example.com`;
+      const invite = await adminApi('POST', '/admin/auth/invite', { body: { email, name: 'Reviewer Person', role: 'reviewer' } });
+      expect(invite.status).toBe(400);
+      expect(await withDb((conn) => conn.execute('SELECT COUNT(*) AS n FROM users WHERE email = ?', [email]).then(([r]: any) => Number(r[0].n)))).toBe(0);
+
+      const editor = await createTempUser('editor');
+      try {
+        expect((await adminApi('PATCH', `/admin/users/${editor.id}`, { body: { role: 'reviewer' } })).status).toBe(400);
+        expect((await adminApi('GET', '/admin/roles')).body.roles).toEqual(['admin', 'editor', 'support']);
+      } finally {
+        await deleteTempUser(editor.id);
+      }
+    });
+  });
 });

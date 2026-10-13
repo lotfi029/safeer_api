@@ -45,7 +45,6 @@ const PROBES: Record<string, Probe> = {
   'admin/users': { area: 'users', read: '/admin/users', delete: { path: `/admin/users/${MISSING_ID}`, area: 'users' } },
   'admin/settings': { area: 'settings', read: '/admin/settings' },
   'admin/mail': { area: 'settings', read: '/admin/mail/settings' },
-  'admin/sms': { area: 'settings', read: '/admin/sms/settings' },
   'admin/cache': { area: 'settings', read: '/admin/cache/stats' },
   'admin/audit': { area: 'audit', read: '/admin/audit' },
 };
@@ -53,7 +52,7 @@ const PROBES: Record<string, Probe> = {
 /** Open to any signed-in staff member, with no area (scripts/lib/check-admin-roles.mjs's allow-list). */
 const ANY_STAFF = ['admin/me', 'admin/auth', 'admin/overview', 'admin/preview-token', 'admin/roles'];
 
-const ROLES: StaffRole[] = ['admin', 'reviewer', 'editor', 'support'];
+const ROLES: StaffRole[] = ['admin', 'editor', 'support'];
 
 describe('permissions matrix (generated from GET admin/roles)', () => {
   const sessions = {} as Record<StaffRole, Session>;

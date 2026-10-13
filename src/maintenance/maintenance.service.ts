@@ -8,7 +8,6 @@ import { MailLog } from '../database/entities/mail-log.entity.js';
 
 const MAIL_LOG_RETENTION_DAYS = 90;
 /** C27 retention policy (docs/backend/DEPLOYMENT-HOSTINGER.md, "Retention"). */
-const SMS_LOG_RETENTION_DAYS = 90;
 const CONTACT_MESSAGE_RETENTION_DAYS = 730; // 24 months
 const NEWSLETTER_INACTIVE_RETENTION_DAYS = 30;
 
@@ -21,8 +20,7 @@ function daysAgo(days: number): Date {
  * independently try/caught, so one failing step (a locked table, ...)
  * never stops the others from running the same night.
  *
- * C27 retention: contact messages after 24 months, sms_log after 90 days
- * (mail_log already), and newsletter rows unsubscribed — or never confirmed
+ * C27 retention: contact messages after 24 months (mail_log after 90 days), and newsletter rows unsubscribed — or never confirmed
  * — for 30 days.
  */
 @Injectable()
@@ -50,7 +48,6 @@ export class MaintenanceService {
       await this.purgeSpentAuthTokens();
       await this.keepReplyDeliveryStatus();
       await this.purgeOldMailLog();
-      await this.purgeOldSmsLog();
       await this.purgeOldContactMessages();
       await this.purgeInactiveNewsletterRows();
     } finally {
@@ -112,12 +109,6 @@ export class MaintenanceService {
           WHERE m.created_at < ?`,
         [daysAgo(MAIL_LOG_RETENTION_DAYS)],
       ),
-    );
-  }
-
-  private async purgeOldSmsLog(): Promise<void> {
-    await this.step(`purge sms_log older than ${SMS_LOG_RETENTION_DAYS} days`, () =>
-      this.dataSource.query('DELETE FROM sms_log WHERE created_at < ?', [daysAgo(SMS_LOG_RETENTION_DAYS)]),
     );
   }
 

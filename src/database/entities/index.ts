@@ -8,9 +8,6 @@ import { MailSettings } from './mail-settings.entity.js';
 import { MailTemplate } from './mail-template.entity.js';
 import { MailLog } from './mail-log.entity.js';
 import { Redirect } from './redirect.entity.js';
-import { SmsSettings } from './sms-settings.entity.js';
-import { SmsTemplate } from './sms-template.entity.js';
-import { SmsLog } from './sms-log.entity.js';
 import { SiteSettings } from './site-settings.entity.js';
 import { Page } from './page.entity.js';
 import { PageSection } from './page-section.entity.js';
@@ -41,9 +38,6 @@ export {
   MailTemplate,
   MailLog,
   Redirect,
-  SmsSettings,
-  SmsTemplate,
-  SmsLog,
   SiteSettings,
   Page,
   PageSection,
@@ -65,7 +59,7 @@ export {
 };
 
 /**
- * Every entity registered with TypeORM: accounts, files, mail, SMS, site,
+ * Every entity registered with TypeORM: accounts, files, mail, site,
  * content, voices/partners, documents and the contact inbox.
  */
 export const entities = [
@@ -79,9 +73,6 @@ export const entities = [
   MailTemplate,
   MailLog,
   Redirect,
-  SmsSettings,
-  SmsTemplate,
-  SmsLog,
   SiteSettings,
   Page,
   PageSection,

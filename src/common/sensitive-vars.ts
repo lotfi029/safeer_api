@@ -1,4 +1,4 @@
-/** What a sensitive template variable (an OTP code) is replaced with in mail_log / sms_log (C1). */
+/** What a sensitive template variable (an OTP code) is replaced with in mail_log (C1). */
 export const MASKED_VALUE = '••••••';
 
 /** `vars` with every key in `sensitive` replaced by MASKED_VALUE — the copy that may be written to a log. */

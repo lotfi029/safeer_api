@@ -96,7 +96,7 @@ const envSchema = z.object({
   IP_HASH_SALT: z.string().min(1),
   CORS_ORIGINS: z.string().min(1),
   // C2: the public frontend (Next.js) origin. Every link that goes out in a
-  // mail or SMS points at a locale-prefixed page there (src/common/frontend-url.ts),
+  // mail points at a locale-prefixed page there (src/common/frontend-url.ts),
   // never at this API. Required in staging/production (the superRefine
   // below); development/test default to the local frontend. Replaces the
   // old PUBLIC_BASE_URL, which pointed at the API and made every emailed

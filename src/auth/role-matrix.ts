@@ -14,7 +14,7 @@ import { Roles } from './decorators/roles.decorator.js';
  * admin/overview, admin/preview-token, admin/roles) carry no area; they're
  * the checker's explicit allow-list.
  */
-export const ROLES = ['admin', 'reviewer', 'editor', 'support'] as const satisfies readonly UserRole[];
+export const ROLES = ['admin', 'editor', 'support'] as const satisfies readonly UserRole[];
 
 export const AREA_ROLES = {
   /** Pages/sections, news and categories, work areas, board, stats, about items, partners, documents, media, redirects. */
@@ -27,7 +27,7 @@ export const AREA_ROLES = {
   'inbox.delete': ['admin'],
   /** Staff accounts and invitations. */
   users: ['admin'],
-  /** Site settings, mail and SMS settings/templates/logs, cache. */
+  /** Site settings, mail settings/templates/logs, cache. */
   settings: ['admin'],
   audit: ['admin'],
 } as const satisfies Record<string, readonly UserRole[]>;

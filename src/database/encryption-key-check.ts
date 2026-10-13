@@ -8,8 +8,8 @@ import { decryptSecret } from '../mail/mail-crypto.js';
  *
  * `site_settings.encryption_key_check` holds HMAC-SHA256(key, label). At boot
  * the app refuses to start when it doesn't match APP_ENCRYPTION_KEY; when
- * nothing is stored yet, it checks one value that is already encrypted (a
- * mail/SMS secret), then stores the check value.
+ * nothing is stored yet, it checks one value that is already encrypted (the
+ * mail password), then stores the check value.
  */
 export const KEY_CHECK_LABEL = 'safeer:app-encryption-key-check:v1';
 
@@ -19,7 +19,6 @@ export function keyCheckValue(keyBase64: string): string {
 
 const ENCRYPTED_PROBES: Array<[table: string, column: string]> = [
   ['mail_settings', 'password_encrypted'],
-  ['sms_settings', 'token_encrypted'],
 ];
 
 export const KEY_MISMATCH_MESSAGE =

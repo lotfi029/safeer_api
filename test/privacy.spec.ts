@@ -33,7 +33,6 @@ describe('C20: dashboard overview', () => {
   // must not see its unread count either — only admin and support do.
   it.each([
     ['editor', false],
-    ['reviewer', false],
     ['support', true],
   ] as const)('%s sees the unread-messages figures: %s', async (role, visible) => {
     const user = await createTempUser(role);
@@ -53,16 +52,6 @@ describe('C20: dashboard overview', () => {
     expect(Object.keys(res.body).sort()).toEqual(['badges', 'contentAlerts', 'recentAuditLog', 'statCards']);
     expect(res.body.statCards.newApplications).toBeUndefined();
     expect(res.body.badges.newApplications).toBeUndefined();
-  });
-
-  it('reviewer gets no audit feed', async () => {
-    const user = await createTempUser('reviewer');
-    try {
-      const res = await api('GET', '/admin/overview', { session: user });
-      expect(res.body.recentAuditLog).toEqual([]);
-    } finally {
-      await deleteTempUser(user.id);
-    }
   });
 
   it("admin's audit feed has the actor's name and no diff or IP hash", async () => {
@@ -128,18 +117,10 @@ describe('C27: newsletter double opt-in', () => {
 });
 
 describe('C27: retention', () => {
-  it('the nightly job purges old sms_log, contact messages and stale newsletter rows', async () => {
+  it('the nightly job purges old contact messages and stale newsletter rows', async () => {
     const tag = `jest-retention-${Date.now()}`;
 
     await withDb(async (conn) => {
-      await conn.execute(
-        "INSERT INTO sms_log (template_key, locale, to_phone, message, status, created_at) VALUES ('otp_code', 'ar', '+966500000000', ?, 'sent', UTC_TIMESTAMP(3) - INTERVAL 100 DAY)",
-        [tag],
-      );
-      await conn.execute(
-        "INSERT INTO sms_log (template_key, locale, to_phone, message, status, created_at) VALUES ('otp_code', 'ar', '+966500000000', ?, 'sent', UTC_TIMESTAMP(3) - INTERVAL 10 DAY)",
-        [`${tag}-recent`],
-      );
       await conn.execute(
         "INSERT INTO contact_messages (name, email, subject, body, created_at) VALUES ('Old', ?, 'other', 'x', UTC_TIMESTAMP(3) - INTERVAL 800 DAY)",
         [`${tag}@example.com`],
@@ -157,13 +138,10 @@ describe('C27: retention', () => {
     try {
       expect((await api('POST', '/__dev/maintenance/run')).status).toBe(200);
 
-      expect(await scalar('SELECT COUNT(*) FROM sms_log WHERE message = ?', [tag])).toBe(0);
-      expect(await scalar('SELECT COUNT(*) FROM sms_log WHERE message = ?', [`${tag}-recent`])).toBe(1);
       expect(await scalar('SELECT COUNT(*) FROM contact_messages WHERE email = ?', [`${tag}@example.com`])).toBe(0);
       expect(await scalar('SELECT COUNT(*) FROM newsletter_subscribers WHERE email LIKE ?', [`${tag}-%`])).toBe(1);
     } finally {
       await withDb(async (conn) => {
-        await conn.execute('DELETE FROM sms_log WHERE message LIKE ?', [`${tag}%`]);
         await conn.execute('DELETE FROM newsletter_subscribers WHERE email LIKE ?', [`${tag}-%`]);
       });
     }

@@ -11,7 +11,6 @@ type Labels<K extends string> = Record<K, { ar: string; en: string }>;
 
 const ROLE_LABELS: Labels<UserRole> = {
   admin: { ar: 'مدير عام', en: 'Admin' },
-  reviewer: { ar: 'مراجع طلبات', en: 'Reviewer' },
   editor: { ar: 'محرر محتوى', en: 'Editor' },
   support: { ar: 'دعم ومراسلات', en: 'Support' },
 };

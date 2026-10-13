@@ -48,7 +48,7 @@ describe('B10: admin pages list', () => {
 
 describe('B17: GET admin/roles', () => {
   const expected = {
-    roles: ['admin', 'reviewer', 'editor', 'support'],
+    roles: ['admin', 'editor', 'support'],
     matrix: {
       content: ['admin', 'editor'],
       'redirects.delete': ['admin'],
