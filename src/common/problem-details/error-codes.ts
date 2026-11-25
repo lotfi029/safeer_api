@@ -22,6 +22,12 @@ export const ErrorCode = {
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
   /** C10: `admin/redirects` — the redirect would chain through another redirect, or duplicates one's source. */
   REDIRECT_CHAIN: 'REDIRECT_CHAIN',
+  /** PERM-4: `DELETE admin/roles/:id` on a role still assigned to users; the body carries `userCount`. */
+  ROLE_IN_USE: 'ROLE_IN_USE',
+  /** PERM-4 (R10, always 409): editing or deleting the admin role, or deleting a system role. */
+  ROLE_IMMUTABLE: 'ROLE_IMMUTABLE',
+  /** PERM-4: `POST admin/roles` with a key another role already has. */
+  ROLE_KEY_TAKEN: 'ROLE_KEY_TAKEN',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

@@ -2,8 +2,9 @@
 // Phase 7 role matrix, area 1).
 //
 // For every role × every admin route group, the expected answer comes from
-// the role's live permission set (the seeded system roles, plus a custom
-// "news only" role), never from a copy of it here. Each group names its
+// the role's live permission set (GET admin/roles: the seeded system roles,
+// plus a custom "news only" role made through POST admin/roles), never from
+// a copy of it here. Each group names its
 // permission module once; a read probe answers 200 (or the route's own
 // status for a bad request) or 403, and a delete probe on an id that doesn't
 // exist answers 404 (allowed, nothing there) or 403 (refused before the
@@ -12,7 +13,7 @@
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { api, createTempRole, createTempUser, deleteTempRole, deleteTempUser, rolePermissions, type Session } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, type Session } from './helpers';
 
 const MISSING_ID = '999999999';
 
@@ -50,6 +51,7 @@ const PROBES: Record<string, Probe> = {
   'admin/newsletter': { module: 'newsletter', read: '/admin/newsletter', delete: `/admin/newsletter/${MISSING_ID}` },
 
   'admin/users': { module: 'users', read: '/admin/users', delete: `/admin/users/${MISSING_ID}` },
+  'admin/roles': { module: 'roles', read: '/admin/roles', delete: `/admin/roles/${MISSING_ID}` },
   'admin/settings': { module: 'settings', read: '/admin/settings' },
   'admin/cache': { module: 'settings', read: '/admin/cache/stats' },
   'admin/mail': { module: 'mail', read: '/admin/mail/settings' },
@@ -57,7 +59,7 @@ const PROBES: Record<string, Probe> = {
 };
 
 /** Open to any signed-in staff member, with no permission (scripts/lib/check-permissions.mjs's allow-list). */
-const ANY_STAFF = ['admin/me', 'admin/auth', 'admin/overview'];
+const ANY_STAFF = ['admin/me', 'admin/auth', 'admin/overview', 'admin/permissions'];
 
 const NEWS_ONLY = 'jest-news-only';
 const NEWS_ONLY_PERMISSIONS = ['news.view', 'news.manage', 'news.delete'];
@@ -72,9 +74,13 @@ describe('permission model (generated from each role’s live permissions)', () 
   let newsOnlyRoleId: string;
 
   beforeAll(async () => {
-    newsOnlyRoleId = await createTempRole(NEWS_ONLY, NEWS_ONLY_PERMISSIONS);
+    const created = await adminApi('POST', '/admin/roles', { body: { key: NEWS_ONLY, nameAr: 'أخبار فقط', nameEn: 'News only', permissions: NEWS_ONLY_PERMISSIONS } });
+    expect(created.status).toBe(201);
+    newsOnlyRoleId = created.body.id;
+    const roles = await adminApi('GET', '/admin/roles');
+    expect(roles.status).toBe(200);
     for (const role of ROLES) {
-      perms[role] = await rolePermissions(role);
+      perms[role] = roles.body.find((r: { key: string }) => r.key === role).permissions;
       const user = await createTempUser(role);
       tempIds.push(user.id);
       sessions[role] = user;
@@ -83,7 +89,7 @@ describe('permission model (generated from each role’s live permissions)', () 
 
   afterAll(async () => {
     for (const id of tempIds) await deleteTempUser(id);
-    await deleteTempRole(newsOnlyRoleId);
+    expect((await adminApi('DELETE', `/admin/roles/${newsOnlyRoleId}`)).status).toBe(200);
   });
 
   it('probes every admin route group in openapi.json', () => {
@@ -123,8 +129,14 @@ describe('permission model (generated from each role’s live permissions)', () 
       expect({ group, role, status: res.status }).toEqual({ group, role, status: allowed ? 404 : 403 });
     });
 
+    it('GET admin/me reports the role and its permissions', async () => {
+      const me = await api('GET', '/admin/me', { session: sessions[role] });
+      expect(me.body.role.key).toBe(role);
+      expect(me.body.permissions.slice().sort()).toEqual(perms[role].slice().sort());
+    });
+
     it('reaches every any-staff route', async () => {
-      for (const route of ['/admin/me', '/admin/overview', '/admin/auth/sessions']) {
+      for (const route of ['/admin/me', '/admin/overview', '/admin/auth/sessions', '/admin/permissions']) {
         expect({ route, status: (await api('GET', route, { session: sessions[role] })).status }).toEqual({ route, status: 200 });
       }
     });

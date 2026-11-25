@@ -129,6 +129,13 @@ export async function deleteTempRole(id: string): Promise<void> {
   await withDb((conn) => conn.execute('DELETE FROM roles WHERE id = ?', [id]));
 }
 
+/** A role's id by key, straight from the database. */
+export async function roleIdOf(key: string): Promise<string> {
+  const [rows]: any = await withDb((conn) => conn.execute('SELECT id FROM roles WHERE role_key = ?', [key]));
+  if (!rows[0]) throw new Error(`no role ${key}`);
+  return String(rows[0].id);
+}
+
 /** A role's permission keys, straight from the database. */
 export async function rolePermissions(key: string): Promise<string[]> {
   const [rows]: any = await withDb((conn) =>

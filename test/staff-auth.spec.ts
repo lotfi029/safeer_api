@@ -6,7 +6,7 @@
 //   C12 a time-boxed lock with backoff that doesn't end sessions; admin unlock clears it
 
 import { createHash, randomBytes } from 'node:crypto';
-import { adminApi, api, createTempUser, deleteTempUser, settleForgot, withDb } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, settleForgot, withDb, roleIdOf } from './helpers';
 import { UTC_SESSION_SQL } from '../src/database/utc';
 
 const PASSWORD = 'Jest-Test-P4ssword!';
@@ -96,7 +96,7 @@ describe('staff auth', () => {
 
     it('invited users start as invited, get no reset link, and become active on accept', async () => {
       const email = `jest-invited-${Date.now()}@example.com`;
-      const invited = await adminApi('POST', '/admin/auth/invite', { body: { email, name: 'Invited Person', role: 'editor' } });
+      const invited = await adminApi('POST', '/admin/auth/invite', { body: { email, name: 'Invited Person', roleId: await roleIdOf('editor') } });
       expect(invited.status).toBe(201);
       expect(invited.body.status).toBe('invited');
       try {
@@ -294,16 +294,22 @@ describe('staff auth', () => {
     });
   });
 
-  describe('the reviewer role is gone (021)', () => {
-    it('inviting or promoting someone to reviewer is a 400', async () => {
+  describe('the reviewer role is gone (021); roles are assigned by id (PERM-4)', () => {
+    it('inviting with a role name, or with an unknown role id, is a 400', async () => {
       const email = `jest-reviewer-${Date.now()}@example.com`;
       const invite = await adminApi('POST', '/admin/auth/invite', { body: { email, name: 'Reviewer Person', role: 'reviewer' } });
       expect(invite.status).toBe(400);
+      const unknown = await adminApi('POST', '/admin/auth/invite', { body: { email, name: 'Reviewer Person', roleId: '999999999' } });
+      expect(unknown.status).toBe(400);
       expect(await withDb((conn) => conn.execute('SELECT COUNT(*) AS n FROM users WHERE email = ?', [email]).then(([r]: any) => Number(r[0].n)))).toBe(0);
 
       const editor = await createTempUser('editor');
       try {
         expect((await adminApi('PATCH', `/admin/users/${editor.id}`, { body: { role: 'reviewer' } })).status).toBe(400);
+        expect((await adminApi('PATCH', `/admin/users/${editor.id}`, { body: { roleId: '999999999' } })).status).toBe(400);
+        const keys = (await adminApi('GET', '/admin/roles')).body.map((r: { key: string }) => r.key);
+        expect(keys).not.toContain('reviewer');
+        expect(keys).toEqual(expect.arrayContaining(['admin', 'editor', 'support']));
       } finally {
         await deleteTempUser(editor.id);
       }

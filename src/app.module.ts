@@ -10,6 +10,7 @@ import { AuditModule } from './audit/audit.module.js';
 import { MarkdownModule } from './common/markdown/markdown.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
+import { RolesModule } from './roles/roles.module.js';
 import { MediaModule } from './media/media.module.js';
 import { FilesModule } from './files/files.module.js';
 import { MailModule } from './mail/mail.module.js';
@@ -63,6 +64,7 @@ import { BackgroundWorkModule } from './common/background/background-work.module
     MarkdownModule,
     AuthModule,
     UsersModule,
+    RolesModule,
     MediaModule,
     FilesModule,
     MailModule,

@@ -1,20 +1,12 @@
 import type { Locale } from './request-context.js';
-import type { UserRole } from '../database/entities/user.entity.js';
 import type { ContactMessageSubject } from '../database/entities/contact-message.entity.js';
 
 /**
  * C23: human labels for the codes that go into mail variables — an Arabic
- * reader must read "محرر محتوى", not `editor`. The wording is the
- * prototype's own (docs/prototype/safeer-prototype.html: the users
- * screen's roles list).
+ * reader must read "استفسار", not `inquiry`. (Role names used to live here
+ * too; since PERM-4 they are the `roles` table's own `name_ar`/`name_en`.)
  */
 type Labels<K extends string> = Record<K, { ar: string; en: string }>;
-
-const ROLE_LABELS: Labels<UserRole> = {
-  admin: { ar: 'مدير عام', en: 'Admin' },
-  editor: { ar: 'محرر محتوى', en: 'Editor' },
-  support: { ar: 'دعم ومراسلات', en: 'Support' },
-};
 
 /** The contact form's subjects — also served by GET meta/enums (contactSubject). */
 export const CONTACT_SUBJECT_LABELS: Labels<ContactMessageSubject> = {
@@ -27,5 +19,3 @@ export const CONTACT_SUBJECT_LABELS: Labels<ContactMessageSubject> = {
 
 export const contactSubjectLabel = (subject: string, locale: Locale): string =>
   CONTACT_SUBJECT_LABELS[subject as keyof typeof CONTACT_SUBJECT_LABELS]?.[locale] ?? subject;
-
-export const roleLabel = (role: UserRole, locale: Locale): string => ROLE_LABELS[role]?.[locale] ?? role;
