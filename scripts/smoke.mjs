@@ -138,8 +138,8 @@ async function createTempUser(role) {
   const email = `smoke-${role}-${Date.now()}@example.com`;
   const id = await withDb(async (conn) => {
     const [result] = await conn.execute(
-      "INSERT INTO users (name, email, password_hash, role, status, failed_logins) VALUES (?, ?, ?, ?, 'active', 0)",
-      [`Smoke ${role}`, email, passwordHash, role],
+      "INSERT INTO users (name, email, password_hash, role, role_id, status, failed_logins) VALUES (?, ?, ?, ?, (SELECT id FROM roles WHERE role_key = ?), 'active', 0)",
+      [`Smoke ${role}`, email, passwordHash, role, role],
     );
     return String(result.insertId);
   });

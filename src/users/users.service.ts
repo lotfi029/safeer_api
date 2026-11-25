@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository, type EntityManager } from 'typeorm';
 import { User, type UserRole } from '../database/entities/user.entity.js';
+import { Role } from '../database/entities/role.entity.js';
 import { Session } from '../database/entities/session.entity.js';
 import { AuthToken } from '../database/entities/auth-token.entity.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
@@ -59,10 +60,12 @@ export class UsersService {
     if (existing) {
       throw new ProblemException(409, ErrorCode.VALIDATION_FAILED, 'A user with that email already exists');
     }
+    const roleRow = await this.userRepo.manager.findOneByOrFail(Role, { key: role });
     const user = this.userRepo.create({
       email,
       name,
-      role,
+      roleId: roleRow.id,
+      legacyRole: role,
       passwordHash: UNUSABLE_PASSWORD_HASH,
       status: 'invited',
       failedLogins: 0,
@@ -79,7 +82,7 @@ export class UsersService {
    * as long as a second, already-locked admin row existed.
    */
   private async usableAdminsBesides(manager: EntityManager, excludeId: string): Promise<number> {
-    return manager.count(User, { where: { role: 'admin', status: 'active', id: Not(excludeId) } });
+    return manager.count(User, { where: { legacyRole: 'admin', status: 'active', id: Not(excludeId) } });
   }
 
   /**
@@ -105,23 +108,24 @@ export class UsersService {
       await manager
         .createQueryBuilder(User, 'u')
         .setLock('pessimistic_write')
-        .where('u.role = :role', { role: 'admin' })
+        .where('u.legacyRole = :role', { role: 'admin' })
         .orWhere('u.id = :id', { id: targetId })
         .getMany();
 
       const target = await manager.findOne(User, { where: { id: targetId } });
       if (!target) throw new ProblemException(404, ErrorCode.NOT_FOUND, 'User not found');
       const before = toPublicUser(target);
-      const wouldRemoveAdminCover = target.role === 'admin' && target.status === 'active';
+      const wouldRemoveAdminCover = target.legacyRole === 'admin' && target.status === 'active';
 
-      if (input.role !== undefined && input.role !== target.role) {
+      if (input.role !== undefined && input.role !== target.legacyRole) {
         if (targetId === actorId) {
           throw new ProblemException(403, ErrorCode.FORBIDDEN, 'You cannot change your own role');
         }
         if (wouldRemoveAdminCover && (await this.usableAdminsBesides(manager, targetId)) === 0) {
           throw new ProblemException(409, ErrorCode.LAST_ADMIN, 'The last remaining admin cannot be demoted');
         }
-        target.role = input.role;
+        target.roleId = (await manager.findOneByOrFail(Role, { key: input.role })).id;
+        target.legacyRole = input.role;
       }
 
       if (input.name !== undefined) target.name = input.name;
@@ -177,7 +181,7 @@ export class UsersService {
       await manager
         .createQueryBuilder(User, 'u')
         .setLock('pessimistic_write')
-        .where('u.role = :role', { role: 'admin' })
+        .where('u.legacyRole = :role', { role: 'admin' })
         .orWhere('u.id = :id', { id: targetId })
         .getMany();
 
@@ -187,7 +191,7 @@ export class UsersService {
       if (targetId === actorId) {
         throw new ProblemException(403, ErrorCode.FORBIDDEN, 'You cannot delete your own account');
       }
-      const wouldRemoveAdminCover = target.role === 'admin' && target.status === 'active';
+      const wouldRemoveAdminCover = target.legacyRole === 'admin' && target.status === 'active';
       if (wouldRemoveAdminCover && (await this.usableAdminsBesides(manager, targetId)) === 0) {
         throw new ProblemException(409, ErrorCode.LAST_ADMIN, 'The last remaining admin cannot be deleted');
       }

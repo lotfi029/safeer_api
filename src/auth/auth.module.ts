@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
+import { Role } from '../database/entities/role.entity.js';
 import { User } from '../database/entities/user.entity.js';
 import { Session } from '../database/entities/session.entity.js';
 import { AuthToken } from '../database/entities/auth-token.entity.js';
@@ -19,7 +20,7 @@ import { BootstrapService } from './bootstrap.service.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Session, AuthToken, AuditLog]),
+    TypeOrmModule.forFeature([User, Role, Session, AuthToken, AuditLog]),
     ConfigModule,
     MailModule,
     UsersModule,

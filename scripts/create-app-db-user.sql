@@ -49,6 +49,8 @@ CREATE USER IF NOT EXISTS 'safeer_app'@'127.0.0.1' IDENTIFIED BY 'CHANGE_ME_BEFO
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.users               TO 'safeer_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.sessions            TO 'safeer_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.auth_tokens         TO 'safeer_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.roles               TO 'safeer_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON safeer.role_permissions    TO 'safeer_app'@'127.0.0.1';
 -- Append-only by design (AuditInterceptor never updates or deletes a row).
 GRANT SELECT, INSERT ON safeer.audit_log TO 'safeer_app'@'127.0.0.1';
 

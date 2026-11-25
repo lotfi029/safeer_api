@@ -18,7 +18,7 @@ describe('BootstrapService dev password fixup (C33)', () => {
       },
     };
     const passwordService = { hash: jest.fn() };
-    const service = new BootstrapService(userRepo as any, passwordService as any, {
+    const service = new BootstrapService(userRepo as any, {} as any, passwordService as any, {
       BOOTSTRAP_ADMIN_EMAIL: 'admin@example.com',
       BOOTSTRAP_ADMIN_PASSWORD: 'x'.repeat(12),
       ALLOW_DEV_PASSWORD_FIXUP: true,

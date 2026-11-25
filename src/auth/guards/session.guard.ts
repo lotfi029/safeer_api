@@ -100,7 +100,7 @@ export class SessionGuard implements CanActivate {
       return false;
     }
 
-    req.user = { id: row.user.id, role: row.user.role };
+    req.user = { id: row.user.id, role: row.user.legacyRole! };
     req.sessionId = row.id;
     req.sessionTokenHash = tokenHash;
 

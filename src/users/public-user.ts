@@ -22,7 +22,7 @@ export function toPublicUser(user: User): PublicUser {
     id: user.id,
     name: user.name,
     email: user.email,
-    role: user.role,
+    role: user.legacyRole!,
     status: user.status,
     isLocked: isBruteForceLocked(user),
     lockedUntil: user.lockedUntil,

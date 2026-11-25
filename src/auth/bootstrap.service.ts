@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../database/entities/user.entity.js';
+import { Role } from '../database/entities/role.entity.js';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
 import { PasswordService } from './password.service.js';
@@ -40,6 +41,7 @@ export class BootstrapService implements OnApplicationBootstrap {
 
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(Role) private readonly roleRepo: Repository<Role>,
     private readonly passwordService: PasswordService,
     @Inject(ENV) private readonly env: Env,
   ) {}
@@ -48,11 +50,14 @@ export class BootstrapService implements OnApplicationBootstrap {
     const admin = await this.userRepo.findOne({ where: { email: this.env.BOOTSTRAP_ADMIN_EMAIL } });
     if (!admin) {
       const passwordHash = await this.passwordService.hash(this.env.BOOTSTRAP_ADMIN_PASSWORD);
+      // The `admin` system role (migration 024) — the wildcard.
+      const adminRole = await this.roleRepo.findOneByOrFail({ key: 'admin' });
       await this.userRepo.save(
         this.userRepo.create({
           email: this.env.BOOTSTRAP_ADMIN_EMAIL,
           name: 'Admin',
-          role: 'admin',
+          roleId: adminRole.id,
+          legacyRole: 'admin',
           passwordHash,
           status: 'active',
         }),
