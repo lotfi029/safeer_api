@@ -25,44 +25,96 @@ Once running:
 - Every route lives under `/api/v1`, except `/files/:publicId[/:variant]`,
   which is deliberately outside the versioned prefix.
 
-## Roles and the permission matrix
+## Roles and permissions
 
-Three staff roles (`users.role`): `admin`, `editor`, `support`. (The fourth,
-`reviewer`, went with the scholarship feature: migration 021 refuses to run
-while any account still holds it, then removes it from the column.)
-There is no self-registration — the only way to create a staff account is
-`POST admin/auth/invite` (admin-only), which emails an accept-invite link;
-the very first admin comes from `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`
-instead, created automatically on first boot.
+Staff permissions are **`<module>.<action>` keys** held by **roles** stored
+in the database (PERM-1–4, v1.1.0; migration 024). A user has exactly one
+role (`users.role_id`) and no per-user overrides. There is no
+self-registration — the only way to create a staff account is
+`POST admin/auth/invite` (`users.manage`), which emails an accept-invite
+link; the very first admin comes from `BOOTSTRAP_ADMIN_EMAIL`/
+`BOOTSTRAP_ADMIN_PASSWORD` instead, created automatically on first boot.
 
-The matrix lives in one place, `src/auth/role-matrix.ts` (B17). Every
-role-gated admin route is tagged `@Area('<area>')`, which applies exactly
-that area's roles. `GET admin/roles` (any signed-in staff member) returns the
-same constants as `{roles, matrix}`. `npm run check:admin-roles` (CI, and
+**The catalog** is one file, `src/auth/permissions.ts`, served as-is by
+`GET admin/permissions` (any signed-in staff member). Actions: `view` (list
+and read), `manage` (create, edit, publish, reorder, upload), `delete`.
+`delete` implies `manage`, which implies `view`, where the module has them;
+every save closes the set that way. Each module lists only the actions its
+routes have:
+
+| Group | Module | Actions | Covers |
+|---|---|---|---|
+| Content | `pages` | view, manage, delete | pages and their sections |
+| | `news` | view, manage, delete | posts, news categories, preview tokens |
+| | `workAreas` | view, manage, delete | work areas and their items |
+| | `board` · `orgChart` · `partners` · `licences` · `stats` · `aboutItems` · `media` · `redirects` | view, manage, delete | one collection each |
+| | `documents` | view, manage, delete | documents and their categories |
+| Inbox | `messages` | view, manage, delete | contact messages (reply, convert) |
+| | `testimonials` | view, manage, delete | testimonials and their themes |
+| | `newsletter` | view, delete | subscribers (list, CSV export, delete) |
+| System | `users` | view, manage, delete | staff accounts, invitations, other users' sessions |
+| | `roles` | view, manage, delete | roles |
+| | `settings` | view, manage, delete | site settings, cache (purge is `settings.delete`) |
+| | `mail` | view, manage | mail settings, templates, log, test send |
+| | `audit` | view | the audit log |
+
+**Enforcement.** Every admin handler carries `@Permission(key, ...extra)`
+(all keys required); `PermissionsGuard` (global) checks them against
+`req.user.permissions`, which `SessionGuard` loads in the same lookup as the
+session on every non-public request — so a role edit applies on the user's
+next request. The CRUD kernel takes one `module` option and applies view /
+manage / delete per generated route. `npm run check:permissions` (CI, and
 Jest via `test/content-security.spec.ts`) fails on any admin route with no
-area, or whose roles differ from its area's.
+catalog permission, or whose first permission's action doesn't match its
+HTTP method (GET → view, POST/PATCH/PUT → manage, DELETE → delete).
 
-| Area | admin | editor | support | Covers |
-|---|:---:|:---:|:---:|---|
-| `content` | ✅ | ✅ | | pages/sections, news + categories, work areas, board, stats, about items, partners, documents + categories (the governance sections), licences, media, redirects |
-| `redirects.delete` | ✅ | | | deleting a redirect |
-| `inbox` | ✅ | | ✅ | contact messages, testimonials + themes, newsletter subscribers |
-| `inbox.delete` | ✅ | | | deleting a contact message |
-| `users` | ✅ | | | staff accounts, invitations |
-| `settings` | ✅ | | | site settings, mail settings/templates/logs, cache |
-| `audit` | ✅ | | | the audit log |
+Open to any signed-in staff member, with no permission: `admin/me` (adds
+`role` and `permissions`), `admin/auth/*` (own sessions, own password —
+the invite inside it needs `users.manage`), `admin/overview`,
+`admin/permissions`. `GET admin/overview` adapts to the caller: message
+figures with `messages.view` (A5), the audit feed with `audit.view` (C20),
+content alerts for everyone.
 
-Open to any signed-in staff member, with no area: `admin/me`,
-`admin/auth/*` (own sessions, own password), `admin/overview`,
-`admin/preview-token`, `admin/roles`. `GET admin/overview` adapts to the
-caller's role, using the same role matrix as the routes behind each block:
-message figures for the `inbox` area (admin, support — A5), the audit feed
-for admins only (C20); content alerts for everyone.
+**System roles** (seeded by 024 with exactly what the old matrix gave,
+route by route):
+
+| Role | Permissions | Editable | Deletable |
+|---|---|:---:|:---:|
+| `admin` (مدير عام) | `*` | no | no |
+| `editor` (محرر محتوى) | every content module, view/manage/delete — except `redirects.delete` | yes | no |
+| `support` (دعم ومراسلات) | `messages` view/manage; `testimonials` view/manage/delete; `newsletter` view/delete | yes | no |
+
+Custom roles get full CRUD (`admin/roles`, `roles.*`). Keys match
+`^[a-z][a-z0-9-]{2,63}$`; `admin`, `editor`, `support`, `owner`, `root` and
+`system` are reserved.
+
+**Safety rules** (`RolesService`, `UsersService`, `AuthService`):
+
+1. A caller grants only permissions they hold, and can't edit or delete a
+   role that holds more than they do (no escalation).
+2. Nobody edits or deletes their own role, or changes their own.
+3. Assigning a role (invite, `PATCH admin/users/:id {roleId}`) needs every
+   permission it holds — `GET admin/users/assignable-roles` lists exactly
+   those. Managing a user, or ending their session, needs a role that covers
+   theirs.
+4. The last usable (active) holder of the `admin` role can't be demoted,
+   disabled or deleted (`LAST_ADMIN`).
+5. A role still assigned can't be deleted (`ROLE_IN_USE`, with `userCount`).
+6. Role writes and user role changes are audited with the permission lists
+   before and after.
+
+The `admin` role can't be edited or deleted, and no system role can be
+deleted (`ROLE_IMMUTABLE`, always 409).
+
+`users.role` (the pre-024 enum) is still written — the system role's key,
+or NULL for a custom role — only so the previous image can run if a release
+is rolled back. Nothing reads it for access; a later migration (025) drops
+it.
 
 ### Staff accounts: status and lockout
 
-- `users.status` is `active`, `disabled` or `invited`. Only an admin changes
-  it (`PATCH admin/users/:id {status}`), except that accepting an invitation
+- `users.status` is `active`, `disabled` or `invited`. Only a `users.manage`
+  holder changes it (`PATCH admin/users/:id {status}`), except that accepting an invitation
   turns `invited` into `active`. Only an `active` account can sign in or hold
   a session. Disabling ends its sessions and deletes its outstanding
   invite/reset links. Forgot-password, reset and accept-invite never act on

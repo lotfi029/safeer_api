@@ -168,3 +168,17 @@ Production target: the VPS, Docker behind the edge Caddy, MySQL 8.4
 | B3 | `deploy/`: compose (`db`, `migrate` profile, `api`, `web`), env templates split per C7, Caddy staging/prod blocks (C8), `backup.sh` | `896d72f` | Local compose run: first-deploy order, `backup.sh`, restore into a scratch schema (41/41 `CHECKSUM TABLE` equal), retention; `caddy validate`, shellcheck |
 | §5 | `DEPLOYMENT-VPS.md`; Hostinger runbook marked superseded | `10036e8` | — |
 
+### Custom roles and permissions (PERM-0–5, v1.1.0)
+
+On branch `feat/custom-roles`. Spec: the permissions plan, Part A (A1–A4),
+with the review's revisions R1–R11 (expand-only 024, catalog actions from
+real routes, assignable-roles picker, key rules, ROLE_IMMUTABLE = 409).
+
+| Item | Fix | Commit | Test |
+|---|---|---|---|
+| PERM-0 | High production advisories: Nest 11.2.12 (multer 2.5.0), zod 4.6.7, body-parser 2.4.0, undici 8.13.1 | `0bc33fa` | `npm audit --omit=dev`: 0 high/critical; full suite |
+| PERM-1 | Migration 024: `roles`, `role_permissions`, system roles seeded 1:1 with the old matrix, `users.role_id` backfilled + FK; `users.role` kept (NULL-able) for the rollback window; GRANTs in both files; `Role`/`RolePermission` entities | `44714e1` | `migration-024.spec` (001–023 + fixtures → 024: backfill, seeds, kept column, FK), `schema:check` |
+| PERM-2 | Permission catalog `src/auth/permissions.ts`: modules × actions from the real routes, ar/en labels, `normalisePermissions`, `can`, `isSubset` | `062a37f` | unit `permissions.spec` |
+| PERM-3 | `@Permission` + `PermissionsGuard` replace `@Area`/`@Roles`/`RolesGuard`; CRUD factory `module`; `SessionGuard` loads permissions on non-public routes; preview-token `news.view`; `check-permissions` replaces `check-admin-roles` | `fcb184b` | `content-security.spec` (check-permissions), `permissions.spec` (every role × every group, news-only role) |
+| PERM-4 | `GET admin/permissions`, `admin/roles` CRUD, `GET admin/users/assignable-roles`; invite/PATCH take `roleId`; user `role` object; `admin/me.permissions`; safety rules 1–6; `ROLE_IN_USE`, `ROLE_IMMUTABLE`, `ROLE_KEY_TAKEN` | `6d85b40` | `roles.spec` (one block per rule, R9, R10, next-request), `staff-auth.spec`, `permissions.spec` |
+| PERM-5 | `smoke.mjs` news-only role case; API-CHANGES, ARCHITECTURE, KNOWN-ISSUES, DEPLOYMENT-VPS (upgrading to 024) | this commit | smoke 13/13 |

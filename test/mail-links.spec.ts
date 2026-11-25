@@ -3,7 +3,7 @@
 //   C2  every link is a locale-prefixed FRONTEND_BASE_URL page
 //   C16 names are letters only; contact_ack echoes nothing; typed text never autolinks
 
-import { adminApi, api, createTempUser, deleteTempUser, withDb } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, withDb, roleIdOf } from './helpers';
 import { withMailSink } from './smtp-sink';
 
 const FRONTEND = process.env.FRONTEND_BASE_URL ?? 'http://localhost:4200';
@@ -29,7 +29,7 @@ describe('mail links and content', () => {
   it('C2: invite and password-reset links point at /{locale}/admin/accept|reset/{token}', async () => {
     await withMailSink(async (sink) => {
       const email = `jest-invite-${Date.now()}@example.com`;
-      const invited = await adminApi('POST', '/admin/auth/invite', { body: { email, name: 'Invited Person', role: 'editor' } });
+      const invited = await adminApi('POST', '/admin/auth/invite', { body: { email, name: 'Invited Person', roleId: await roleIdOf('editor') } });
       expect(invited.status).toBe(201);
       try {
         const invite = await sink.waitFor((m) => m.to.includes(email));

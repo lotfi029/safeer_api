@@ -3,7 +3,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { CrudController } from '../common/crud/crud.factory.js';
 import { CacheService } from '../cache/cache.service.js';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import { OrgPosition } from '../database/entities/org-position.entity.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
@@ -13,7 +13,7 @@ import { CreateOrgPositionDto, UpdateOrgPositionDto, createOrgPositionSchema, up
 
 const BaseOrgPositionsController = CrudController<OrgPosition>({
   path: 'admin/org-positions',
-  deleteArea: 'content',
+  module: 'orgChart',
   entity: OrgPosition,
   createDto: createOrgPositionSchema,
   updateDto: updateOrgPositionSchema,
@@ -47,7 +47,6 @@ const GUARD_MESSAGES: Record<TreeGuardError, string> = {
  *    points at it (sub-positions, members) — not a bare foreign-key error.
  */
 @Controller('admin/org-positions')
-@Area('content')
 export class AdminOrgPositionsController extends BaseOrgPositionsController {
   constructor(
     @InjectRepository(OrgPosition) repo: Repository<OrgPosition>,
@@ -57,6 +56,7 @@ export class AdminOrgPositionsController extends BaseOrgPositionsController {
     super(repo, cache, dataSource);
   }
 
+  @Permission('orgChart.manage')
   @Post()
   override async create(@Body() dto: CreateOrgPositionDto, @Req() req: RequestContext): Promise<OrgPosition> {
     const saved = await this.dataSource.transaction(async (manager) => {
@@ -73,6 +73,7 @@ export class AdminOrgPositionsController extends BaseOrgPositionsController {
     return saved;
   }
 
+  @Permission('orgChart.manage')
   @Patch(':id')
   override async update(@Param('id') id: string, @Body() dto: UpdateOrgPositionDto, @Req() req: RequestContext): Promise<OrgPosition> {
     const { saved, before } = await this.dataSource.transaction(async (manager) => {
@@ -105,7 +106,7 @@ export class AdminOrgPositionsController extends BaseOrgPositionsController {
 
   // Overriding `remove` drops the kernel's decorators — both re-applied here
   // (crud.factory.ts, B0-4).
-  @Area('content')
+  @Permission('orgChart.delete')
   @Delete(':id')
   override async remove(@Param('id') id: string, @Req() req: RequestContext): Promise<{ deleted: true }> {
     const snapshot = await this.dataSource.transaction(async (manager) => {

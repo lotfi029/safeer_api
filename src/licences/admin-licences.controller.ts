@@ -3,7 +3,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { CrudController, assertAltTextReady } from '../common/crud/crud.factory.js';
 import { CacheService } from '../cache/cache.service.js';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import { Licence } from '../database/entities/licence.entity.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
@@ -12,7 +12,7 @@ import { CreateLicenceDto, PublishLicenceDto, UpdateLicenceDto, createLicenceSch
 
 const BaseLicencesController = CrudController<Licence>({
   path: 'admin/licences',
-  deleteArea: 'content',
+  module: 'licences',
   entity: Licence,
   createDto: createLicenceSchema,
   updateDto: updateLicenceSchema,
@@ -45,7 +45,6 @@ const BaseLicencesController = CrudController<Licence>({
  * table is empty.
  */
 @Controller('admin/licences')
-@Area('content')
 export class AdminLicencesController extends BaseLicencesController {
   constructor(
     @InjectRepository(Licence) repo: Repository<Licence>,
@@ -55,6 +54,7 @@ export class AdminLicencesController extends BaseLicencesController {
     super(repo, cache, dataSource);
   }
 
+  @Permission('licences.manage')
   @Post()
   override async create(@Body() dto: CreateLicenceDto, @Req() req: RequestContext): Promise<Licence> {
     await this.validateAsset(dto.assetId);
@@ -75,6 +75,7 @@ export class AdminLicencesController extends BaseLicencesController {
     return saved;
   }
 
+  @Permission('licences.manage')
   @Patch(':id')
   override async update(@Param('id') id: string, @Body() dto: UpdateLicenceDto, @Req() req: RequestContext): Promise<Licence> {
     await this.validateAsset(dto.assetId);
@@ -104,6 +105,7 @@ export class AdminLicencesController extends BaseLicencesController {
     return saved;
   }
 
+  @Permission('licences.manage')
   @Patch(':id/publish')
   override async publish(@Param('id') id: string, @Body() dto: PublishLicenceDto, @Req() req: RequestContext): Promise<Licence> {
     const isPublished = dto.isPublished ?? true;
@@ -122,6 +124,7 @@ export class AdminLicencesController extends BaseLicencesController {
   }
 
   /** Makes this licence the primary one; site_settings follows once it is published. */
+  @Permission('licences.manage')
   @Patch(':id/primary')
   async makePrimary(@Param('id') id: string, @Req() req: RequestContext): Promise<Licence> {
     const saved = await this.dataSource.transaction(async (manager) => {
@@ -147,7 +150,7 @@ export class AdminLicencesController extends BaseLicencesController {
 
   // Overriding `remove` drops the kernel's decorators — both re-applied here
   // (crud.factory.ts, B0-4).
-  @Area('content')
+  @Permission('licences.delete')
   @Delete(':id')
   override async remove(@Param('id') id: string, @Req() req: RequestContext): Promise<{ deleted: true }> {
     const snapshot = await this.dataSource.transaction(async (manager) => {

@@ -5,21 +5,16 @@
 - **No frontend.** This repository is the REST API only. The prototype at
   `docs/prototype/safeer-prototype.html` describes the intended UI; nothing
   here renders it.
-- **The Unifonic SMS driver hasn't been exercised against the live
-  provider** from this repository — only against its documented API shape.
-  Run `POST admin/sms/test` after configuring it (`DEPLOYMENT-HOSTINGER.md`,
-  "SMS provider").
-- **Backups are cron-scheduled scripts, not a managed service.**
-  `DEPLOYMENT-HOSTINGER.md` describes a `mysqldump` cron and
-  `npm run backup:storage` for `STORAGE_ROOT`. There is no restore tooling
-  and no point-in-time recovery. In S3 mode the buckets' durability is the
-  provider's job.
+- **Backups are a cron-scheduled script, not a managed service.**
+  `deploy/backup.sh` (`DEPLOYMENT-VPS.md` §6) dumps the database and tars
+  the storage volume nightly; restoring is the manual procedure in its
+  header. There is no point-in-time recovery. In S3 mode the buckets'
+  durability is the provider's job.
 - **`npm run seed` rewrites `002_seed.sql` / `dev/003_dev_sample.sql`,**
   which `npm run migrate` now treats as immutable once applied (a sha256 per
   file). A regenerated 002/003 that differs from what a database already ran
   fails that database's next migrate. Seed changes for existing databases
-  go in a new numbered migration; see `DEPLOYMENT-HOSTINGER.md`,
-  "Migrations".
+  go in a new numbered migration.
 - **No `@ApiOkResponse` schemas.** Every route's request DTO is fully typed
   in `openapi.json` (nestjs-zod generates those from the same zod schemas
   the `ZodValidationPipe` validates against), but no route declares an
@@ -38,10 +33,9 @@
   actually validating a request — it shows up as `npm run openapi`/
   `npm run openapi:check` crashing outright, with a stack trace that points
   into `zod`/`nestjs-zod` internals rather than at the offending DTO. The
-  one place that needed a real datetime value in this codebase
-  (`src/admin-applications/dto/interview-slot.dto.ts`, `startsAt`/`endsAt`)
-  uses `z.iso.datetime({ offset: true })` instead — a validated ISO 8601
-  string. TypeORM's mysql driver already parses a string the same as a
+  one place that needed a real datetime value (the interview-slot DTO,
+  removed with the scholarship feature in 021) used
+  `z.iso.datetime({ offset: true })` instead — a validated ISO 8601 string. TypeORM's mysql driver already parses a string the same as a
   `Date` instance when persisting a `datetime` column, so nothing downstream
   needs the value pre-converted to an actual `Date`. **If you add a new DTO
   field that needs a full date-and-time value, use
@@ -71,8 +65,8 @@
   cases. Safeer's own `002_seed.sql`/`migrations/dev/003_dev_sample.sql`
   seed **zero** users on purpose (`BootstrapService`'s own header comment
   says so directly) — the only account either one ever produces is the
-  bootstrap admin. `scripts/smoke.mjs`'s permission-matrix case creates its
-  own temporary editor/reviewer/support accounts by a direct row insert
+  bootstrap admin. `scripts/smoke.mjs`'s permission cases create their
+  own temporary editor/support/custom-role accounts by a direct row insert
   (hashing a known password with the same Argon2id `PasswordService` uses,
   since the invite-and-accept-token email flow has no way to hand a raw
   token back to an unattended script when mail is disabled by default). This
@@ -80,36 +74,41 @@
   for a different, real reason — the legacy-news bulk-delete smoke case
   needs `dev/003_dev_sample.sql`'s 3 "legacy template" posts to have
   anything to act on.
-- **Other locking transactions could deadlock the way `POST applications`
-  did (S1 follow-up).** These are not covered by the S1 fix:
-  - interview booking (`portal-interview.service.ts`)
-  - OTP issue and verify (`portal-otp.service.ts`)
-  - document upload and replace (`portal-documents.service.ts`)
-  - the portal application save (`portal-application.service.ts`)
-  - staff login and users (`auth.service.ts`, `users.service.ts`)
-  - the maintenance purge
-
-  They all take `FOR UPDATE` locks, and none is wrapped in
-  `withTransactionRetry` (`src/database/transaction-retry.ts`). None has
-  been seen deadlocking. Next step: a concurrent same-slot booking test.
-  If it deadlocks, fix the lock order first, as S1 did, and wrap the
-  transaction (never anything after its commit) in `withTransactionRetry`.
-- **`npm audit` leftovers after S3** (`npm audit fix`, no `--force`, 2026-10-09).
-  sharp is at 0.35.5 (the librsvg CVE). What remains, and why it stays:
-  - *Runtime (what the Docker image installs):* `js-yaml` 5.0–5.4 via
-    `@nestjs/swagger` (moderate, merge-key CPU use). The fix is a major
-    swagger bump (12.x). Swagger only *dumps* YAML, never parses input, and
-    is not mounted when `NODE_ENV=production`, so it isn't reachable. Revisit
-    with the swagger 12 upgrade.
-  - *Dev tooling only:* `braces` via `nodemon` → `chokidar` (high; the fix is
-    a nodemon downgrade to 1.x), `js-yaml`/`sprintf-js`/`argparse` via Jest's
-    istanbul chain (moderate). None of it is in the image's runtime stage
+- **Locking transactions have no deadlock retry.** Staff login and users
+  (`auth.service.ts`, `users.service.ts` — the admin set and the target are
+  locked together), roles (`roles.service.ts`) and the maintenance purge take
+  `FOR UPDATE` locks with no retry on error 1213. (`withTransactionRetry`,
+  added for the old applications flow, went with it in A2.) None has been
+  seen deadlocking. If one does, fix the lock order first, then add a retry
+  around the transaction only (never around anything after its commit).
+- **`npm audit` state** (PERM-0, 2026-11-25: Nest 11.2.12 with multer
+  2.5.0, zod 4.6.7, body-parser 2.4.0, undici 8.13.1, js-yaml 5.5.0 via
+  swagger).
+  - *Runtime (what the Docker image installs):*
+    `npm_config_include=prod npm audit --omit=dev` finds 0 vulnerabilities.
+  - *Dev tooling only:* `glob`/`minimatch` via `@nestjs/cli`, Jest and
+    `nodemon` (moderate, ReDoS on patterns we write ourselves). The fixes are
+    major bumps of those tools. None of it is in the image's runtime stage
     (the Dockerfile installs with `--omit=dev` and without this repo's
-    `.npmrc`). `concurrently` → `shell-quote` and `ts-jest` → `handlebars`
-    were fixed by `npm audit fix`.
-  - To audit what production installs, override the `.npmrc`:
-    `npm_config_include=prod npm audit --omit=dev`. `include=dev` wins over
-    `--omit=dev` otherwise.
+    `.npmrc`).
+  - A plain `npm audit --omit=dev` still lists the dev chain: this repo's
+    `.npmrc` sets `include=dev`, which wins over `--omit=dev`. Override it as
+    above to audit what production installs.
+
+- **`users.role` is a leftover column until migration 025** (PERM-1).
+  024 keeps the pre-roles enum, now NULL-able, and the app writes it on
+  every role assignment (the system role's key, or NULL for a custom role)
+  so the previous image can still run if v1.1.0 has to be rolled back. While
+  rolled back, that image can't invite anyone (it doesn't set `role_id`,
+  which is NOT NULL), and a role change it makes doesn't reach `role_id`;
+  users on a custom role (`role` NULL) are refused everywhere by it. Restore
+  the pre-deploy backup instead if any of that matters (`DEPLOYMENT-VPS.md`
+  §8, "Upgrading to v1.1.0"). 025 drops the column once the window closes.
+- **Permissions are re-read on every staff request** (PERM-3): `SessionGuard`
+  joins the role and its permissions into the session lookup it already
+  did, so a role edit applies at once with no cache to invalidate. That
+  costs two extra joins per staff request; the dashboard's traffic makes it
+  negligible.
 
 ## Resolved during this pass (noted for context)
 

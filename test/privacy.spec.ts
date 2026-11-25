@@ -5,7 +5,7 @@
 //   C27 newsletter double opt-in + signed unsubscribe; nightly retention
 
 import { issueNewsletterToken } from '../src/contact/newsletter-token.util';
-import { adminApi, api, createTempUser, deleteTempUser, withDb } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, withDb, roleIdOf } from './helpers';
 import { withMailSink } from './smtp-sink';
 
 const APP_KEY = process.env.TEST_APP_ENCRYPTION_KEY!;
@@ -78,7 +78,7 @@ describe('C23: labels in mail', () => {
       await withDb((conn) => conn.execute('DELETE FROM contact_messages WHERE email = ?', [email]));
 
       const invitee = `jest-c23-invite-${Date.now()}@example.com`;
-      expect((await adminApi('POST', '/admin/auth/invite', { body: { email: invitee, name: 'Invited Person', role: 'editor' } })).status).toBe(201);
+      expect((await adminApi('POST', '/admin/auth/invite', { body: { email: invitee, name: 'Invited Person', roleId: await roleIdOf('editor') } })).status).toBe(201);
       const invite = await sink.waitFor((m) => m.to.includes(invitee));
       expect(invite.text).toContain('محرر محتوى');
       expect(invite.text).not.toMatch(/\beditor\b/);

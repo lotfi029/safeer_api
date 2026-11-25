@@ -1,10 +1,12 @@
-import type { User, UserRole, UserStatus } from '../database/entities/user.entity.js';
+import type { User, UserStatus } from '../database/entities/user.entity.js';
+import { toRoleRef, type RoleRef } from '../roles/public-role.js';
 
 export interface PublicUser {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  /** PERM-4: was the role key string; now the role itself. */
+  role: RoleRef;
   /** C3: active | disabled | invited — only an admin changes it. */
   status: UserStatus;
   /** C12: true while a brute-force lock is running (`lockedUntil` in the future). */
@@ -16,13 +18,17 @@ export interface PublicUser {
   updatedAt: Date;
 }
 
-/** Never include passwordHash in an API response or an audit-log snapshot. */
+/**
+ * Never include passwordHash in an API response or an audit-log snapshot.
+ * `user.role` must be loaded (every user lookup that feeds this joins it).
+ */
 export function toPublicUser(user: User): PublicUser {
+  if (!user.role) throw new Error(`toPublicUser: role not loaded for user ${user.id}`);
   return {
     id: user.id,
     name: user.name,
     email: user.email,
-    role: user.role,
+    role: toRoleRef(user.role),
     status: user.status,
     isLocked: isBruteForceLocked(user),
     lockedUntil: user.lockedUntil,

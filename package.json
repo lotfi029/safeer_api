@@ -27,7 +27,7 @@
     "schema:log": "typeorm schema:log -d dist/database/data-source.js",
     "openapi": "node scripts/export-openapi.mjs",
     "openapi:check": "node scripts/check-openapi.mjs",
-    "check:admin-roles": "node scripts/check-admin-roles.mjs",
+    "check:permissions": "node scripts/check-permissions.mjs",
     "backup:storage": "node scripts/backup-storage.mjs",
     "media:reprocess": "node scripts/reprocess-media.mjs",
     "smoke": "node scripts/smoke.mjs",
@@ -36,10 +36,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",
     "@aws-sdk/s3-request-presigner": "^3.1141.0",
-    "@nestjs/common": "^11.2.3",
+    "@nestjs/common": "^11.2.12",
     "@nestjs/config": "^12.0.0",
-    "@nestjs/core": "^11.2.3",
-    "@nestjs/platform-express": "^11.2.3",
+    "@nestjs/core": "^11.2.12",
+    "@nestjs/platform-express": "^11.2.12",
     "@nestjs/schedule": "^12.0.1",
     "@nestjs/swagger": "^11.4.7",
     "@nestjs/throttler": "^6.5.0",
@@ -61,7 +61,7 @@
     "rxjs": "^7.8.1",
     "sharp": "^0.35.5",
     "typeorm": "^1.1.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
@@ -85,6 +85,6 @@
     "typescript": "^6.0.2"
   },
   "overrides": {
-    "multer": "^2.3.0"
+    "multer": "^2.5.0"
   }
 }

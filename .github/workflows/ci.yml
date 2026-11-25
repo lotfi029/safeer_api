@@ -177,10 +177,10 @@ jobs:
       # frontend API client depends on it.
       - run: npm run openapi:check
 
-      # B4/B5/B17 sweep: every admin/* route must be gated by its
-      # role-matrix area or be on the explicit allow-list — see
-      # scripts/lib/check-admin-roles.mjs.
-      - run: npm run check:admin-roles
+      # B4/B5/B17 sweep (PERM-3): every admin/* route must carry a catalog
+      # permission whose action matches its HTTP method, or be on the
+      # explicit allow-list — see scripts/lib/check-permissions.mjs.
+      - run: npm run check:permissions
 
       - name: Boot the API
         run: |

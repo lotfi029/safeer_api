@@ -1,6 +1,6 @@
 import { Body, Controller, Param, Patch, Post, Req } from '@nestjs/common';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import { BoardMember } from '../database/entities/board-member.entity.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
@@ -8,10 +8,9 @@ import type { RequestContext } from '../common/request-context.js';
 import { CreateBoardMemberDto, UpdateBoardMemberDto, createBoardMemberSchema, updateBoardMemberSchema } from './dto/board-member.dto.js';
 
 @Controller('admin/board')
-@Area('content')
 export class AdminBoardController extends CrudController<BoardMember>({
   path: 'admin/board',
-  deleteArea: 'content',
+  module: 'board',
   entity: BoardMember,
   createDto: createBoardMemberSchema,
   updateDto: updateBoardMemberSchema,
@@ -23,12 +22,14 @@ export class AdminBoardController extends CrudController<BoardMember>({
   label: (m) => m.nameAr,
 }) {
   // Overriding drops the kernel's route decorators — re-applied here (crud.factory.ts).
+  @Permission('board.manage')
   @Post()
   override async create(@Body() dto: CreateBoardMemberDto, @Req() req: RequestContext): Promise<BoardMember> {
     await this.validatePosition(dto.orgPositionId);
     return super.create(dto, req);
   }
 
+  @Permission('board.manage')
   @Patch(':id')
   override async update(@Param('id') id: string, @Body() dto: UpdateBoardMemberDto, @Req() req: RequestContext): Promise<BoardMember> {
     await this.validatePosition(dto.orgPositionId);

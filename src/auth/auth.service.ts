@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, type EntityManager } from 'typeorm';
 import { randomBytes } from 'node:crypto';
 import { LRUCache } from 'lru-cache';
-import { User, type UserRole } from '../database/entities/user.entity.js';
+import { User } from '../database/entities/user.entity.js';
+import { Role } from '../database/entities/role.entity.js';
 import { Session } from '../database/entities/session.entity.js';
 import { AuthToken, type AuthTokenPurpose } from '../database/entities/auth-token.entity.js';
 import { AuditLog } from '../database/entities/audit-log.entity.js';
@@ -17,9 +18,9 @@ import { UsersService } from '../users/users.service.js';
 import { isBruteForceLocked, toPublicUser, type PublicUser } from '../users/public-user.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
-import type { RequestContext } from '../common/request-context.js';
+import type { AuthenticatedUser, RequestContext } from '../common/request-context.js';
+import { can, isSubset } from './permissions.js';
 import { frontendUrl } from '../common/links/frontend-url.js';
-import { roleLabel } from '../common/labels.js';
 
 const LOGIN_ATTEMPT_LIMIT = 5;
 const LOGIN_ATTEMPT_WINDOW_MS = 60_000;
@@ -95,6 +96,7 @@ export class AuthService {
     const user = await this.userRepo
       .createQueryBuilder('u')
       .addSelect('u.passwordHash')
+      .innerJoinAndSelect('u.role', 'r')
       .where('u.email = :email', { email })
       .getOne();
 
@@ -191,15 +193,27 @@ export class AuthService {
       }));
   }
 
-  /** A user ends their own session; an admin may end any user's (FR-A-08). */
-  async endSession(actorId: string, actorRole: string, targetSessionId: string): Promise<void> {
-    const session = await this.sessionRepo.findOne({ where: { id: targetSessionId } });
+  /**
+   * A user ends their own session (FR-A-08). Ending someone else's needs
+   * `users.manage` and (PERM-3, no escalation) a role that covers the
+   * session owner's — a users manager can't sign an admin out.
+   */
+  async endSession(actor: AuthenticatedUser, targetSessionId: string): Promise<void> {
+    const session = await this.sessionRepo
+      .createQueryBuilder('s')
+      .innerJoinAndSelect('s.user', 'u')
+      .innerJoinAndSelect('u.role', 'r')
+      .leftJoinAndSelect('r.permissions', 'rp')
+      .where('s.id = :id', { id: targetSessionId })
+      .getOne();
     if (!session) throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Session not found');
-    if (session.userId !== actorId && actorRole !== 'admin') {
-      throw new ProblemException(403, ErrorCode.FORBIDDEN, 'You can only end your own sessions');
+    if (session.userId !== actor.id) {
+      const ownerPermissions = (session.user?.role?.permissions ?? []).map((p) => p.permission);
+      if (!can(actor.permissions, 'users.manage') || !isSubset(actor.permissions, ownerPermissions)) {
+        throw new ProblemException(403, ErrorCode.FORBIDDEN, 'You can only end your own sessions');
+      }
     }
-    session.revokedAt = new Date();
-    await this.sessionRepo.save(session);
+    await this.sessionRepo.update({ id: session.id }, { revokedAt: new Date() });
   }
 
   async endOtherSessions(userId: string, currentSessionId: string): Promise<number> {
@@ -242,7 +256,12 @@ export class AuthService {
   // Invitations
   // -------------------------------------------------------------------
 
-  async invite(inviter: PublicUser, email: string, name: string, role: UserRole): Promise<PublicUser> {
+  /**
+   * PERM-4 rule 3: the inviter must hold every permission of the role they
+   * hand out (403 otherwise; an unknown role id is a 400).
+   */
+  async invite(actor: AuthenticatedUser, inviter: PublicUser, email: string, name: string, roleId: string): Promise<PublicUser> {
+    const role = await this.usersService.assignableRole(actor, roleId);
     const user = await this.usersService.createInvitedUser(email, name, role);
 
     const rawToken = randomBytes(32).toString('base64url');
@@ -259,8 +278,8 @@ export class AuthService {
     await this.mailService.send({
       key: 'user_invite',
       to: user.email,
-      // C23: the template names the role — a label, in the mail's language.
-      vars: { name: user.name, inviter: inviter.name, role: roleLabel(role, 'ar'), link },
+      // C23: the template names the role — its Arabic name (the mail's language).
+      vars: { name: user.name, inviter: inviter.name, role: role.nameAr, link },
       locale: 'ar',
       entity: { type: 'users', id: user.id },
     });
@@ -387,6 +406,7 @@ export class AuthService {
         .where('u.id = :id', { id: authToken.userId })
         .getOne();
       if (!user || !allowedStatuses.includes(user.status)) throw invalid();
+      user.role = (await manager.findOneBy(Role, { id: user.roleId })) ?? undefined;
 
       authToken.usedAt = new Date();
       await manager.save(authToken);

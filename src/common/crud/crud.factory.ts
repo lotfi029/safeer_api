@@ -10,7 +10,8 @@ import { escapeLikeValue, readPageLimit, readString } from '../query/list-params
 import { ProblemException } from '../problem-details/problem.exception.js';
 import { ErrorCode } from '../problem-details/error-codes.js';
 import type { RequestContext } from '../request-context.js';
-import { Area } from '../../auth/role-matrix.js';
+import { Permission } from '../../auth/decorators/permission.decorator.js';
+import type { PermissionKey, PermissionModule } from '../../auth/permissions.js';
 
 /**
  * Deliberately `any`: zod's own `ZodType`/`ZodSchema` type defaults its
@@ -119,12 +120,12 @@ export interface CrudFactoryOptions<E extends { id: string }> {
   /** Adds `POST /reorder` (C4: a different HTTP method from `PATCH /:id`, never `PATCH /reorder` — see the comment above `reorderBodySchema`). */
   sortable?: boolean;
   /**
-   * B0-4/B17: the role-matrix area (src/auth/role-matrix.ts) whose roles
-   * may `DELETE /:id`. Required, so every collection states it: the
-   * collection's own area where its owners genuinely own deletion (e.g.
-   * `'content'`), or an admin-only `*.delete` area.
+   * PERM-3: the permission module (src/auth/permissions.ts) that gates every
+   * generated route — `<module>.view` on list/get, `.manage` on
+   * create/update/publish/reorder, `.delete` on remove. Required, so every
+   * collection states it.
    */
-  deleteArea: Area;
+  module: PermissionModule;
   /** Human label for the audit row. */
   label: (e: E) => string;
   /** Throws a PUBLISH_BLOCKED ProblemException when `e` isn't ready to publish. Runs on create, update and publish (C13). */
@@ -533,26 +534,32 @@ export function CrudController<E extends { id: string }>(opts: CrudFactoryOption
   ApiQuery({ name: 'limit', required: false, type: String })(GeneratedCrudController.prototype, 'list', listDescriptor);
   ApiQuery({ name: 'q', required: false, type: String })(GeneratedCrudController.prototype, 'list', listDescriptor);
   ApiQuery({ name: 'published', required: false, type: String })(GeneratedCrudController.prototype, 'list', listDescriptor);
+  // PERM-3: PermissionsGuard is opt-in (no @Permission metadata means any
+  // valid session passes), so every generated route carries its module's
+  // permission explicitly — view, manage or delete by HTTP method. Same trap
+  // as C4: a subclass that overrides one of these gets a *new* function
+  // object with no metadata on it and must re-apply `@Permission(...)`
+  // itself (scripts/lib/check-permissions.mjs fails CI if it doesn't).
+  const perm = (action: 'view' | 'manage' | 'delete') => Permission(`${opts.module}.${action}` as PermissionKey);
+  const descriptor = (name: string) => Object.getOwnPropertyDescriptor(GeneratedCrudController.prototype, name)!;
+  perm('view')(GeneratedCrudController.prototype, 'list', listDescriptor);
   Get()(GeneratedCrudController.prototype, 'list', listDescriptor);
-  Get(':id')(GeneratedCrudController.prototype, 'get', Object.getOwnPropertyDescriptor(GeneratedCrudController.prototype, 'get')!);
-  Post()(GeneratedCrudController.prototype, 'create', Object.getOwnPropertyDescriptor(GeneratedCrudController.prototype, 'create')!);
-  Patch(':id')(GeneratedCrudController.prototype, 'update', Object.getOwnPropertyDescriptor(GeneratedCrudController.prototype, 'update')!);
-
-  // B0-4: RolesGuard is opt-in (no @Roles metadata means any valid session
-  // passes), so `remove` needs it applied explicitly — without this, any
-  // editor could delete any row in every collection built on this kernel.
-  // Same trap as C4: a subclass that ever overrides `remove` gets a *new*
-  // function object with no metadata on it and must re-apply `@Roles(...)`
-  // itself.
-  const removeDescriptor = Object.getOwnPropertyDescriptor(GeneratedCrudController.prototype, 'remove')!;
-  Area(opts.deleteArea)(GeneratedCrudController.prototype, 'remove', removeDescriptor);
-  Delete(':id')(GeneratedCrudController.prototype, 'remove', removeDescriptor);
+  perm('view')(GeneratedCrudController.prototype, 'get', descriptor('get'));
+  Get(':id')(GeneratedCrudController.prototype, 'get', descriptor('get'));
+  perm('manage')(GeneratedCrudController.prototype, 'create', descriptor('create'));
+  Post()(GeneratedCrudController.prototype, 'create', descriptor('create'));
+  perm('manage')(GeneratedCrudController.prototype, 'update', descriptor('update'));
+  Patch(':id')(GeneratedCrudController.prototype, 'update', descriptor('update'));
+  perm('delete')(GeneratedCrudController.prototype, 'remove', descriptor('remove'));
+  Delete(':id')(GeneratedCrudController.prototype, 'remove', descriptor('remove'));
 
   if (opts.publishable) {
-    Patch(':id/publish')(GeneratedCrudController.prototype, 'publish', Object.getOwnPropertyDescriptor(GeneratedCrudController.prototype, 'publish')!);
+    perm('manage')(GeneratedCrudController.prototype, 'publish', descriptor('publish'));
+    Patch(':id/publish')(GeneratedCrudController.prototype, 'publish', descriptor('publish'));
   }
   if (opts.sortable) {
-    Post('reorder')(GeneratedCrudController.prototype, 'reorder', Object.getOwnPropertyDescriptor(GeneratedCrudController.prototype, 'reorder')!);
+    perm('manage')(GeneratedCrudController.prototype, 'reorder', descriptor('reorder'));
+    Post('reorder')(GeneratedCrudController.prototype, 'reorder', descriptor('reorder'));
   }
 
   return GeneratedCrudController;

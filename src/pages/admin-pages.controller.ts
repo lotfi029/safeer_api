@@ -1,7 +1,6 @@
 import { Controller } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Area } from '../auth/role-matrix.js';
 import { Page } from '../database/entities/page.entity.js';
 import { PageSection } from '../database/entities/page-section.entity.js';
 import { createPageSchema, updatePageSchema } from './dto/page.dto.js';
@@ -29,10 +28,9 @@ async function withSectionsCount(pages: Page[], dataSource: DataSource): Promise
  * reorderable one), so `sortable` is intentionally omitted.
  */
 @Controller('admin/pages')
-@Area('content')
 export class AdminPagesController extends CrudController<Page>({
   path: 'admin/pages',
-  deleteArea: 'content',
+  module: 'pages',
   entity: Page,
   createDto: createPageSchema,
   updateDto: updatePageSchema,

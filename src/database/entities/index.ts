@@ -1,4 +1,6 @@
 import { User } from './user.entity.js';
+import { Role } from './role.entity.js';
+import { RolePermission } from './role-permission.entity.js';
 import { Session } from './session.entity.js';
 import { AuthToken } from './auth-token.entity.js';
 import { AuditLog } from './audit-log.entity.js';
@@ -31,6 +33,8 @@ import { MessageReply } from './message-reply.entity.js';
 
 export {
   User,
+  Role,
+  RolePermission,
   Session,
   AuthToken,
   AuditLog,
@@ -68,6 +72,8 @@ export {
  */
 export const entities = [
   User,
+  Role,
+  RolePermission,
   Session,
   AuthToken,
   AuditLog,

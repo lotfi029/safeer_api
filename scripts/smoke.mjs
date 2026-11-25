@@ -133,13 +133,15 @@ async function withDb(fn) {
  * (001_schema.sql `fk_session_user ... ON DELETE CASCADE`).
  */
 async function createTempUser(role) {
+  // `role` is a role key (PERM-1); users.role, the legacy enum, holds it only for a system role.
+  const legacyRole = ['admin', 'editor', 'support'].includes(role) ? role : null;
   const password = 'Smoke-Test-P4ssword!';
   const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
   const email = `smoke-${role}-${Date.now()}@example.com`;
   const id = await withDb(async (conn) => {
     const [result] = await conn.execute(
-      "INSERT INTO users (name, email, password_hash, role, status, failed_logins) VALUES (?, ?, ?, ?, 'active', 0)",
-      [`Smoke ${role}`, email, passwordHash, role],
+      "INSERT INTO users (name, email, password_hash, role, role_id, status, failed_logins) VALUES (?, ?, ?, ?, (SELECT id FROM roles WHERE role_key = ?), 'active', 0)",
+      [`Smoke ${role}`, email, passwordHash, legacyRole, role],
     );
     return String(result.insertId);
   });
@@ -161,8 +163,9 @@ function test(name, fn) {
 }
 
 // ---------------------------------------------------------------------------
-// Permission matrix — editor owns content but not the inbox or settings;
-// support owns the inbox but not content; only admin sees the audit feed.
+// Permissions (PERM-3/4) — editor owns content but not the inbox or
+// settings; support owns the inbox but not content; only audit.view sees the
+// audit feed; a custom role reaches exactly its own modules.
 
 test('permissions: editor is refused admin/messages and admin/settings, support is refused admin/news and admin/licences', async () => {
   const editor = await createTempUser('editor');
@@ -187,9 +190,11 @@ test('permissions: editor is refused admin/messages and admin/settings, support 
     const supportOwn = await api('GET', '/admin/messages', { session: support });
     assert(supportOwn.status === 200, `support should be allowed into admin/messages, got ${supportOwn.status}`);
 
-    // The reviewer role is gone (021): an invite naming it is a 400.
+    // Roles are assigned by id (PERM-4): a role name, or an unknown id, is a 400.
     const reviewerInvite = await api('POST', '/admin/auth/invite', { body: { email: `smoke-reviewer-${Date.now()}@example.com`, name: 'Smoke Reviewer', role: 'reviewer' } });
-    assert(reviewerInvite.status === 400, `inviting a reviewer should be 400, got ${reviewerInvite.status}`);
+    assert(reviewerInvite.status === 400, `inviting with a role name should be 400, got ${reviewerInvite.status}`);
+    const unknownRole = await api('POST', '/admin/auth/invite', { body: { email: `smoke-unknown-${Date.now()}@example.com`, name: 'Smoke Unknown', roleId: '999999999' } });
+    assert(unknownRole.status === 400, `inviting with an unknown role id should be 400, got ${unknownRole.status}`);
 
     // B6: recentAuditLog is admin-only; the overview carries no application blocks.
     const overviewAsAdmin = await api('GET', '/admin/overview');
@@ -485,17 +490,46 @@ test('content: DELETE admin/news/legacy removes exactly the legacy-flagged rows'
   assert(second.body.deleted === 0, `a second call with nothing legacy left should report deleted: 0, got ${JSON.stringify(second.body)}`);
 });
 
-test('fix plan phases 4–6: role matrix, about items, unknown filters, readiness', async () => {
-  // B17: the matrix RolesGuard enforces, readable by any staff member.
+test('permissions: a custom "news only" role reaches news and nothing else', async () => {
+  // PERM-4: the catalog is open to any staff member; roles need roles.view.
+  const catalog = await api('GET', '/admin/permissions');
+  assert(catalog.status === 200 && catalog.body.groups?.length === 3, `GET admin/permissions: ${catalog.status} ${JSON.stringify(catalog.body)}`);
   const roles = await api('GET', '/admin/roles');
-  assert(roles.status === 200 && roles.body.matrix?.content?.includes('editor'), `GET admin/roles: ${roles.status} ${JSON.stringify(roles.body)}`);
-  const editor = await createTempUser('editor');
+  assert(
+    roles.status === 200 && roles.body.find((r) => r.key === 'admin')?.permissions?.[0] === '*',
+    `GET admin/roles: ${roles.status} ${JSON.stringify(roles.body)}`,
+  );
+
+  const key = `smoke-news-${Date.now().toString(36)}`;
+  const role = await api('POST', '/admin/roles', { body: { key, nameAr: 'أخبار فقط', nameEn: 'News only', permissions: ['news.delete'] } });
+  assert(role.status === 201, `creating a custom role: ${role.status} ${JSON.stringify(role.body)}`);
+  assert(
+    JSON.stringify(role.body.permissions) === JSON.stringify(['news.view', 'news.manage', 'news.delete']),
+    `news.delete should imply view and manage: ${JSON.stringify(role.body.permissions)}`,
+  );
+  const writer = await createTempUser(key);
   try {
-    const asEditor = await api('GET', '/admin/roles', { session: editor });
-    assert(asEditor.status === 200, `an editor could not read admin/roles: ${asEditor.status}`);
+    for (const path of ['/admin/news', '/admin/news-categories']) {
+      const res = await api('GET', path, { session: writer });
+      assert(res.status === 200, `the news-only role should reach ${path}, got ${res.status}`);
+    }
+    for (const path of ['/admin/pages', '/admin/media', '/admin/messages', '/admin/users', '/admin/roles', '/admin/settings', '/admin/audit']) {
+      const res = await api('GET', path, { session: writer });
+      assert(res.status === 403, `the news-only role should be refused ${path}, got ${res.status}`);
+    }
+    const me = await api('GET', '/admin/me', { session: writer });
+    assert(me.body.role?.key === key && me.body.permissions?.length === 3, `GET admin/me for the news-only role: ${JSON.stringify(me.body)}`);
+
+    const inUse = await api('DELETE', `/admin/roles/${role.body.id}`);
+    assert(inUse.status === 409 && inUse.body.code === 'ROLE_IN_USE', `deleting a role in use should be 409 ROLE_IN_USE, got ${inUse.status} ${inUse.body?.code}`);
   } finally {
-    await deleteTempUser(editor.id);
+    await deleteTempUser(writer.id);
   }
+  const removed = await api('DELETE', `/admin/roles/${role.body.id}`);
+  assert(removed.status === 200, `deleting the unused role: ${removed.status}`);
+});
+
+test('fix plan phases 4–6: about items, unknown filters, readiness', async () => {
 
   // B18 + C26: grouped, published, rendered.
   const items = await fetch(`${BASE}/about-items?kind=vision,goal`).then((r) => r.json());

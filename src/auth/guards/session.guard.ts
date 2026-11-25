@@ -62,7 +62,7 @@ export class SessionGuard implements CanActivate {
         // Never throws: a missing, expired, revoked or locked-account
         // session on a public route just means "treat this caller as
         // anonymous", not an error.
-        await this.resolveStaffSession(req, cookieValue);
+        await this.resolveStaffSession(req, cookieValue, false);
       }
       return true;
     }
@@ -71,7 +71,7 @@ export class SessionGuard implements CanActivate {
       throw new ProblemException(401, ErrorCode.UNAUTHENTICATED, 'Sign-in required');
     }
 
-    const resolved = await this.resolveStaffSession(req, cookieValue);
+    const resolved = await this.resolveStaffSession(req, cookieValue, true);
     if (!resolved) {
       throw new ProblemException(401, ErrorCode.UNAUTHENTICATED, 'Session expired or revoked');
     }
@@ -79,13 +79,23 @@ export class SessionGuard implements CanActivate {
     return true;
   }
 
-  /** Looks up `cookieValue`, and if it resolves to a live session, populates `req.user`/`sessionId`/`sessionTokenHash` and bumps `lastSeenAt`. Returns whether it resolved. */
-  private async resolveStaffSession(req: RequestContext, cookieValue: string): Promise<boolean> {
+  /**
+   * Looks up `cookieValue`, and if it resolves to a live session, populates
+   * `req.user`/`sessionId`/`sessionTokenHash` and bumps `lastSeenAt`.
+   * Returns whether it resolved. PERM-3: with `withPermissions` (every
+   * non-public route) the same query also joins the user's role and its
+   * permissions — one lookup, read fresh on every request, so a role edit
+   * applies on the next one. A public route skips that join (R5): nothing
+   * there is permission-gated.
+   */
+  private async resolveStaffSession(req: RequestContext, cookieValue: string, withPermissions: boolean): Promise<boolean> {
     const tokenHash = hashToken(cookieValue);
 
-    const row = await this.sessionRepo
-      .createQueryBuilder('s')
-      .innerJoinAndSelect('s.user', 'u')
+    const qb = this.sessionRepo.createQueryBuilder('s').innerJoinAndSelect('s.user', 'u');
+    if (withPermissions) {
+      qb.innerJoinAndSelect('u.role', 'r').leftJoinAndSelect('r.permissions', 'rp');
+    }
+    const row = await qb
       .where('s.token_hash = :tokenHash', { tokenHash })
       .andWhere('s.revoked_at IS NULL')
       .andWhere('s.expires_at > NOW()')
@@ -100,7 +110,11 @@ export class SessionGuard implements CanActivate {
       return false;
     }
 
-    req.user = { id: row.user.id, role: row.user.role };
+    req.user = {
+      id: row.user.id,
+      roleId: row.user.roleId,
+      permissions: new Set((row.user.role?.permissions ?? []).map((p) => p.permission)),
+    };
     req.sessionId = row.id;
     req.sessionTokenHash = tokenHash;
 

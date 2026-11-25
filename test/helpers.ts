@@ -88,16 +88,21 @@ export async function withDb<T>(fn: (conn: Connection) => Promise<T>): Promise<T
 }
 
 export type StaffRole = 'admin' | 'editor' | 'support';
+const SYSTEM_ROLES: readonly string[] = ['admin', 'editor', 'support'];
 
-/** A throwaway staff account, created by a direct row insert (see scripts/smoke.mjs's own long comment on why: no invite/accept token round-trip needed for a script's own fixture). */
-export async function createTempUser(role: StaffRole): Promise<Session & { id: string; email: string }> {
+/**
+ * A throwaway staff account, created by a direct row insert (see scripts/smoke.mjs's own long comment on why: no invite/accept token round-trip needed for a script's own fixture).
+ * `role` is a role key — a system role or a custom one (POST admin/roles).
+ */
+export async function createTempUser(role: StaffRole | (string & {})): Promise<Session & { id: string; email: string }> {
   const password = 'Jest-Test-P4ssword!';
   const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
   const email = `jest-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
+  const legacyRole = SYSTEM_ROLES.includes(role) ? role : null;
   const id = await withDb(async (conn) => {
     const [result] = await conn.execute(
-      "INSERT INTO users (name, email, password_hash, role, status, failed_logins) VALUES (?, ?, ?, ?, 'active', 0)",
-      [`Jest ${role}`, email, passwordHash, role],
+      "INSERT INTO users (name, email, password_hash, role, role_id, status, failed_logins) VALUES (?, ?, ?, ?, (SELECT id FROM roles WHERE role_key = ?), 'active', 0)",
+      [`Jest ${role}`, email, passwordHash, legacyRole, role],
     );
     return String((result as any).insertId);
   });
@@ -107,6 +112,13 @@ export async function createTempUser(role: StaffRole): Promise<Session & { id: s
 
 export async function deleteTempUser(id: string): Promise<void> {
   await withDb((conn) => conn.execute('DELETE FROM users WHERE id = ?', [id]));
+}
+
+/** A role's id by key, straight from the database. */
+export async function roleIdOf(key: string): Promise<string> {
+  const [rows]: any = await withDb((conn) => conn.execute('SELECT id FROM roles WHERE role_key = ?', [key]));
+  if (!rows[0]) throw new Error(`no role ${key}`);
+  return String(rows[0].id);
 }
 
 /** A minimal but genuinely valid PDF — real magic bytes, same as scripts/smoke.mjs's own tinyPdf(). */

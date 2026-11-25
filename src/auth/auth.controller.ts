@@ -10,7 +10,8 @@ import { AcceptInviteDto } from './dto/accept-invite.dto.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { Public } from './decorators/public.decorator.js';
-import { Area } from './role-matrix.js';
+import { Permission } from './decorators/permission.decorator.js';
+import { permissionList } from '../roles/public-role.js';
 import { computeCsrfToken } from './csrf.util.js';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
@@ -57,6 +58,8 @@ export class AuthController {
     const user = await this.usersService.findById(req.user!.id);
     return {
       ...toPublicUser(user),
+      // PERM-4: what the dashboard shows and hides by — `["*"]` for admin.
+      permissions: permissionList(user.role!),
       csrfToken: computeCsrfToken(this.env.APP_ENCRYPTION_KEY, req.sessionTokenHash!),
     };
   }
@@ -70,7 +73,7 @@ export class AuthController {
   @ApiCookieAuth()
   @Delete('auth/sessions/:id')
   async endSession(@Param('id') id: string, @Req() req: RequestContext) {
-    await this.authService.endSession(req.user!.id, req.user!.role, id);
+    await this.authService.endSession(req.user!, id);
     req.auditContext = { action: 'update', entityType: 'sessions', entityId: id, entityLabel: 'End session' };
     return { ok: true };
   }
@@ -93,12 +96,12 @@ export class AuthController {
     return { ok: true };
   }
 
-  @Area('users')
+  @Permission('users.manage')
   @ApiCookieAuth()
   @Post('auth/invite')
   async invite(@Body() dto: InviteDto, @Req() req: RequestContext) {
     const inviter = await this.usersService.findById(req.user!.id);
-    const created = await this.authService.invite(toPublicUser(inviter), dto.email, dto.name, dto.role);
+    const created = await this.authService.invite(req.user!, toPublicUser(inviter), dto.email, dto.name, dto.roleId);
     req.auditContext = { action: 'create', entityType: 'users', entityId: created.id, entityLabel: created.name, after: created };
     return created;
   }

@@ -6,24 +6,21 @@ import { Partner } from '../database/entities/partner.entity.js';
 import { Post } from '../database/entities/post.entity.js';
 import { Page } from '../database/entities/page.entity.js';
 import { MessagesService } from '../messages/messages.service.js';
-import type { UserRole } from '../database/entities/user.entity.js';
 import { User } from '../database/entities/user.entity.js';
-import { AREA_ROLES, type Area } from '../auth/role-matrix.js';
-
-const hasArea = (area: Area, role: UserRole): boolean => (AREA_ROLES[area] as readonly UserRole[]).includes(role);
+import { can } from '../auth/permissions.js';
 
 const RECENT_AUDIT_LIMIT = 20;
 
 /**
  * `GET admin/overview` (project plan "Admin overview"). Reachable by any
- * staff role — `AdminOverviewController` carries no `@Roles()` — but the
- * response shape itself narrows by `req.user.role`:
+ * staff member — `AdminOverviewController` carries no `@Permission()` — but
+ * the response shape itself narrows by the caller's permissions (PERM-3):
  * - messages-related blocks (the unread-messages stat card and sidebar
- *   badge) only for the inbox area's roles (admin, support — A5).
- * - B6/C20: `recentAuditLog` is admin-only, and never carries `diff` or IP
- *   hashes — every other role gets an empty array. `GET admin/audit` (the
- *   full log) is already admin-only, so the overview's own summary matches.
- * Content alerts are never role-filtered.
+ *   badge) only with `messages.view` (A5).
+ * - B6/C20: `recentAuditLog` only with `audit.view`, and never carries
+ *   `diff` or IP hashes — everyone else gets an empty array, matching
+ *   `GET admin/audit` (the full log), which needs the same permission.
+ * Content alerts are never filtered.
  *
  * The scholarship blocks (application stat cards, the 6-month series, the
  * latest applications and the applications badge) went with the
@@ -39,16 +36,15 @@ export class AdminOverviewService {
     private readonly messages: MessagesService,
   ) {}
 
-  async get(role: UserRole) {
-    // C20 + A5: each block only for the roles that own its area — the same
-    // matrix @Area() applies to the routes behind it. Message figures are
-    // the inbox area's (admin, support): editors don't see the inbox.
-    const includeMessages = hasArea('inbox', role);
+  async get(permissions: ReadonlySet<string>) {
+    // C20 + A5: each block only for callers holding the permission that
+    // opens the routes behind it.
+    const includeMessages = can(permissions, 'messages.view');
 
     const [messagesBlock, contentAlerts, recentAuditLog] = await Promise.all([
       includeMessages ? this.messages.countUnread() : null,
       this.contentAlerts(),
-      role === 'admin' ? this.recentAuditLog() : Promise.resolve([]),
+      can(permissions, 'audit.view') ? this.recentAuditLog() : Promise.resolve([]),
     ]);
 
     const statCards: Record<string, number> = {};

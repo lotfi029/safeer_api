@@ -9,6 +9,7 @@ import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { readString } from '../common/query/list-params.js';
 import { issuePreviewToken, PREVIEW_TOKEN_TTL_SECONDS, type PreviewCollection } from '../auth/preview-token.util.js';
 import { Post } from '../database/entities/post.entity.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 
 const PREVIEW_COLLECTIONS: readonly PreviewCollection[] = ['posts'];
 
@@ -18,10 +19,10 @@ function isPreviewCollection(value: string): value is PreviewCollection {
 
 /**
  * FR-G-05 equivalent: mints the token `news.controller.ts`'s public
- * `GET news/:slug` accepts as `?preview=` to show an unpublished row. No
- * `@Roles()` — any authenticated session can preview, same as the CRUD
- * kernel's own create/update, and the row lookup below already confines a
- * token to something that exists.
+ * `GET news/:slug` accepts as `?preview=` to show an unpublished row. Needs
+ * `news.view` (PERM-3): only someone who can already read the draft in the
+ * dashboard can mint a link to it. The row lookup below confines a token to
+ * something that exists.
  */
 @Controller('admin/preview-token')
 @ApiCookieAuth()
@@ -33,6 +34,7 @@ export class PreviewController {
 
   @ApiQuery({ name: 'collection', required: true, type: String, enum: PREVIEW_COLLECTIONS as unknown as string[] })
   @ApiQuery({ name: 'id', required: true, type: String })
+  @Permission('news.view')
   @Get()
   async issue(@Query() query: Record<string, unknown>): Promise<{ token: string; expiresInSeconds: number }> {
     const collection = readString(query, 'collection');

@@ -1,17 +1,17 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from 'typeorm';
+import { Role } from './role.entity.js';
 
-/**
- * Three roles: admin has full access; editor manages site content; support
- * handles messages/testimonials/newsletter. src/auth/role-matrix.ts is the
- * one source of truth for which routes each role reaches. (The fourth,
- * `reviewer`, went with the scholarship feature — migration 021.)
- */
 export type UserStatus = 'active' | 'disabled' | 'invited';
 
+/**
+ * The three system role keys — the values the legacy `users.role` column
+ * still holds (migration 024 keeps it for the rollback window; 025 drops it).
+ */
 export type UserRole = 'admin' | 'editor' | 'support';
 
 @Entity('users')
 @Unique('uq_users_email', ['email'])
+@Index('ix_users_role', ['roleId'])
 export class User {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: string;
@@ -34,8 +34,25 @@ export class User {
   @Column({ name: 'password_hash', type: 'varchar', length: 255, select: false })
   passwordHash: string;
 
-  @Column({ type: 'enum', enum: ['admin', 'editor', 'support'] as UserRole[], default: 'editor' })
-  role: UserRole;
+  /**
+   * PERM-1 (migration 024): the user's one role (src/auth/permissions.ts
+   * says what each permission opens).
+   */
+  @Column({ name: 'role_id', type: 'bigint', unsigned: true })
+  roleId: string;
+
+  @ManyToOne(() => Role, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'role_id', foreignKeyConstraintName: 'fk_users_role' })
+  role?: Role;
+
+  /**
+   * The pre-024 role enum, kept in step for the rollback window only (the
+   * previous image reads it): the system role's key, or NULL for a custom
+   * role. Nothing here reads it for access — PermissionsGuard uses the role
+   * above. Migration 025 drops it.
+   */
+  @Column({ name: 'role', type: 'enum', enum: ['admin', 'editor', 'support'] as UserRole[], nullable: true })
+  legacyRole: UserRole | null;
 
   /**
    * C3: the account's standing — set by an admin (`disabled`/`active`) or

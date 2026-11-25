@@ -1,71 +1,86 @@
-// test/permissions.spec.ts — Phase 7 (safeer-backend-fix-prompt.md), area 1.
+// test/permissions.spec.ts — the permission model (PERM-3/PERM-5; was the
+// Phase 7 role matrix, area 1).
 //
-// Generated from GET admin/roles (B17): for every role × every admin route
-// group, the expected answer comes from the live matrix, never from a copy
-// of it here. Each group names its area once; a read probe answers 200 or
-// 403, and a delete probe on an id that doesn't exist answers 404 (allowed,
-// nothing there) or 403 (refused before the lookup). A coverage check fails
-// if openapi.json gains an admin route group this file doesn't probe.
-// Also: the unauthenticated 401.
+// For every role × every admin route group, the expected answer comes from
+// the role's live permission set (GET admin/roles: the seeded system roles,
+// plus a custom "news only" role made through POST admin/roles), never from
+// a copy of it here. Each group names its
+// permission module once; a read probe answers 200 (or the route's own
+// status for a bad request) or 403, and a delete probe on an id that doesn't
+// exist answers 404 (allowed, nothing there) or 403 (refused before the
+// lookup). A coverage check fails if openapi.json gains an admin route group
+// this file doesn't probe. Also: the unauthenticated 401.
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { adminApi, api, createTempUser, deleteTempUser, type Session, type StaffRole } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, type Session } from './helpers';
 
 const MISSING_ID = '999999999';
 
 interface Probe {
-  area: string;
+  module: string;
   read: string;
-  /** The group's DELETE, with the area that gates it (often a stricter `*.delete` one). */
-  delete?: { path: string; area: string };
+  /** What an allowed read answers, when not 200 (the preview-token probe sends no query, so it's a 400). */
+  readOk?: number;
+  /** The group's DELETE (gated by `<module>.delete`). */
+  delete?: string;
 }
 
 const PROBES: Record<string, Probe> = {
-  'admin/pages': { area: 'content', read: '/admin/pages', delete: { path: `/admin/pages/${MISSING_ID}`, area: 'content' } },
-  'admin/page-sections': { area: 'content', read: '/admin/page-sections', delete: { path: `/admin/page-sections/${MISSING_ID}`, area: 'content' } },
-  'admin/news': { area: 'content', read: '/admin/news', delete: { path: `/admin/news/${MISSING_ID}`, area: 'content' } },
-  'admin/news-categories': { area: 'content', read: '/admin/news-categories', delete: { path: `/admin/news-categories/${MISSING_ID}`, area: 'content' } },
-  'admin/work-areas': { area: 'content', read: '/admin/work-areas', delete: { path: `/admin/work-areas/${MISSING_ID}`, area: 'content' } },
-  'admin/work-area-items': { area: 'content', read: '/admin/work-area-items', delete: { path: `/admin/work-area-items/${MISSING_ID}`, area: 'content' } },
-  'admin/board': { area: 'content', read: '/admin/board', delete: { path: `/admin/board/${MISSING_ID}`, area: 'content' } },
-  'admin/stats': { area: 'content', read: '/admin/stats', delete: { path: `/admin/stats/${MISSING_ID}`, area: 'content' } },
-  'admin/about-items': { area: 'content', read: '/admin/about-items', delete: { path: `/admin/about-items/${MISSING_ID}`, area: 'content' } },
-  'admin/partners': { area: 'content', read: '/admin/partners', delete: { path: `/admin/partners/${MISSING_ID}`, area: 'content' } },
-  'admin/doc-categories': { area: 'content', read: '/admin/doc-categories', delete: { path: `/admin/doc-categories/${MISSING_ID}`, area: 'content' } },
-  'admin/documents': { area: 'content', read: '/admin/documents', delete: { path: `/admin/documents/${MISSING_ID}`, area: 'content' } },
-  'admin/licences': { area: 'content', read: '/admin/licences', delete: { path: `/admin/licences/${MISSING_ID}`, area: 'content' } },
-  'admin/org-positions': { area: 'content', read: '/admin/org-positions', delete: { path: `/admin/org-positions/${MISSING_ID}`, area: 'content' } },
-  'admin/media': { area: 'content', read: '/admin/media', delete: { path: `/admin/media/${MISSING_ID}`, area: 'content' } },
-  'admin/redirects': { area: 'content', read: '/admin/redirects', delete: { path: `/admin/redirects/${MISSING_ID}`, area: 'redirects.delete' } },
+  'admin/pages': { module: 'pages', read: '/admin/pages', delete: `/admin/pages/${MISSING_ID}` },
+  'admin/page-sections': { module: 'pages', read: '/admin/page-sections', delete: `/admin/page-sections/${MISSING_ID}` },
+  'admin/news': { module: 'news', read: '/admin/news', delete: `/admin/news/${MISSING_ID}` },
+  'admin/news-categories': { module: 'news', read: '/admin/news-categories', delete: `/admin/news-categories/${MISSING_ID}` },
+  'admin/preview-token': { module: 'news', read: '/admin/preview-token', readOk: 400 },
+  'admin/work-areas': { module: 'workAreas', read: '/admin/work-areas', delete: `/admin/work-areas/${MISSING_ID}` },
+  'admin/work-area-items': { module: 'workAreas', read: '/admin/work-area-items', delete: `/admin/work-area-items/${MISSING_ID}` },
+  'admin/board': { module: 'board', read: '/admin/board', delete: `/admin/board/${MISSING_ID}` },
+  'admin/stats': { module: 'stats', read: '/admin/stats', delete: `/admin/stats/${MISSING_ID}` },
+  'admin/about-items': { module: 'aboutItems', read: '/admin/about-items', delete: `/admin/about-items/${MISSING_ID}` },
+  'admin/partners': { module: 'partners', read: '/admin/partners', delete: `/admin/partners/${MISSING_ID}` },
+  'admin/doc-categories': { module: 'documents', read: '/admin/doc-categories', delete: `/admin/doc-categories/${MISSING_ID}` },
+  'admin/documents': { module: 'documents', read: '/admin/documents', delete: `/admin/documents/${MISSING_ID}` },
+  'admin/licences': { module: 'licences', read: '/admin/licences', delete: `/admin/licences/${MISSING_ID}` },
+  'admin/org-positions': { module: 'orgChart', read: '/admin/org-positions', delete: `/admin/org-positions/${MISSING_ID}` },
+  'admin/media': { module: 'media', read: '/admin/media', delete: `/admin/media/${MISSING_ID}` },
+  'admin/redirects': { module: 'redirects', read: '/admin/redirects', delete: `/admin/redirects/${MISSING_ID}` },
 
-  'admin/messages': { area: 'inbox', read: '/admin/messages', delete: { path: `/admin/messages/${MISSING_ID}`, area: 'inbox.delete' } },
-  'admin/testimonials': { area: 'inbox', read: '/admin/testimonials', delete: { path: `/admin/testimonials/${MISSING_ID}`, area: 'inbox' } },
-  'admin/testimonial-themes': { area: 'inbox', read: '/admin/testimonial-themes', delete: { path: `/admin/testimonial-themes/${MISSING_ID}`, area: 'inbox' } },
-  'admin/newsletter': { area: 'inbox', read: '/admin/newsletter', delete: { path: `/admin/newsletter/${MISSING_ID}`, area: 'inbox' } },
+  'admin/messages': { module: 'messages', read: '/admin/messages', delete: `/admin/messages/${MISSING_ID}` },
+  'admin/testimonials': { module: 'testimonials', read: '/admin/testimonials', delete: `/admin/testimonials/${MISSING_ID}` },
+  'admin/testimonial-themes': { module: 'testimonials', read: '/admin/testimonial-themes', delete: `/admin/testimonial-themes/${MISSING_ID}` },
+  'admin/newsletter': { module: 'newsletter', read: '/admin/newsletter', delete: `/admin/newsletter/${MISSING_ID}` },
 
-  'admin/users': { area: 'users', read: '/admin/users', delete: { path: `/admin/users/${MISSING_ID}`, area: 'users' } },
-  'admin/settings': { area: 'settings', read: '/admin/settings' },
-  'admin/mail': { area: 'settings', read: '/admin/mail/settings' },
-  'admin/cache': { area: 'settings', read: '/admin/cache/stats' },
-  'admin/audit': { area: 'audit', read: '/admin/audit' },
+  'admin/users': { module: 'users', read: '/admin/users', delete: `/admin/users/${MISSING_ID}` },
+  'admin/roles': { module: 'roles', read: '/admin/roles', delete: `/admin/roles/${MISSING_ID}` },
+  'admin/settings': { module: 'settings', read: '/admin/settings' },
+  'admin/cache': { module: 'settings', read: '/admin/cache/stats' },
+  'admin/mail': { module: 'mail', read: '/admin/mail/settings' },
+  'admin/audit': { module: 'audit', read: '/admin/audit' },
 };
 
-/** Open to any signed-in staff member, with no area (scripts/lib/check-admin-roles.mjs's allow-list). */
-const ANY_STAFF = ['admin/me', 'admin/auth', 'admin/overview', 'admin/preview-token', 'admin/roles'];
+/** Open to any signed-in staff member, with no permission (scripts/lib/check-permissions.mjs's allow-list). */
+const ANY_STAFF = ['admin/me', 'admin/auth', 'admin/overview', 'admin/permissions'];
 
-const ROLES: StaffRole[] = ['admin', 'editor', 'support'];
+const NEWS_ONLY = 'jest-news-only';
+const NEWS_ONLY_PERMISSIONS = ['news.view', 'news.manage', 'news.delete'];
+const ROLES = ['admin', 'editor', 'support', NEWS_ONLY];
 
-describe('permissions matrix (generated from GET admin/roles)', () => {
-  const sessions = {} as Record<StaffRole, Session>;
+const can = (perms: string[], key: string) => perms.includes('*') || perms.includes(key);
+
+describe('permission model (generated from each role’s live permissions)', () => {
+  const sessions: Record<string, Session> = {};
+  const perms: Record<string, string[]> = {};
   const tempIds: string[] = [];
-  let matrix: Record<string, StaffRole[]>;
+  let newsOnlyRoleId: string;
 
   beforeAll(async () => {
+    const created = await adminApi('POST', '/admin/roles', { body: { key: NEWS_ONLY, nameAr: 'أخبار فقط', nameEn: 'News only', permissions: NEWS_ONLY_PERMISSIONS } });
+    expect(created.status).toBe(201);
+    newsOnlyRoleId = created.body.id;
     const roles = await adminApi('GET', '/admin/roles');
     expect(roles.status).toBe(200);
-    matrix = roles.body.matrix;
     for (const role of ROLES) {
+      perms[role] = roles.body.find((r: { key: string }) => r.key === role).permissions;
       const user = await createTempUser(role);
       tempIds.push(user.id);
       sessions[role] = user;
@@ -74,9 +89,10 @@ describe('permissions matrix (generated from GET admin/roles)', () => {
 
   afterAll(async () => {
     for (const id of tempIds) await deleteTempUser(id);
+    expect((await adminApi('DELETE', `/admin/roles/${newsOnlyRoleId}`)).status).toBe(200);
   });
 
-  it('probes every admin route group in openapi.json, each under an area the matrix knows', () => {
+  it('probes every admin route group in openapi.json', () => {
     const doc = JSON.parse(readFileSync(path.join(__dirname, '..', 'openapi.json'), 'utf8'));
     const groups = new Set<string>();
     for (const p of Object.keys(doc.paths)) {
@@ -85,36 +101,57 @@ describe('permissions matrix (generated from GET admin/roles)', () => {
     }
     const unprobed = [...groups].filter((g) => !PROBES[g] && !ANY_STAFF.includes(g));
     expect(unprobed).toEqual([]);
-    for (const probe of Object.values(PROBES)) {
-      expect(Object.keys(matrix)).toContain(probe.area);
-      if (probe.delete) expect(Object.keys(matrix)).toContain(probe.delete.area);
-    }
-    expect(Object.keys(matrix).sort()).toEqual(
-      [...new Set(Object.values(PROBES).flatMap((p) => [p.area, ...(p.delete ? [p.delete.area] : [])]))].sort(),
+  });
+
+  it('the seeded system roles keep what they could do before (editor: content; support: inbox; admin: *)', () => {
+    expect(perms.admin).toEqual(['*']);
+    expect(perms.editor).toContain('news.delete');
+    expect(perms.editor).not.toContain('redirects.delete');
+    expect(perms.editor.some((p) => /^(messages|testimonials|newsletter|users|roles|settings|mail|audit)\./.test(p))).toBe(false);
+    expect(perms.support.sort()).toEqual(
+      ['messages.view', 'messages.manage', 'testimonials.view', 'testimonials.manage', 'testimonials.delete', 'newsletter.view', 'newsletter.delete'].sort(),
     );
   });
 
   describe.each(ROLES)('%s', (role) => {
     it.each(Object.keys(PROBES))('%s — read', async (group) => {
       const probe = PROBES[group];
-      const allowed = matrix[probe.area].includes(role);
+      const allowed = can(perms[role], `${probe.module}.view`);
       const res = await api('GET', probe.read, { session: sessions[role] });
-      expect({ group, role, status: res.status }).toEqual({ group, role, status: allowed ? 200 : 403 });
+      expect({ group, role, status: res.status }).toEqual({ group, role, status: allowed ? (probe.readOk ?? 200) : 403 });
       if (!allowed) expect(res.body?.code).toBe('FORBIDDEN');
     });
 
     it.each(Object.keys(PROBES).filter((g) => PROBES[g].delete))('%s — delete', async (group) => {
-      const { path: deletePath, area } = PROBES[group].delete!;
-      const allowed = matrix[area].includes(role);
-      const res = await api('DELETE', deletePath, { session: sessions[role] });
+      const probe = PROBES[group];
+      const allowed = can(perms[role], `${probe.module}.delete`);
+      const res = await api('DELETE', probe.delete!, { session: sessions[role] });
       expect({ group, role, status: res.status }).toEqual({ group, role, status: allowed ? 404 : 403 });
     });
 
+    it('GET admin/me reports the role and its permissions', async () => {
+      const me = await api('GET', '/admin/me', { session: sessions[role] });
+      expect(me.body.role.key).toBe(role);
+      expect(me.body.permissions.slice().sort()).toEqual(perms[role].slice().sort());
+    });
+
     it('reaches every any-staff route', async () => {
-      for (const route of ['/admin/me', '/admin/overview', '/admin/roles', '/admin/auth/sessions']) {
+      for (const route of ['/admin/me', '/admin/overview', '/admin/auth/sessions', '/admin/permissions']) {
         expect({ route, status: (await api('GET', route, { session: sessions[role] })).status }).toEqual({ route, status: 200 });
       }
     });
+  });
+
+  it('a custom "news only" role reaches news and nothing else', async () => {
+    const allowed = Object.keys(PROBES).filter((g) => PROBES[g].module === 'news');
+    expect(allowed.sort()).toEqual(['admin/news', 'admin/news-categories', 'admin/preview-token']);
+    const session = sessions[NEWS_ONLY];
+    expect((await api('GET', '/admin/news', { session })).status).toBe(200);
+    expect((await api('GET', '/admin/news-categories', { session })).status).toBe(200);
+    for (const group of Object.keys(PROBES).filter((g) => !allowed.includes(g))) {
+      const res = await api('GET', PROBES[group].read, { session });
+      expect({ group, status: res.status }).toEqual({ group, status: 403 });
+    }
   });
 
   it('an unauthenticated request to any admin group is 401', async () => {

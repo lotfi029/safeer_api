@@ -1,6 +1,5 @@
 // test/low-items.spec.ts — Phase 5 of the fix plan:
 //   B10 admin pages carry sectionsCount (factory listEnrich hook)
-//   B17 GET admin/roles returns the matrix RolesGuard enforces
 //   B18 public GET about-items + the about sections (014)
 //   C30 parallel readiness probes never collide
 //   C33 idle sessions aren't listed; changePassword is throttled
@@ -43,32 +42,6 @@ describe('B10: admin pages list', () => {
     const searched = await adminApi('GET', '/admin/pages?q=about');
     expect(searched.body.data.map((p: any) => p.slug)).toEqual(['about']);
     expect(searched.body.data[0].sectionsCount).toBe(4);
-  });
-});
-
-describe('B17: GET admin/roles', () => {
-  const expected = {
-    roles: ['admin', 'editor', 'support'],
-    matrix: {
-      content: ['admin', 'editor'],
-      'redirects.delete': ['admin'],
-      inbox: ['admin', 'support'],
-      'inbox.delete': ['admin'],
-      users: ['admin'],
-      settings: ['admin'],
-      audit: ['admin'],
-    },
-  };
-
-  it('is served to any staff role, and to nobody signed out', async () => {
-    expect((await api('GET', '/admin/roles')).status).toBe(401);
-    expect((await adminApi('GET', '/admin/roles')).body).toEqual(expected);
-    const support = await createTempUser('support');
-    try {
-      expect((await api('GET', '/admin/roles', { session: support })).body).toEqual(expected);
-    } finally {
-      await deleteTempUser(support.id);
-    }
   });
 });
 

@@ -8,7 +8,7 @@ import { CacheService } from '../cache/cache.service.js';
 import { declarePurger } from '../cache/cache-tag-registry.js';
 import { readPageLimit } from '../common/query/list-params.js';
 import type { RequestContext } from '../common/request-context.js';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import { decodeUploadName } from '../common/http/filenames.js';
@@ -20,13 +20,12 @@ const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
 /**
- * B5 (safeer-backend-fr-review.md): the matrix gives media to admin/editor
- * only, but this hand-written controller (not CrudController-generated) had
- * no class-level `@Roles` at all — only `DELETE` was gated. Reviewer and
- * support accounts could list, upload and edit alt text on every asset.
+ * B5 (safeer-backend-fr-review.md): this hand-written controller (not
+ * CrudController-generated) once gated only `DELETE`, so any staff account
+ * could list, upload and edit alt text on every asset. Every handler now
+ * carries its own `media.*` permission (PERM-3).
  */
 @Controller('admin/media')
-@Area('content')
 @ApiCookieAuth()
 export class MediaController {
   constructor(
@@ -40,6 +39,7 @@ export class MediaController {
 
   @ApiQuery({ name: 'page', required: false, type: String })
   @ApiQuery({ name: 'limit', required: false, type: String })
+  @Permission('media.view')
   @Get()
   async list(@Query() query: Record<string, unknown>) {
     const { page, limit, offset, beyondMaxOffset } = readPageLimit(query, { defaultLimit: DEFAULT_LIMIT, maxLimit: MAX_LIMIT });
@@ -56,6 +56,7 @@ export class MediaController {
     return { data, total, page, limit };
   }
 
+  @Permission('media.manage')
   @Post()
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MULTIPART_BODY_LIMIT } }))
   async upload(
@@ -89,6 +90,7 @@ export class MediaController {
     return asset;
   }
 
+  @Permission('media.manage')
   @Patch(':id')
   async setAltText(@Param('id') id: string, @Body() dto: SetAltTextDto, @Req() req: RequestContext) {
     const asset = await this.mediaService.setAltText(id, dto.altAr, dto.altEn ?? null);
@@ -105,12 +107,10 @@ export class MediaController {
     return asset;
   }
 
-  // B8 (safeer-backend-fr-review.md): the matrix gives media deletion to
-  // admin+editor, same as every other content collection — no
-  // method-level override needed now that the class-level @Roles above
-  // (B5) already covers both. (Previously admin-only here; B0-4's
-  // reasoning for keeping list/upload/setAltText open to editors still
-  // holds and is unaffected — this only concerns DELETE.)
+  // B8 (safeer-backend-fr-review.md): media deletion follows the module's
+  // own `delete` permission, like every other content collection
+  // (editors hold it by default).
+  @Permission('media.delete')
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: RequestContext) {
     const asset = await this.mediaService.remove(id);

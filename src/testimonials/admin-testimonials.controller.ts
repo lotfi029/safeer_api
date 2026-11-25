@@ -1,6 +1,6 @@
 import { Body, Controller, Param, Patch, Req } from '@nestjs/common';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
 import { Testimonial } from '../database/entities/testimonial.entity.js';
 import {
@@ -12,7 +12,7 @@ import {
 
 const BaseAdminTestimonialsController = CrudController<Testimonial>({
   path: 'admin/testimonials',
-  deleteArea: 'inbox',
+  module: 'testimonials',
   entity: Testimonial,
   createDto: createTestimonialSchema,
   updateDto: updateTestimonialSchema,
@@ -26,8 +26,8 @@ const BaseAdminTestimonialsController = CrudController<Testimonial>({
 });
 
 @Controller('admin/testimonials')
-@Area('inbox')
 export class AdminTestimonialsController extends BaseAdminTestimonialsController {
+  @Permission('testimonials.manage')
   @Patch(':id/status')
   async setStatus(@Param('id') id: string, @Body() dto: SetTestimonialStatusDto, @Req() req: RequestContext): Promise<Testimonial> {
     const entity = await this.findOrNotFound(id);
@@ -43,6 +43,7 @@ export class AdminTestimonialsController extends BaseAdminTestimonialsController
     return saved;
   }
 
+  @Permission('testimonials.manage')
   @Patch(':id/feature')
   async setFeature(@Param('id') id: string, @Body() dto: SetTestimonialFeatureDto, @Req() req: RequestContext): Promise<Testimonial> {
     const entity = await this.findOrNotFound(id);

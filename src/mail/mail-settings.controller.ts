@@ -1,22 +1,23 @@
 import { Body, Controller, Get, Put, Post, Req } from '@nestjs/common';
 import { ApiCookieAuth } from '@nestjs/swagger';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
 import { MailSettingsService } from './mail-settings.service.js';
 import { UpdateMailSettingsDto, TestMailDto } from './dto/mail-settings.dto.js';
 
 /** Settings are association-wide, like site_settings — admin-only. */
 @Controller('admin/mail/settings')
-@Area('settings')
 @ApiCookieAuth()
 export class MailSettingsController {
   constructor(private readonly settingsService: MailSettingsService) {}
 
+  @Permission('mail.view')
   @Get()
   get() {
     return this.settingsService.get();
   }
 
+  @Permission('mail.manage')
   @Put()
   async update(@Body() dto: UpdateMailSettingsDto, @Req() req: RequestContext) {
     const { before, after } = await this.settingsService.update(dto, req.user!.id);
@@ -33,11 +34,11 @@ export class MailSettingsController {
 }
 
 @Controller('admin/mail')
-@Area('settings')
 @ApiCookieAuth()
 export class MailTestController {
   constructor(private readonly settingsService: MailSettingsService) {}
 
+  @Permission('mail.manage')
   @Post('test')
   test(@Body() dto: TestMailDto) {
     return this.settingsService.test(dto.to);
