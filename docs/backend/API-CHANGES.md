@@ -544,3 +544,18 @@ reached before, so existing users see no change.
 - `DELETE admin/cache` is `settings.delete`.
 - Role writes are audited as `entityType: "roles"`, and user updates now
   carry `permissions` in the audit row's before/after, next to `role`.
+
+## Create a user without an invitation (v1.2.0)
+
+- **New: `POST admin/users`** (`users.manage`), body
+  `{ email, name, roleId, password }` (password 8–200 characters, strict
+  body). Creates an **active** account with that password and sends **no
+  mail**; no invitation token is issued. Returns the public user (201), like
+  the invite. The owner's decision: admins may now set a staff member's first
+  password (this relaxes FR-A-09 for this route; the invite flow is
+  unchanged). The user can change it afterwards with
+  `PATCH admin/auth/password`.
+- Same rules as the invite: the role must be one the caller may assign
+  (`403 FORBIDDEN` otherwise, PERM-4 rule 3); an email already in use is
+  `409`. Audited as `create` on `users` (the password is never in the
+  response, the audit row or the logs).

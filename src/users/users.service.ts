@@ -16,8 +16,9 @@ import { toPublicUser, type PublicUser } from './public-user.js';
  * An unusable Argon2id-shaped hash. Real Argon2id verification against it
  * always fails (PasswordService.verify catches the parse error and returns
  * false) — this is not a security-by-obscurity placeholder, the account
- * genuinely cannot be signed into until /auth/accept/:token sets a real one
- * (FR-A-09: admins never type another user's password).
+ * genuinely cannot be signed into until /auth/accept/:token sets a real one.
+ * (An admin can instead create an active account with a password they set:
+ * `POST admin/users`, v1.2.0.)
  *
  * It is a marker, not a timing shield: its cost is m=1,t=1, far cheaper than
  * a real hash. Login's refusal paths verify against PasswordService's dummy
@@ -93,8 +94,16 @@ export class UsersService {
     return role;
   }
 
-  /** Row creation only — no password. Used by AuthService.invite() (FR-A-09: admins never type another user's password). `role` comes from assignableRole(). */
+  /** Row creation only — no password. Used by AuthService.invite(). `role` comes from assignableRole(). */
   async createInvitedUser(email: string, name: string, role: Role): Promise<User> {
+    return this.createUser(email, name, role, UNUSABLE_PASSWORD_HASH, 'invited');
+  }
+
+  /**
+   * A new account: `invited` (unusable password, completes through its invite
+   * link) or `active` with a password an admin set (`POST admin/users`).
+   */
+  async createUser(email: string, name: string, role: Role, passwordHash: string, status: 'invited' | 'active'): Promise<User> {
     const existing = await this.findByEmail(email);
     if (existing) {
       throw new ProblemException(409, ErrorCode.VALIDATION_FAILED, 'A user with that email already exists');
@@ -104,8 +113,8 @@ export class UsersService {
       name,
       roleId: role.id,
       legacyRole: legacyRoleFor(role),
-      passwordHash: UNUSABLE_PASSWORD_HASH,
-      status: 'invited',
+      passwordHash,
+      status,
       failedLogins: 0,
     });
     const saved = await this.userRepo.save(user);

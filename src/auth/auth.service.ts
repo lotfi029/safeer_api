@@ -288,6 +288,18 @@ export class AuthService {
   }
 
   /**
+   * `POST admin/users`: an active account with the password the admin typed,
+   * and no mail. The role must be one the caller may assign (PERM-4 rule 3),
+   * as for an invitation.
+   */
+  async createUser(actor: AuthenticatedUser, email: string, name: string, roleId: string, password: string): Promise<PublicUser> {
+    const role = await this.usersService.assignableRole(actor, roleId);
+    const passwordHash = await this.passwordService.hash(password);
+    const user = await this.usersService.createUser(email, name, role, passwordHash, 'active');
+    return toPublicUser(user);
+  }
+
+  /**
    * C3: only an account still `invited` can accept (a disabled one can't
    * reactivate itself through an old link). Accepting sets the password and
    * `status = 'active'` in the same transaction that spends the token.
