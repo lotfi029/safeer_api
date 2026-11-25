@@ -11,7 +11,7 @@
 // plus R9 (key rules), R10 (ROLE_IMMUTABLE is 409) and "a role edit applies
 // on the next request".
 
-import { adminApi, api, createTempUser, deleteTempUser, roleIdOf, withDb, type Session } from './helpers';
+import { adminApi, api, createTempUser, deleteTempUser, loginAs, roleIdOf, withDb, type Session } from './helpers';
 
 type TempUser = Session & { id: string; email: string };
 
@@ -213,6 +213,30 @@ describe('roles and permissions API (PERM-4)', () => {
       expect(ok.status).toBe(201);
       userIds.push(ok.body.id);
       expect(ok.body.role).toEqual({ id: writerRole.id, key: writerRole.key, nameAr: expect.any(String), nameEn: expect.any(String) });
+    });
+
+    it('creates an active user with an admin-set password, no mail, only with a covered role', async () => {
+      const email = `jest-new-${stamp()}@example.com`;
+      const password = `Pw-${stamp()}-long`;
+      const body = { email, name: 'Created Person', roleId: writerRole.id, password };
+      expect((await api('POST', '/admin/users', { session: manager, body: { ...body, roleId: await roleIdOf('editor') } })).status).toBe(403);
+      expect((await api('POST', '/admin/users', { session: manager, body: { ...body, password: 'short' } })).status).toBe(400);
+
+      const ok = await api('POST', '/admin/users', { session: manager, body });
+      expect(ok.status).toBe(201);
+      userIds.push(ok.body.id);
+      expect(ok.body).toMatchObject({ email, name: 'Created Person', status: 'active', role: { id: writerRole.id, key: writerRole.key } });
+      expect(JSON.stringify(ok.body)).not.toContain(password);
+      expect((await api('POST', '/admin/users', { session: manager, body })).status).toBe(409);
+
+      // No invitation token was issued, and the new user signs in with that password.
+      const [tokens]: any = await withDb((conn) => conn.execute('SELECT id FROM auth_tokens WHERE user_id = ?', [ok.body.id]));
+      expect(tokens).toHaveLength(0);
+      const session = await loginAs(email, password);
+      expect((await api('GET', '/admin/me', { session })).body.email).toBe(email);
+
+      const row = await auditRow('users', ok.body.id, 'create');
+      expect(JSON.stringify(row.diff)).not.toContain(password);
     });
 
     it("can't assign an uncovered role, nor manage a user whose role holds more than the caller", async () => {

@@ -8,8 +8,9 @@ import type { RequestContext } from '../common/request-context.js';
 import { toPublicUser } from './public-user.js';
 
 /**
- * No POST here — account creation is exclusively through /auth/invite
- * (FR-A-09: admins never type another user's password). PermissionsGuard is
+ * No POST here: accounts are created by `POST admin/auth/invite` (mail) or
+ * `POST admin/users` (admin-set password, no mail), both in AuthController
+ * because they need AuthService. PermissionsGuard is
  * registered globally (AuthModule); each handler's `@Permission('users.*')`
  * supplies the metadata it reads.
  */

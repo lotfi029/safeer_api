@@ -6,6 +6,7 @@ import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { InviteDto } from './dto/invite.dto.js';
+import { CreateUserDto } from './dto/create-user.dto.js';
 import { AcceptInviteDto } from './dto/accept-invite.dto.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
@@ -102,6 +103,20 @@ export class AuthController {
   async invite(@Body() dto: InviteDto, @Req() req: RequestContext) {
     const inviter = await this.usersService.findById(req.user!.id);
     const created = await this.authService.invite(req.user!, toPublicUser(inviter), dto.email, dto.name, dto.roleId);
+    req.auditContext = { action: 'create', entityType: 'users', entityId: created.id, entityLabel: created.name, after: created };
+    return created;
+  }
+
+  /**
+   * Creates an active staff account with a password the admin sets — no
+   * invitation mail. Lives here rather than in UsersController because it
+   * needs AuthService (hashing, the assignable-role check).
+   */
+  @Permission('users.manage')
+  @ApiCookieAuth()
+  @Post('users')
+  async createUser(@Body() dto: CreateUserDto, @Req() req: RequestContext) {
+    const created = await this.authService.createUser(req.user!, dto.email, dto.name, dto.roleId, dto.password);
     req.auditContext = { action: 'create', entityType: 'users', entityId: created.id, entityLabel: created.name, after: created };
     return created;
   }
