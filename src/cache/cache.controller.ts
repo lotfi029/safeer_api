@@ -1,6 +1,6 @@
 import { Controller, Delete, Get, Query, Req } from '@nestjs/common';
 import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import { asString } from '../common/query/list-params.js';
 import type { RequestContext } from '../common/request-context.js';
 import { CacheService } from './cache.service.js';
@@ -14,17 +14,18 @@ import { CacheService } from './cache.service.js';
  * other settings/operational surface (11-architecture.md §3).
  */
 @Controller('admin/cache')
-@Area('settings')
 @ApiCookieAuth()
 export class CacheController {
   constructor(private readonly cache: CacheService) {}
 
+  @Permission('settings.view')
   @Get('stats')
   stats() {
     return this.cache.stats();
   }
 
   @ApiQuery({ name: 'tag', required: false, type: String })
+  @Permission('settings.delete')
   @Delete()
   clear(@Query('tag') tagRaw: unknown, @Req() req: RequestContext) {
     // 30-backend-finishing-prompt.md §2.5 (task 5): `@Query('tag') tag:

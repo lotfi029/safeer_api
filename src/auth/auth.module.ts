@@ -11,10 +11,9 @@ import { MailModule } from '../mail/mail.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
-import { RolesController } from './roles.controller.js';
 import { PasswordService } from './password.service.js';
 import { SessionGuard } from './guards/session.guard.js';
-import { RolesGuard } from './guards/roles.guard.js';
+import { PermissionsGuard } from './guards/permissions.guard.js';
 import { CsrfGuard } from './guards/csrf.guard.js';
 import { BootstrapService } from './bootstrap.service.js';
 
@@ -25,7 +24,7 @@ import { BootstrapService } from './bootstrap.service.js';
     MailModule,
     UsersModule,
   ],
-  controllers: [AuthController, RolesController],
+  controllers: [AuthController],
   providers: [
     AuthService,
     PasswordService,
@@ -34,12 +33,12 @@ import { BootstrapService } from './bootstrap.service.js';
     // globally regardless of which module declares them, and this is the
     // module whose own imports (TypeOrmModule.forFeature, ConfigModule)
     // actually satisfy these guards' constructor dependencies. Order
-    // matters — Roles reads req.user and Csrf reads req.sessionTokenHash,
+    // matters — Permissions reads req.user and Csrf reads req.sessionTokenHash,
     // both written by Session, so Session must resolve first; AppModule
     // lists ThrottlerModule before AuthModule in its own imports so
     // ThrottlerGuard still runs before all three.
     { provide: APP_GUARD, useClass: SessionGuard },
-    { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },
   ],
   exports: [AuthService, PasswordService],

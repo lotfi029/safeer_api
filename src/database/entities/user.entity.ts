@@ -46,8 +46,10 @@ export class User {
   role?: Role;
 
   /**
-   * The pre-024 role enum, kept in step for the rollback window: the system
-   * role's key, or NULL for a custom role. Migration 025 drops it.
+   * The pre-024 role enum, kept in step for the rollback window only (the
+   * previous image reads it): the system role's key, or NULL for a custom
+   * role. Nothing here reads it for access — PermissionsGuard uses the role
+   * above. Migration 025 drops it.
    */
   @Column({ name: 'role', type: 'enum', enum: ['admin', 'editor', 'support'] as UserRole[], nullable: true })
   legacyRole: UserRole | null;

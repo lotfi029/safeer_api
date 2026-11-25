@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Param, Patch, Post as HttpPost, Req } from '@nestjs/common';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import { Post } from '../database/entities/post.entity.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
@@ -11,7 +11,7 @@ import { CreatePostDto, UpdatePostDto, createPostSchema, updatePostSchema } from
 
 const BaseAdminNewsController = CrudController<Post>({
   path: 'admin/news',
-  deleteArea: 'content',
+  module: 'news',
   entity: Post,
   createDto: createPostSchema,
   updateDto: updatePostSchema,
@@ -32,14 +32,15 @@ const BaseAdminNewsController = CrudController<Post>({
 });
 
 @Controller('admin/news')
-@Area('content')
 export class AdminNewsController extends BaseAdminNewsController {
+  @Permission('news.manage')
   @HttpPost()
   override async create(@Body() dto: CreatePostDto, @Req() req: RequestContext): Promise<Post> {
     const slug = await generateUniqueSlug(this.repo, dto.titleEn, dto.titleAr, `post-${Date.now()}`, RESERVED_POST_SLUGS);
     return super.create({ ...dto, slug, createdBy: req.user!.id } as unknown as CreatePostDto, req);
   }
 
+  @Permission('news.manage')
   @Patch(':id')
   override async update(@Param('id') id: string, @Body() dto: UpdatePostDto, @Req() req: RequestContext): Promise<Post> {
     if (dto.slug) {
@@ -61,6 +62,7 @@ export class AdminNewsController extends BaseAdminNewsController {
    * `DELETE /admin/news/legacy` request would match `:id` first with
    * `id: 'legacy'`, a 404, before ever reaching this handler.
    */
+  @Permission('news.delete')
   @Delete('legacy')
   async deleteLegacy(@Req() req: RequestContext): Promise<{ deleted: number }> {
     const legacyRows = await this.repo.find({ where: { isLegacy: true } });

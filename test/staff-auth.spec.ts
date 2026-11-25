@@ -304,7 +304,6 @@ describe('staff auth', () => {
       const editor = await createTempUser('editor');
       try {
         expect((await adminApi('PATCH', `/admin/users/${editor.id}`, { body: { role: 'reviewer' } })).status).toBe(400);
-        expect((await adminApi('GET', '/admin/roles')).body.roles).toEqual(['admin', 'editor', 'support']);
       } finally {
         await deleteTempUser(editor.id);
       }

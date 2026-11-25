@@ -1,5 +1,5 @@
 // test/content-security.spec.ts — Phase 3 of the fix plan, content:
-//   B4/B5 sweep: every admin/* route is role-gated (check-admin-roles in Jest)
+//   B4/B5 sweep: every admin/* route is permission-gated (check-permissions in Jest)
 //   C7  image originals re-encoded: no EXIF/GPS, orientation applied, post-rotation size;
 //       scripts/reprocess-media.mjs backfills older assets
 //   C10 stored URLs limited to safe schemes; redirects are site paths, no chains
@@ -49,8 +49,8 @@ async function uploadMedia(buffer: Buffer, filename: string, type: string) {
 }
 
 describe('content security', () => {
-  it('B4/B5/B17 sweep: every admin/* route is gated by its role-matrix area or explicitly allow-listed', () => {
-    const result = runScript('scripts/check-admin-roles.mjs', {
+  it('B4/B5/B17 sweep: every admin/* route is gated by a catalog permission matching its method, or explicitly allow-listed', () => {
+    const result = runScript('scripts/check-permissions.mjs', {
       ...process.env,
       DOTENV_CONFIG_PATH: '/dev/null',
       NODE_ENV: 'test',
@@ -61,7 +61,7 @@ describe('content security', () => {
       DB_PASSWORD: process.env.TEST_DB_PASSWORD ?? '',
       STORAGE_ROOT: STORAGE_ROOT,
     });
-    expect(result.output).toContain('Every admin/* route is gated by its role-matrix area or explicitly allow-listed.');
+    expect(result.output).toContain('Every admin/* route is gated by a catalog permission matching its method, or explicitly allow-listed.');
     expect(result.status).toBe(0);
   });
 

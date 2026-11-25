@@ -1,6 +1,5 @@
 import { Controller } from '@nestjs/common';
 import { CrudController } from '../common/crud/crud.factory.js';
-import { Area } from '../auth/role-matrix.js';
 import { PageSection } from '../database/entities/page-section.entity.js';
 import { createPageSectionSchema, updatePageSectionSchema } from './dto/page.dto.js';
 
@@ -12,10 +11,9 @@ import { createPageSectionSchema, updatePageSectionSchema } from './dto/page.dto
  * reorder drag-and-drop `POST reorder`.
  */
 @Controller('admin/page-sections')
-@Area('content')
 export class AdminPageSectionsController extends CrudController<PageSection>({
   path: 'admin/page-sections',
-  deleteArea: 'content',
+  module: 'pages',
   entity: PageSection,
   createDto: createPageSectionSchema,
   updateDto: updatePageSectionSchema,

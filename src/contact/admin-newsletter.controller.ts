@@ -3,7 +3,7 @@ import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { Response } from 'express';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import { readPageLimit, readString } from '../common/query/list-params.js';
 import { toCsvWithBom } from '../common/csv.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
@@ -23,7 +23,6 @@ const MAX_LIMIT = 100;
  * can't express.
  */
 @Controller('admin/newsletter')
-@Area('inbox')
 @ApiCookieAuth()
 export class AdminNewsletterController {
   constructor(@InjectRepository(NewsletterSubscriber) private readonly repo: Repository<NewsletterSubscriber>) {}
@@ -31,6 +30,7 @@ export class AdminNewsletterController {
   @ApiQuery({ name: 'status', required: false, enum: ['subscribed', 'pending', 'unsubscribed'] })
   @ApiQuery({ name: 'page', required: false, type: String })
   @ApiQuery({ name: 'limit', required: false, type: String })
+  @Permission('newsletter.view')
   @Get()
   async list(@Query() query: Record<string, unknown>): Promise<PagedResult<NewsletterSubscriber>> {
     const { page, limit, offset, beyondMaxOffset } = readPageLimit(query, { defaultLimit: DEFAULT_LIMIT, maxLimit: MAX_LIMIT });
@@ -47,6 +47,7 @@ export class AdminNewsletterController {
   }
 
   @ApiQuery({ name: 'status', required: false, enum: ['subscribed', 'pending', 'unsubscribed'] })
+  @Permission('newsletter.view')
   @Get('export.csv')
   async exportCsv(@Query() query: Record<string, unknown>, @Res() res: Response): Promise<void> {
     const rows = await this.buildFilteredQuery(readString(query, 'status')).getMany();
@@ -62,6 +63,7 @@ export class AdminNewsletterController {
     res.send(csv);
   }
 
+  @Permission('newsletter.delete')
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: RequestContext): Promise<{ deleted: true }> {
     const entity = await this.repo.findOne({ where: { id } });

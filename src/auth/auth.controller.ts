@@ -10,7 +10,7 @@ import { AcceptInviteDto } from './dto/accept-invite.dto.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { Public } from './decorators/public.decorator.js';
-import { Area } from './role-matrix.js';
+import { Permission } from './decorators/permission.decorator.js';
 import { computeCsrfToken } from './csrf.util.js';
 import { ENV } from '../config/env.tokens.js';
 import type { Env } from '../config/env.js';
@@ -70,7 +70,7 @@ export class AuthController {
   @ApiCookieAuth()
   @Delete('auth/sessions/:id')
   async endSession(@Param('id') id: string, @Req() req: RequestContext) {
-    await this.authService.endSession(req.user!.id, req.user!.role, id);
+    await this.authService.endSession(req.user!, id);
     req.auditContext = { action: 'update', entityType: 'sessions', entityId: id, entityLabel: 'End session' };
     return { ok: true };
   }
@@ -93,7 +93,7 @@ export class AuthController {
     return { ok: true };
   }
 
-  @Area('users')
+  @Permission('users.manage')
   @ApiCookieAuth()
   @Post('auth/invite')
   async invite(@Body() dto: InviteDto, @Req() req: RequestContext) {

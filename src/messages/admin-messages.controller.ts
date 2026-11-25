@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
 import type { ContactMessage } from '../database/entities/contact-message.entity.js';
 import type { Testimonial } from '../database/entities/testimonial.entity.js';
@@ -11,14 +11,11 @@ import type { PagedResult } from '../common/crud/crud.factory.js';
 /**
  * `admin/messages` — the contact inbox (project plan "Messages", hand-written
  * since `reply`/`convert-to-testimonial`/mark-read-on-view aren't
- * `CrudController`-shaped). `support` gets full access per the plan's
- * permission matrix; `DELETE` narrows to `admin` only, same
- * roles-tighten-on-delete convention as `submissions.controller.ts` (the
- * reference) and this app's own kernel default (`crud.factory.ts`'s
- * `deleteRoles`).
+ * `CrudController`-shaped). Gated on the `messages` module (PERM-3):
+ * the seeded `support` role holds view/manage; `messages.delete` stays
+ * admin-only in the seeded roles.
  */
 @Controller('admin/messages')
-@Area('inbox')
 @ApiCookieAuth()
 export class AdminMessagesController {
   constructor(private readonly messages: MessagesService) {}
@@ -26,11 +23,13 @@ export class AdminMessagesController {
   @ApiQuery({ name: 'status', required: false, enum: ['unread', 'read', 'archived'] })
   @ApiQuery({ name: 'page', required: false, type: String })
   @ApiQuery({ name: 'limit', required: false, type: String })
+  @Permission('messages.view')
   @Get()
   async list(@Query() query: Record<string, unknown>): Promise<PagedResult<MessageListItem> & { unreadCount: number }> {
     return this.messages.list(query);
   }
 
+  @Permission('messages.view')
   @Get(':id')
   async get(@Param('id') id: string): Promise<MessageDetail> {
     return this.messages.findWithReplies(id);
@@ -43,6 +42,7 @@ export class AdminMessagesController {
    * "wrote a reply" action, recorded against the new `message_replies` row
    * (a `create`), not the message it replied to.
    */
+  @Permission('messages.manage')
   @Post(':id/reply')
   async reply(@Param('id') id: string, @Body() dto: ReplyMessageDto, @Req() req: RequestContext): Promise<{ message: ContactMessage; reply: unknown }> {
     const { message, reply } = await this.messages.reply(id, dto.body, req.user!.id);
@@ -56,6 +56,7 @@ export class AdminMessagesController {
     return { message, reply };
   }
 
+  @Permission('messages.manage')
   @Patch(':id')
   async setStatus(@Param('id') id: string, @Body() dto: SetMessageStatusDto, @Req() req: RequestContext): Promise<ContactMessage> {
     const { before, after } = await this.messages.setStatus(id, dto.status);
@@ -70,6 +71,8 @@ export class AdminMessagesController {
     return after;
   }
 
+  // Writes a testimonial too, so it needs that module's manage as well.
+  @Permission('messages.manage', 'testimonials.manage')
   @Post(':id/convert-to-testimonial')
   async convertToTestimonial(@Param('id') id: string, @Body() dto: ConvertToTestimonialDto, @Req() req: RequestContext): Promise<Testimonial> {
     const saved = await this.messages.convertToTestimonial(id, dto);
@@ -84,14 +87,14 @@ export class AdminMessagesController {
   }
 
   /**
-   * Admin-only (see the class-level `@Roles` comment above). Audit snapshot
+   * `messages.delete` (admin-only in the seeded roles). Audit snapshot
    * carries no personal data — `entityLabel` is a content-free id string and
    * `before` only records `status`/`createdAt`, the same redaction
    * `submissions.controller.ts`'s `remove()` applies for the identical PDPL
    * reason: `audit_log` is append-only with no DELETE grant, so anything
    * recorded here outlives the deletion it's evidence of.
    */
-  @Area('inbox.delete')
+  @Permission('messages.delete')
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: RequestContext): Promise<{ deleted: true }> {
     const message = await this.messages.remove(id);

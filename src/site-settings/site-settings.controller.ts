@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { CacheService } from '../cache/cache.service.js';
 import { declarePurger } from '../cache/cache-tag-registry.js';
 import { SiteSettings } from '../database/entities/site-settings.entity.js';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import type { RequestContext } from '../common/request-context.js';
 import { UpdateSiteSettingsDto } from './dto/site-settings.dto.js';
 
@@ -15,8 +15,8 @@ const SINGLETON_ID = '1';
  * Singleton — `GET`/`PUT` only, no list, no delete, mirroring african_api's
  * site-settings module. `002_seed.sql` inserts the one row; this service
  * only ever UPDATEs it, never INSERTs. Settings are association-wide, so
- * admin-only (`@Area('settings')`), unlike the content collections editors
- * can also manage (Safeer infra change §1's permission matrix).
+ * gated on the `settings` module (admin-only among the system roles),
+ * unlike the content collections editors can also manage.
  *
  * `declarePurger('site_settings', 'home')` is registered here even though
  * no public route serves either tag yet — the `home`/`site` aggregates land
@@ -26,7 +26,6 @@ const SINGLETON_ID = '1';
  * saves having to remember to add it once those routes exist.
  */
 @Controller('admin/settings')
-@Area('settings')
 @ApiCookieAuth()
 export class SiteSettingsController {
   constructor(
@@ -36,11 +35,13 @@ export class SiteSettingsController {
     declarePurger('site_settings', 'home');
   }
 
+  @Permission('settings.view')
   @Get()
   async get(): Promise<SiteSettings> {
     return this.findSingleton();
   }
 
+  @Permission('settings.manage')
   @Put()
   async update(@Body() dto: UpdateSiteSettingsDto, @Req() req: RequestContext): Promise<SiteSettings> {
     const entity = await this.findSingleton();

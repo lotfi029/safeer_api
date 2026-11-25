@@ -1,5 +1,4 @@
 import type { Request } from 'express';
-import type { UserRole } from '../database/entities/user.entity.js';
 import type { AuditAction } from '../database/entities/audit-log.entity.js';
 
 export type Locale = 'ar' | 'en';
@@ -16,7 +15,14 @@ export interface AuditContext {
 
 export interface AuthenticatedUser {
   id: string;
-  role: UserRole;
+  roleId: string;
+  /**
+   * PERM-3: the role's permission keys (`*` for admin), loaded by
+   * SessionGuard on every staff (non-public) request — so a role edit
+   * applies on the next request. Empty on a `@Public()` route, where the
+   * session is only resolved best-effort and nothing is permission-gated.
+   */
+  permissions: ReadonlySet<string>;
 }
 
 /**

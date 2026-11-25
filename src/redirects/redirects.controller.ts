@@ -5,24 +5,22 @@ import { CreateRedirectDto, UpdateRedirectDto, createRedirectSchema, updateRedir
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
 import type { RequestContext } from '../common/request-context.js';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 
 /**
  * No `is_published` / `sort_order` columns (12-database.md) — plain CRUD
  * only, no publish/reorder routes.
  *
- * B4 (safeer-backend-fr-review.md): CrudController only ever applies
- * roles to its own generated `DELETE` (`deleteArea`, here the admin-only
- * `redirects.delete`) — read/create/update are open to any signed-in staff member
- * unless the subclass adds a class-level `@Roles` of its own, the same way
- * every other content controller (admin-news.controller.ts,
- * admin-partners.controller.ts, …) already does. Redirects were the one
- * collection that never did, so a support account could
- * redirect any public path to an arbitrary URL.
+ * B4 (safeer-backend-fr-review.md): redirects were once the one
+ * collection whose read/create/update were open to any signed-in staff
+ * member, so a support account could redirect any public path to an
+ * arbitrary URL. PERM-3: CrudController now gates every generated route on
+ * its module (`redirects.view/manage/delete`); `redirects.delete` stays
+ * admin-only in the seeded roles (it can break links already shared).
  */
 const BaseRedirectsController = CrudController<Redirect>({
   path: 'admin/redirects',
-  deleteArea: 'redirects.delete',
+  module: 'redirects',
   entity: Redirect,
   createDto: createRedirectSchema,
   updateDto: updateRedirectSchema,
@@ -35,14 +33,15 @@ const BaseRedirectsController = CrudController<Redirect>({
 });
 
 @Controller('admin/redirects')
-@Area('content')
 export class RedirectsController extends BaseRedirectsController {
+  @Permission('redirects.manage')
   @HttpPost()
   override async create(@Body() dto: CreateRedirectDto, @Req() req: RequestContext): Promise<Redirect> {
     await this.assertNoChain(null, dto.fromPath, dto.toPath);
     return super.create(dto, req);
   }
 
+  @Permission('redirects.manage')
   @Patch(':id')
   override async update(@Param('id') id: string, @Body() dto: UpdateRedirectDto, @Req() req: RequestContext): Promise<Redirect> {
     const current = await this.repo.findOne({ where: { id } });

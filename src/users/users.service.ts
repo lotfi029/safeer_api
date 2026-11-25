@@ -75,8 +75,7 @@ export class UsersService {
 
   /**
    * B1-9: how many *usable* admins would remain besides `excludeId` — a
-   * locked admin cannot sign in and cannot unlock anyone (unlock is
-   * @Roles('admin')), so it must not count as cover. The old `isLastAdmin`
+   * locked admin cannot sign in and cannot unlock anyone, so it must not count as cover. The old `isLastAdmin`
    * counted every admin regardless of lock state, which meant demoting or
    * deleting the sole *active* admin could still pass "not the last admin"
    * as long as a second, already-locked admin row existed.

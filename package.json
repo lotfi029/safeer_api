@@ -27,7 +27,7 @@
     "schema:log": "typeorm schema:log -d dist/database/data-source.js",
     "openapi": "node scripts/export-openapi.mjs",
     "openapi:check": "node scripts/check-openapi.mjs",
-    "check:admin-roles": "node scripts/check-admin-roles.mjs",
+    "check:permissions": "node scripts/check-permissions.mjs",
     "backup:storage": "node scripts/backup-storage.mjs",
     "media:reprocess": "node scripts/reprocess-media.mjs",
     "smoke": "node scripts/smoke.mjs",

@@ -17,7 +17,8 @@ import { UsersService } from '../users/users.service.js';
 import { isBruteForceLocked, toPublicUser, type PublicUser } from '../users/public-user.js';
 import { ProblemException } from '../common/problem-details/problem.exception.js';
 import { ErrorCode } from '../common/problem-details/error-codes.js';
-import type { RequestContext } from '../common/request-context.js';
+import type { AuthenticatedUser, RequestContext } from '../common/request-context.js';
+import { can, isSubset } from './permissions.js';
 import { frontendUrl } from '../common/links/frontend-url.js';
 import { roleLabel } from '../common/labels.js';
 
@@ -191,15 +192,27 @@ export class AuthService {
       }));
   }
 
-  /** A user ends their own session; an admin may end any user's (FR-A-08). */
-  async endSession(actorId: string, actorRole: string, targetSessionId: string): Promise<void> {
-    const session = await this.sessionRepo.findOne({ where: { id: targetSessionId } });
+  /**
+   * A user ends their own session (FR-A-08). Ending someone else's needs
+   * `users.manage` and (PERM-3, no escalation) a role that covers the
+   * session owner's — a users manager can't sign an admin out.
+   */
+  async endSession(actor: AuthenticatedUser, targetSessionId: string): Promise<void> {
+    const session = await this.sessionRepo
+      .createQueryBuilder('s')
+      .innerJoinAndSelect('s.user', 'u')
+      .innerJoinAndSelect('u.role', 'r')
+      .leftJoinAndSelect('r.permissions', 'rp')
+      .where('s.id = :id', { id: targetSessionId })
+      .getOne();
     if (!session) throw new ProblemException(404, ErrorCode.NOT_FOUND, 'Session not found');
-    if (session.userId !== actorId && actorRole !== 'admin') {
-      throw new ProblemException(403, ErrorCode.FORBIDDEN, 'You can only end your own sessions');
+    if (session.userId !== actor.id) {
+      const ownerPermissions = (session.user?.role?.permissions ?? []).map((p) => p.permission);
+      if (!can(actor.permissions, 'users.manage') || !isSubset(actor.permissions, ownerPermissions)) {
+        throw new ProblemException(403, ErrorCode.FORBIDDEN, 'You can only end your own sessions');
+      }
     }
-    session.revokedAt = new Date();
-    await this.sessionRepo.save(session);
+    await this.sessionRepo.update({ id: session.id }, { revokedAt: new Date() });
   }
 
   async endOtherSessions(userId: string, currentSessionId: string): Promise<number> {

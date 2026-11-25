@@ -3,7 +3,7 @@ import { ApiCookieAuth, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MailLog } from '../database/entities/mail-log.entity.js';
-import { Area } from '../auth/role-matrix.js';
+import { Permission } from '../auth/decorators/permission.decorator.js';
 import { readPageLimit, readString } from '../common/query/list-params.js';
 import type { RequestContext } from '../common/request-context.js';
 import { MailService } from './mail.service.js';
@@ -13,7 +13,6 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 @Controller('admin/mail/log')
-@Area('settings')
 @ApiCookieAuth()
 export class MailLogController {
   constructor(
@@ -25,6 +24,7 @@ export class MailLogController {
   @ApiQuery({ name: 'limit', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'template', required: false, type: String })
+  @Permission('mail.view')
   @Get()
   async list(@Query() query: Record<string, unknown>) {
     // H1: clamp the computed offset, not just the page number.
@@ -59,6 +59,7 @@ export class MailLogController {
     return { data: data.map(toPublicMailLog), total, page, limit };
   }
 
+  @Permission('mail.manage')
   @Post(':id/retry')
   async retry(@Param('id') id: string, @Req() req: RequestContext): Promise<PublicMailLog> {
     const row = await this.mailService.retryNow(id);

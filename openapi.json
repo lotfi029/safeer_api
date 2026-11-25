@@ -402,25 +402,6 @@
         ]
       }
     },
-    "/admin/roles": {
-      "get": {
-        "operationId": "RolesController_get",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "cookie": []
-          }
-        ],
-        "tags": [
-          "Roles"
-        ]
-      }
-    },
     "/admin/mail/settings": {
       "get": {
         "operationId": "MailSettingsController_get",

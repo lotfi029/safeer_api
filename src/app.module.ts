@@ -94,7 +94,7 @@ import { BackgroundWorkModule } from './common/background/background-work.module
   ],
   providers: [
     // Guards run before interceptors regardless of relative registration
-    // order (Nest's fixed pipeline). SessionGuard, RolesGuard and CsrfGuard
+    // order (Nest's fixed pipeline). SessionGuard, PermissionsGuard and CsrfGuard
     // are registered as APP_GUARD providers inside AuthModule instead of
     // here — see the comment there for why and for the ordering guarantee.
     // Phase 6: TestAwareThrottlerGuard delegates to this same ThrottlerGuard
