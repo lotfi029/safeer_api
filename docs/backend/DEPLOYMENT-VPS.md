@@ -397,6 +397,31 @@ After it:
   issuer, and mark the primary one (`PATCH admin/licences/:id/primary`) so
   the footer shows the licence number.
 
+### Upgrading to v1.1.0 (024: custom roles and permissions)
+
+024 adds `roles` and `role_permissions`, seeds `admin`, `editor` and
+`support` with exactly what each could do before, and gives every user a
+`role_id` from their old `role`. It is additive: `users.role` stays (a later
+025 drops it). Release order:
+
+1. `./deploy.sh migrate v1.1.0` (takes the backup first; keep that dump) —
+   it also grants `safeer_app` the two new tables from
+   `deploy/create-app-db-user.sql`.
+2. `./deploy.sh api v1.1.0`. Check: the admin sign-in, `GET /api/v1/admin/me`
+   shows `role` and `permissions: ["*"]`.
+3. Deploy the web release that reads `role` as an object and
+   `admin/me.permissions` (safeer_web pinned to API `v1.1.0`). Until it is
+   out, the old dashboard's users screen shows the role badly and can't
+   invite (it sends `role`, now a 400).
+4. In the dashboard: create the roles you need (System → Roles), then invite
+   people with them.
+
+**Rollback.** Code only: `./deploy.sh api <previous tag>` runs against the
+024 schema (it reads `users.role`, which v1.1.0 keeps in step), but while it
+runs it can't invite anyone, a role change it makes doesn't reach the new
+`role_id`, and users on a custom role are refused everywhere. For a clean
+state, use the "A migration ran" procedure below with the dump from step 1.
+
 ## 9. Rollback
 
 - **Code only** (no migration ran): `./deploy.sh api <previous tag>` (or

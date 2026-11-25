@@ -92,7 +92,7 @@ const SYSTEM_ROLES: readonly string[] = ['admin', 'editor', 'support'];
 
 /**
  * A throwaway staff account, created by a direct row insert (see scripts/smoke.mjs's own long comment on why: no invite/accept token round-trip needed for a script's own fixture).
- * `role` is a role key — a system role or one made with createTempRole().
+ * `role` is a role key — a system role or a custom one (POST admin/roles).
  */
 export async function createTempUser(role: StaffRole | (string & {})): Promise<Session & { id: string; email: string }> {
   const password = 'Jest-Test-P4ssword!';
@@ -114,34 +114,11 @@ export async function deleteTempUser(id: string): Promise<void> {
   await withDb((conn) => conn.execute('DELETE FROM users WHERE id = ?', [id]));
 }
 
-/** A throwaway custom role, inserted directly (permissions taken as given — normalise them yourself). Returns its id. */
-export async function createTempRole(key: string, permissions: string[]): Promise<string> {
-  return withDb(async (conn) => {
-    const [result] = await conn.execute('INSERT INTO roles (role_key, name_ar, name_en, is_system) VALUES (?, ?, ?, 0)', [key, `دور ${key}`, `Role ${key}`]);
-    const id = String((result as any).insertId);
-    for (const p of permissions) await conn.execute('INSERT INTO role_permissions (role_id, permission) VALUES (?, ?)', [id, p]);
-    return id;
-  });
-}
-
-/** Removes a role made by createTempRole() (its users must be gone first). */
-export async function deleteTempRole(id: string): Promise<void> {
-  await withDb((conn) => conn.execute('DELETE FROM roles WHERE id = ?', [id]));
-}
-
 /** A role's id by key, straight from the database. */
 export async function roleIdOf(key: string): Promise<string> {
   const [rows]: any = await withDb((conn) => conn.execute('SELECT id FROM roles WHERE role_key = ?', [key]));
   if (!rows[0]) throw new Error(`no role ${key}`);
   return String(rows[0].id);
-}
-
-/** A role's permission keys, straight from the database. */
-export async function rolePermissions(key: string): Promise<string[]> {
-  const [rows]: any = await withDb((conn) =>
-    conn.execute('SELECT p.permission FROM role_permissions p JOIN roles r ON r.id = p.role_id WHERE r.role_key = ?', [key]),
-  );
-  return rows.map((r: { permission: string }) => r.permission);
 }
 
 /** A minimal but genuinely valid PDF — real magic bytes, same as scripts/smoke.mjs's own tinyPdf(). */

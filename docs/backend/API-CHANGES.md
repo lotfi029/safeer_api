@@ -462,3 +462,85 @@ that sub-positions or members still point at is 409 `RESOURCE_IN_USE` with
 
 `admin/board` rows gain `orgPositionId` (nullable); an id that doesn't exist
 is 400 `VALIDATION_FAILED` with `field: "orgPositionId"`.
+
+## Custom roles and permissions (v1.1.0, branch `feat/custom-roles`, migration 024)
+
+Staff permissions move from three fixed roles to roles stored in the
+database, each a set of `<module>.<action>` keys (`ARCHITECTURE.md`, "Roles
+and permissions"). The three system roles are seeded with exactly what each
+reached before, so existing users see no change.
+
+### Breaking
+
+- **`GET admin/roles` changes shape and gate.** It was `{roles, matrix}` for
+  any staff member. It is now an array of roles, and it needs `roles.view`
+  (only `admin` by default):
+
+  ```ts
+  interface Role {
+    id: string; key: string; nameAr: string; nameEn: string | null;
+    descriptionAr: string | null; descriptionEn: string | null;
+    isSystem: boolean;
+    permissions: string[];   // catalog order; ["*"] for admin
+    userCount: number;
+    createdAt: string; updatedAt: string;
+  }
+  ```
+
+  For the invite and edit dialogs' role picker, use
+  `GET admin/users/assignable-roles` instead (below).
+- **The user `role` field is an object** in every user response (`GET
+  admin/users[/:id]`, `PATCH admin/users/:id`, `POST admin/auth/invite`,
+  `POST admin/auth/login`'s `user`, `GET admin/me`): it was `"admin" |
+  "editor" | "support"` and is now `{id, key, nameAr, nameEn}`.
+- **`POST admin/auth/invite` and `PATCH admin/users/:id` take `roleId`**
+  (a numeric string) in place of `role`. Sending `role` is a 400 (strict
+  body). An unknown `roleId` is 400 `VALIDATION_FAILED` (`errors[0].path:
+  "roleId"`).
+- **`GET admin/preview-token` needs `news.view`.** It was open to any staff
+  member.
+
+### New
+
+| Route | Permission | Body / result |
+|---|---|---|
+| `GET admin/permissions` | any staff | `{actions: ["view","manage","delete"], groups: [{key, labelAr, labelEn, modules: [{key, labelAr, labelEn, actions}]}]}` — the grid for the role editor; a module lists only the actions it has (`audit`: view; `mail`: view, manage; `newsletter`: view, delete) |
+| `GET admin/roles` | `roles.view` | `Role[]`, the system roles first |
+| `GET admin/roles/:id` | `roles.view` | `Role` |
+| `POST admin/roles` | `roles.manage` | `{key?, nameAr, nameEn?, descriptionAr?, descriptionEn?, permissions: string[]}` → 201 `Role`. A missing `key` is generated (`custom-<6 hex>`) |
+| `PATCH admin/roles/:id` | `roles.manage` | any of `nameAr, nameEn, descriptionAr, descriptionEn, permissions` → `Role`. `key` can't be changed |
+| `DELETE admin/roles/:id` | `roles.delete` | `{deleted: true}` |
+| `GET admin/users/assignable-roles` | `users.view` | `[{id, key, nameAr, nameEn}]` — the roles the caller may assign (every role whose permissions they hold) |
+
+- **`GET admin/me`** adds `permissions: string[]` (`["*"]` for admin). Show
+  a nav item for `<module>.view`, New/Edit/Publish/Reorder/Upload for
+  `.manage` and Delete for `.delete`; `*` means everything.
+- **Permissions on save** are closed under `delete ⇒ manage ⇒ view` (where
+  the module has them), deduplicated and returned in catalog order. Unknown
+  keys, `*`, and actions a module doesn't have are one 400 listing them.
+- **Role keys** match `^[a-z][a-z0-9-]{2,63}$`. `admin`, `editor`,
+  `support`, `owner`, `root` and `system` are reserved (400).
+
+### Errors
+
+| Status | Code | When |
+|---|---|---|
+| 403 | `FORBIDDEN` | the route's permission is missing; granting, or assigning a role with, permissions the caller doesn't hold; editing/deleting a role, or managing a user (or ending their session), whose permissions the caller doesn't hold; editing or deleting one's own role; changing one's own role |
+| 409 | `ROLE_IMMUTABLE` | editing or deleting the `admin` role; deleting `editor` or `support` |
+| 409 | `ROLE_IN_USE` | deleting a role still assigned; the body carries `userCount` |
+| 409 | `ROLE_KEY_TAKEN` | `POST admin/roles` with a key another role has |
+| 409 | `LAST_ADMIN` | unchanged, now keyed on the `admin` role |
+
+### Behaviour
+
+- A role edit applies on its users' **next request** — no re-login, no
+  forced sign-out.
+- `GET admin/overview`: message figures need `messages.view` (was: the inbox
+  roles), the audit feed needs `audit.view` (was: admin).
+- `DELETE admin/auth/sessions/:id` on another user's session needs
+  `users.manage` and a role that covers that user's (was: admin).
+- `POST admin/messages/:id/convert-to-testimonial` needs `messages.manage`
+  and `testimonials.manage`.
+- `DELETE admin/cache` is `settings.delete`.
+- Role writes are audited as `entityType: "roles"`, and user updates now
+  carry `permissions` in the audit row's before/after, next to `role`.
